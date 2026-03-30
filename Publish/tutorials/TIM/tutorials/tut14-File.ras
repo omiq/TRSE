@@ -1,0 +1,46 @@
+program Tutorial1;
+@use "system/z80cpm"
+@use "system/system"
+@use "system/file"
+
+@addemulatorparam "-nothrottle"
+var
+	// type used for files
+	TextFile: File::Handle;
+	
+	ch: byte;
+	
+	// buffer for reading a line of text from file
+	buffer: array[256] of byte;
+
+begin
+	Z80CPM::Startup();
+	
+	System::SetScreenPos(0);
+	System::CursorOff();
+	
+	// open a file for reading
+	// all files from copy_to_img directory are just copied to floppy IMG
+	TextFile.Open("message.txt", File::ModeRead);
+
+	// loop that reads from file byte by byte
+	while TextFile.FilePos <> File::EOF do begin
+		// read one byte/char
+		ch := TextFile.ReadByte();
+		// print char to screen
+		Z80CPM::PutChar(ch);
+		// read just first line, exit when LF is encountered
+		if ch = ASCII::LF then break;
+	end;
+	
+	// read second text line into a buffer, stop reading when LF is encountered
+	TextFile.ReadUntil(#buffer, ASCII::LF);
+	// print string
+	Z80CPM::PutString(#buffer);
+	
+	// close the file
+	TextFile.Close();
+
+	System::CursorOn();
+	Z80CPM::Exit();
+end.

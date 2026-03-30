@@ -4,13 +4,16 @@
 #include <QString>
 #include <QFile>
 #include "source/LeLib/util/cinifile.h"
-#include <QMap>
+#include <QHash>
 //#include "source/OrgAsm/orgasm.h"
 #include <QElapsedTimer>
+#include "source/Compiler/token.h"
 
 class Orgasm;
 
 class SymbolTable;
+
+class Assembler;
 
 class SystemLabel {
 public:
@@ -42,18 +45,28 @@ public:
     }
     QStringList m_registers;
     AbstractSystem(AbstractSystem* a);
-    QMap<QString, QString> m_systemParams;
+    static QHash<QString, QString> m_systemParams;
     // Base types allowed for the current system
-    QStringList m_allowedBaseTypes = QStringList() <<"BYTE"<<"ADDRESS"<<"INTEGER"<<"POINTER"<<"ARRAY"<<"BOOLEAN";
+    QStringList m_allowedBaseTypes = QStringList() <<"BYTE"<<"ADDRESS"<<"INTEGER"<<"POINTER"<<"ARRAY"<<"BOOLEAN"<<"STRING";
     QStringList m_renameVariables; // Disallowed variables for a given system - will be replaced with a prefix
     QString m_renamedVariablePrefix = "varPrefixed_";
     QElapsedTimer timer;
     QString m_orgOutput;
+    QString m_alternateMethods="";
     bool m_ignoreSys = false;
     bool m_stripPrg = false;
     bool m_canRunAsmFiles = false;
+    bool m_supportsInclusiveFor = true;
+    bool m_useOctals = false;
 
-    QMap<int,int> m_addresses;
+
+    QStringList ApplyDefaultMameParams();
+
+
+    virtual TokenType::Type getSystemPointerArrayType() {
+        return TokenType::POINTER;
+    }
+    QHash<int,int> m_addresses;
     bool m_hasVariableColorPalette = false;
     bool m_supportsExomizer = false;
     bool m_allowClasses = false;
@@ -62,6 +75,7 @@ public:
     QSharedPointer<CIniFile> m_projectIni, m_settingsIni;
     int m_startAddress = 0x800;
     int m_programStartAddress = m_startAddress+10;
+    int m_ramAddress = 0;
 //    bool m_hasSysHeader = true;
 
 //    virtual void getEmulatorAndParams(QString emulator, QStringList params) = 0;
@@ -70,23 +84,37 @@ public:
         return CompressLZ4(fileName, fileName +"_c");
     }
     QString CompressLZ4(QString fileName, QString outFileName);
+    QString CompressZX0(QString fileName) {
+        return CompressZX0(fileName, fileName +"_c");
+    }
+    QString CompressZX0(QString fileName, QString outFileName);
 
 
     virtual QString getArkosTrackerSystemString() {return "";}
-    virtual void InitSystemPreprocessors(QMap<QString, QString>& defines)  {};
+    virtual void InitSystemPreprocessors(QHash<QString, QString>& defines)  {};
     virtual QString CompressFile(QString fileName) {
         return fileName;
     }
-    Orgasm* m_orgAsm = nullptr;
+    virtual QStringList CompressData(QStringList& inData, QString& string) {
+        return QStringList();
+    }
+    QSharedPointer<Orgasm> m_orgAsm = nullptr;
 
+    virtual QString getCPUFlavor() {
+        return "";
+    }
     int m_memoryType = 0;
     QVector<SystemLabel> m_labels;
     int m_memorySize = 65536;
-    static QMap<SystemLabel::Type, QColor> m_labelColors;
+    static QHash<SystemLabel::Type, QColor> m_labelColors;
     QColor m_systemColor = QColor(64,64,128);
 
     QStringList m_allowedGlobalTypeFlags;
     QStringList m_allowedProcedureTypeFlags;
+
+    bool m_requireEmulatorWorkingDirectory = false;
+    bool m_isBigEndian = false;
+    bool m_usesRom = false;
 
     virtual bool is8bit() {
         return true;
@@ -95,72 +123,119 @@ public:
     virtual bool isCommodoreSystem()  {return false;}
     virtual int getDefaultBasicAddress() { return 0;}
 
+    virtual bool is186() { return false;}
     virtual bool is486() { return false;}
     virtual bool is386() { return false;}
     virtual bool is286() { return false;}
     virtual bool is8088() { return false;}
+    virtual bool is6809() { return false;}
     virtual int getPointerSize() {
-        return 16;
+        return 2;
     }
+    virtual TokenType::Type getPointerType() { return TokenType::Type::INTEGER;}
 
     virtual bool AllowPointerInStructs() {return true;}
+
+    virtual void PrepareInitialAssembler(Assembler* as) {}
 
 
     void StartProcess(QString file, QStringList params, QString& output, bool standardOutput = false, QString currentDir = "");
 
+    virtual void ExtraEmulatorCommands() {}
+
     static void InitLabelColors();
  //   virtual bool hasFixedProgramAddress() {return true;}
 
-    enum System {C64, VIC20, PET, NES, C128, BBCM, AMIGA, PLUS4, OK64, X16,X86, GAMEBOY, SPECTRUM, TIKI100, ATARI2600, ATARI520ST, AMSTRADCPC, COLECO, MEGA65, ATARI800, MSX, APPLEII};
-    enum Processor {MOS6502, M68000,PX86, GBZ80, Z80};
+    enum System {C64, VIC20, PET, NES, C128, BBCM, AMIGA, PLUS4,
+        OK64, X16,X86, GAMEBOY, SPECTRUM, TIKI100, ATARI2600,
+        ATARI520ST, AMSTRADCPC, COLECO, MEGA65, ATARI800,
+        MSX, APPLEII, M1ARM, ORIC, SNES, CUSTOM, VZ200,
+        ACORN, JDH8, POKEMONMINI, TRS80, TRS80COCO, WONDERSWAN,
+                  TIM, TVC, VECTREX, THOMSON, CHIP8, PCW, SCHIP, XO_CHIP, CHIP8X, BK0010, DRAGON, FOENIX, AGON, PRIMO};
+    enum Processor {MOS6502, M68000,PX86, GBZ80, Z80, ARM, WDC65C816,
+        WDC65C02, PJDH8, S1C88, M6809, Z180, PCHIP8,PDP11};
 
-    static QString StringFromProcessor(Processor s) {
-        if (s == MOS6502) return "MOS6502";
-        if (s == M68000) return "M68000";
-        if (s == PX86) return "PX86";
-        if (s == GBZ80) return "GBZ80";
-        if (s == Z80) return "Z80";
-        qDebug() << "SYSTEM CPU NOT FOUND for system "<<s;
-        return "";
+    static QString StringFromProcessor(Processor s);
+    static Processor ProcessorFromString(QString s);
+    virtual bool CL65Syntax() {return false;}
+    static QString StringFromProcessor(QString s);
+
+
+    virtual int addressBusBits() {
+        return 16;
     }
 
-    static QString StringFromProcessor(QString s) {
-        if (s == "PET" || s == "C64" || s == "ATARI2600" ||s == "VIC20" || s == "NES" || s == "OK64" || s == "C128" || s == "PLUS4" || s == "X16" || s == "MEGA65" || s == "BBCM" || s=="ATARI800"|| s=="APPLEII") return "MOS6502";
-        if (s == "AMIGA" || s == "ATARI520ST") return "M68000";
-        if (s == "X86") return "PX86";
-        if (s == "GAMEBOY") return "GBZ80";
-        if (s == "AMSTRADCPC" || s == "TIKI100" || s == "SPECTRUM" || s =="COLECO" || s == "MSX") return "Z80";
-        qDebug() << "SYSTEM STRING NOT FOUND for system "<<s ;
-        return "";
-    }
-
-
-
-
-    bool m_buildSuccess;
-    static bool isSupported(System currentSystem, QString list) {
-        return isSupported(StringFromSystem(currentSystem), list);
-    }
-    static bool isSupported(QString currentSystem, QString list) {
-        QStringList lst  = list.toLower().trimmed().simplified().split(",");
-        for (QString s : lst)
-            if (s == currentSystem.toLower())
-                return true;
-
+    virtual bool isZ80() {
         return false;
     }
 
+    bool isGB() { return m_system == AbstractSystem::GAMEBOY; }
+
+
+    virtual bool HasCycleCounter() {
+        return false;
+    }
+    virtual bool HasAddressCounter() {
+        return false;
+    }
+
+    virtual QString getEmulatorName() = 0;
+    virtual void applyEmulatorParameters(QStringList& params, QString debugFile, QString baseFile, CIniFile* pini) = 0;
+
+    virtual bool useZeroPagePointers() { return false;}
+
+
+
+    virtual QString getTripePointerType() { return "uint64";}
+
+    virtual void AssembleTripe(QString& text, QString file, QString currentDir, QSharedPointer<SymbolTable>  symTab);
+
+    bool m_buildSuccess;
+/*    static bool isSupported(System currentSystem, QString list) {
+        return isSupported(StringFromSystem(currentSystem), list);
+    }
+    static bool isSupported(QString currentSystem, QString list);
+*/
     static System SystemFromString(QString s);
 
     static QString StringFromSystem(System s);
 
+    bool isWDC65();
+    bool iseZ80();
 
+
+    bool systemIsOfType(QString val);
+    bool systemIsOfType(QStringList val);
+
+
+    void AssembleOrgasm(QString& output,QString& text, QString filename, QString currentDir, QSharedPointer<SymbolTable>  symTab);
+    void AssembleZOrgasm(QString& output,QString &text, QString filename, QString currentDir, QSharedPointer<SymbolTable> symTab, int orgType=0);
+    void AssembleCL65(QString &text, QString filename, QString currentDir, QSharedPointer<SymbolTable> symTab, QString ending, QStringList params);
+
+    virtual QStringList AnalyseForPotentialVariables(QString asmCode);
+    virtual QStringList Wash(QString s);
+
+    virtual QString getCPUAssemblerString() {
+        return "";
+    }
+
+    virtual int getCPUFlavorint() {
+        return 0;
+    }
+
+    virtual bool isCustom() { return false; }
     System m_system = C64;
     Processor m_processor = MOS6502;
+
 
     virtual void Assemble(QString& text, QString file, QString currentDir, QSharedPointer<SymbolTable>  symTab) {}
     virtual void PostProcess(QString& text, QString file, QString currentDir) {}
     virtual void DefaultValues() {}
+    void Sparkle(QString &text, QString filename, QString currentDir);
+    bool GenericAssemble(QString assembler, QStringList parameters, QString error, QString& output, QString workingDir="");
+    bool useZByte = false;
+
+
 //    virtual void Execute(QString filename, QString currentDir);
 public:
 signals:

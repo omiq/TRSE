@@ -47,27 +47,31 @@ class LColorList : public QObject
     Q_OBJECT
 private:
 
-    QVector<int> m_multicolors;
     int m_currentType = 0;
-    QVector<QSharedPointer<LPen>> m_pens;
+    int m_currentPalette = 0;
+    bool firstTime=true;
 
 public:
+    QVector<QSharedPointer<LPen>> m_pens;
 //    uchar m_nesCols[4];    // OBSOLETE REWRITE
+    QVector<int> m_multicolors;
 //    bool m_isMulticolor = true; // OBSOLETE REWRITE
     QVector<LColor> m_list;
     bool m_isCharset = false;
     bool m_isHybridMode = false;
     bool m_supportsFooterPen = false;
+    bool m_isLevelEditor = false;
     QVector3D m_bpp = QVector3D(8,8,8);
-    enum Type{ NES, C64, C64_ORG, CGA1_LOW, CGA1_HIGH, CGA2_LOW, CGA2_HIGH, UNSUPPORTED, TIFF, VIC20, PICO8,OK64,X16, AMSTRADCPC, BBC, VGA, SPECTRUM };
+    enum Type{ NES, C64, C64_ORG, CGA1_LOW, CGA1_HIGH, CGA2_LOW, CGA2_HIGH, UNSUPPORTED, TIFF, VIC20, PICO8,OK64,X16, AMSTRADCPC, BBC, VGA, SPECTRUM, SNES, VZ200, DOS, TIM, TVC, COCO3, THOMSON, MONO };
     bool m_selectClosestFromPen = true;
     QVector<int> m_enabledColors;
-
+    QByteArray m_customPalette;
     Type m_type = Type::C64;
     LColorList();
     ~LColorList();
 
     QByteArray m_nesPPU;
+
     int m_curPal = 0;
     bool m_ignoreSetIsMulti = false;
     LColor& get(int i);
@@ -106,7 +110,7 @@ public:
 
     int getNoBitplanes();
     void setNoBitplanes(int bpl);
-    QByteArray toArray();
+    void toArray(QByteArray& data);
     void fromArray(QByteArray& d);
 
     void Initialize(Type t);
@@ -116,6 +120,7 @@ public:
     void SetC64SpritePen(bool m_isMulticolor);
 
     void InitNESPens();
+    void InitSNESPens();
 
 
     QPixmap CreateColorIcon(int col, int s);
@@ -124,6 +129,11 @@ public:
     void CopyFromKeep(LColorList* other);
     void InitC64_org();
     void InitC64();
+    void InitMono();
+    void InitTVC();
+    void InitCOCO3();
+    void InitThomson();
+    void InitDOS();
     void InitSPECTRUM();
     void InitC64Multicolor();
     void InitPICO8();
@@ -133,11 +143,14 @@ public:
     void InitOK64();
     void InitVGA();
     void InitNES();
+    void InitSNES();
     void InitNES4();
     void InitCGA2_LOW();
     void InitCGA2_HIGH();
     void InitAmstradCPC();
     void InitBBC(int noColors);
+    void InitVZ200();
+    void InitTIM();
     void UpdateColors();
     void LoadFromFile(QString fileName);
 
@@ -156,7 +169,10 @@ public:
     QColor getPenColour(int pcol);
 
     void ExportAmigaPalette(QString filename);
+    void ExportSNESPalette(QString filename);
     void ExportAtariSTPalette(QString filename);
+    void ExportVGAPalette(QString filename);
+    void ExportX16Palette(QString filename);
 
 
     void PenToFooter(LImageFooter* footer);
@@ -181,6 +197,9 @@ public:
     QLayout* m_layout = nullptr;
     void CreateUI(QLayout* ly, int type);
     void CreateUI(QLayout* ly, int type, QSize windowSize);
+    void UpdateUI();
+
+    void EnableAuxShowing(bool yes);
 
 public slots:
     void handleButtonImport(int data);

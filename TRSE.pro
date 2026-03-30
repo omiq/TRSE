@@ -3,6 +3,7 @@
 # Project created by QtCreator 2018-02-03T17:17:06
 #
 #-------------------------------------------------
+CONFIG += c++17
 
 QT += core gui opengl qml
 QT += widgets
@@ -11,7 +12,10 @@ equals(VER, 6) {
     QT += openglwidgets
 }
 
-CONFIG += c++14
+
+CONFIG(debug, debug|release) {
+    #CONFIG += sanitizer sanitize_address sanitize_undefined sanitize_threads
+}
 
 TARGET = trse
 TEMPLATE = app
@@ -22,52 +26,35 @@ DEFINES += USE_LUA
 
 DEFINES +=USE_OMP
 
+#DEFINES += QT_ENABLE_DEPRECATED_BEFORE=0x050F00
+
 INCLUDEPATH +=$$PWD/libs/lua/include
 
 DEPENDPATH += $$PWD/../Libs
 win32:RC_ICONS += trse.ico
 ICON = trse.icns
-
+#QMAKE_CXXFLAGS_WARN_OFF += -Wunused-parameter
+QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-function -Wno-delete-non-abstract-non-virtual-dtor -Wno-overloaded-virtual -Wno-unused-variable -Wno-missing-field-initializers -Wno-sign-compare
 ARCH = $$QMAKE_HOST.arch
 
 macx{
-    CONFIG += warn_off
+    QMAKE_CXXFLAGS += -O3
+    QMAKE_CXXFLAGS += -Werror=return-type -Werror=deprecated-declarations
 
-    #LIBS += -openmp
-#    ICON = trse.icns
-    QMAKE_CXXFLAGS += -Werror=return-type
-    QMAKE_CXXFLAGS_RELEASE += -Ofast
-    LIBS += -L$$PWD/libs -Ofast
+    QMAKE_APPLE_DEVICE_ARCHS = arm64
+
+    LIBS += -L$$PWD/libs
     LIBS += -ldl
-#    QMAKE_LFLAGS += -F /Library/Frameworks
-#    LIBS += -framework SDL2
+    QMAKE_CXXFLAGS += -Xpreprocessor -fopenmp -I/usr/local/include
+    LIBS+= -L/opt/homebrew/opt/libomp/lib
 
-    LIBS += -L/usr/local/lib /usr/local/lib/libomp.dylib -lomp
-    DEFINES -=USE_OMP
-    contains(DEFINES, USE_OMP) {
-      QMAKE_CXXFLAGS += -Xpreprocessor -fopenmp -I/usr/local/include
-    }
+    QMAKE_CXXFLAGS+= -I/opt/homebrew/opt/libomp/include
 
-    contains(ARCH, arm64): {
-      message("Arme meg!")
-      QMAKE_APPLE_DEVICE_ARCHS=arm64
-      LIBS += -L$$PWD/libs/lua/ -lluamac_arm
-      CONFIG += arm64
+    message("Arme meg!")
+    LIBS += -L$$PWD/libs/lua/ -lluamac_arm
+    CONFIG += arm64
 
-    }
-    contains(ARCH, x86_64) |contains(ARCH, amd64):  {
-        LIBS += -L$$PWD/libs/lua/ -lluamac
-   }
-   LIBS += -L$$PWD/libs/lua/ -lluamac
-   INCLUDEPATH += /usr/local/include/
-   INCLUDEPATH += /opt/homebrew/include/
-
-#   LIBS +=  -L/Users/leuat/code/sdl-x86/Versions/A -lSDL2
-
-
-#    QMAKE_CXXFLAGS += -Xpreprocessor -fopenmp -lomp -I/opt/homebrew/include/
-#   QMAKE_LFLAGS += -lomp
-#     LIBS += -L /opt/homebrew/lib
+    LIBS+= -lomp
 
     DEPLOY = $$(DEPLOY)
     contains(DEPLOY, yes) {
@@ -85,6 +72,7 @@ macx{
 }
 
 win32-g++ {
+    CONFIG += console
     CONFIG += warn_off
     QMAKE_CXXFLAGS += -fopenmp
     LIBS += -fopenmp
@@ -94,6 +82,7 @@ win32-g++ {
 
 }
 win32-msvc*{
+#    CONFIG += console
     CONFIG += warn_off
     QMAKE_CXXFLAGS += -openmp
     LIBS += -openmp
@@ -106,6 +95,7 @@ linux*{
     QMAKE_CXXFLAGS += -fopenmp -Wall -Werror
     # TODO(ColinPitrat): Progressively fix and activate the most valuable warnings. Looseley ordered so that the last ones are the most valuable to remove.
     QMAKE_CXXFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-unused-function -Wno-unused-but-set-variable -Wno-unused-value -Wno-sign-compare -Wno-missing-field-initializers -Wno-delete-non-virtual-dtor -Wno-type-limits -Wno-stringop-overflow
+    QMAKE_CXXFLAGS += -Wno-unused-result -Wno-implicit-fallthrough -Wno-format-truncation -Wno-mismatched-new-delete
     LIBS += -fopenmp
     QMAKE_CXXFLAGS_RELEASE += -Ofast
     LIBS += -L$$PWD/libs/lua/ -llua -ldl
@@ -122,47 +112,109 @@ linux*{
 
 
 SOURCES += main.cpp\
+    LeLib/Util/tcencode.cpp \
+    formtutorialitem.cpp \
         mainwindow.cpp \
     imageworker.cpp \
-    source/Compiler/assembler/abstractmethods.cpp \
+    source/Compiler/assembler/asm6502.cpp \
+    source/Compiler/assembler/asm68000.cpp \
+    source/Compiler/assembler/asm6809.cpp \
+    source/Compiler/assembler/asmTripe.cpp \
+    source/Compiler/assembler/asmarm.cpp \
+    source/Compiler/assembler/asmchip8.cpp \
+    source/Compiler/assembler/asmjdh8.cpp \
+    source/Compiler/assembler/asmpdp11.cpp \
     source/Compiler/assembler/asmx86.cpp \
     source/Compiler/assembler/asmz80.cpp \
-    source/Compiler/assembler/astdispatcherx86.cpp \
-    source/Compiler/assembler/dispatcherz80.cpp \
-    source/Compiler/assembler/factorymethods.cpp \
-    source/Compiler/assembler/methods68000atari.cpp \
-    source/Compiler/assembler/methods6800amiga.cpp \
-    source/Compiler/assembler/methodsz80.cpp \
-    source/Compiler/assembler/mos6502/methods6502c64.cpp \
-    source/Compiler/assembler/mos6502/methods6502ok64.cpp \
-    source/Compiler/assembler/mos6502/methods6502vic20.cpp \
-    source/Compiler/assembler/methodsx86.cpp \
     source/Compiler/ast/nodecase.cpp \
+    source/Compiler/ast/nodecast.cpp \
     source/Compiler/ast/nodecontrolstatement.cpp \
+    source/Compiler/ast/nodefactory.cpp \
     source/Compiler/ast/noderepeatuntil.cpp \
+    source/Compiler/codegen/abstractcodegen.cpp \
+    source/Compiler/codegen/codegen_6502.cpp \
+    source/Compiler/codegen/codegen_6809.cpp \
+    source/Compiler/codegen/codegen_arm.cpp \
+    source/Compiler/codegen/codegen_chip8.cpp \
+    source/Compiler/codegen/codegen_jdh8.cpp \
+    source/Compiler/codegen/codegen_m68k.cpp \
+    source/Compiler/codegen/codegen_pdp11.cpp \
+    source/Compiler/codegen/codegen_s1c88.cpp \
+    source/Compiler/codegen/codegen_tripe.cpp \
+    source/Compiler/codegen/codegen_x86.cpp \
+    source/Compiler/codegen/codegen_z80.cpp \
+    source/Compiler/codegen/methods/abstractmethods.cpp \
+    source/Compiler/codegen/methods/factorymethods.cpp \
+    source/Compiler/codegen/methods/methods6502.cpp \
+    source/Compiler/codegen/methods/methods6502c64.cpp \
+    source/Compiler/codegen/methods/methods6502ok64.cpp \
+    source/Compiler/codegen/methods/methods6502vic20.cpp \
+    source/Compiler/codegen/methods/methods68000.cpp \
+    source/Compiler/codegen/methods/methods68000atari.cpp \
+    source/Compiler/codegen/methods/methods6800amiga.cpp \
+    source/Compiler/codegen/methods/methods6809.cpp \
+    source/Compiler/codegen/methods/methodsx86.cpp \
+    source/Compiler/codegen/methods/methodsz80.cpp \
+    source/Compiler/codegen/registerstack.cpp \
     source/Compiler/compilers/compiler6502.cpp \
+    source/Compiler/compilers/compiler65c816.cpp \
+    source/Compiler/compilers/compiler6809.cpp \
+    source/Compiler/compilers/compilerarm.cpp \
+    source/Compiler/compilers/compilerchip8.cpp \
     source/Compiler/compilers/compilergbz80.cpp \
+    source/Compiler/compilers/compilerjdh8.cpp \
     source/Compiler/compilers/compilerm68k.cpp \
+    source/Compiler/compilers/compilerpdp11.cpp \
+    source/Compiler/compilers/compilers1c88.cpp \
     source/Compiler/compilers/compilerx86.cpp \
     source/Compiler/compilers/compilerz80.cpp \
     source/Compiler/compilers/factorycompiler.cpp \
     source/Compiler/optimiser/postoptimiser.cpp \
+    source/Compiler/optimiser/postoptimizer6809.cpp \
     source/Compiler/optimiser/postoptimizerm68k.cpp \
     source/Compiler/optimiser/postoptimizerx86.cpp \
     source/Compiler/optimiser/postoptimizerz80.cpp \
+    source/Compiler/systems/system65c816.cpp \
+    source/Compiler/systems/system6809.cpp \
+    source/Compiler/systems/systemacorn.cpp \
+    source/Compiler/systems/systemagon.cpp \
     source/Compiler/systems/systemamstradcpc.cpp \
     source/Compiler/systems/systemappleii.cpp \
+    source/Compiler/systems/systemarm.cpp \
     source/Compiler/systems/systematari2600.cpp \
     source/Compiler/systems/systematari520st.cpp \
     source/Compiler/systems/systematari800.cpp \
     source/Compiler/systems/systembbcm.cpp \
+    source/Compiler/systems/systembk0010.cpp \
+    source/Compiler/systems/systemchip8.cpp \
     source/Compiler/systems/systemcoleco.cpp \
+    source/Compiler/systems/systemcustom.cpp \
+    source/Compiler/systems/systemdragon.cpp \
     source/Compiler/systems/systemgameboy.cpp \
+    source/Compiler/systems/systemjdh8.cpp \
+    source/Compiler/systems/systemm1arm.cpp \
+    source/Compiler/systems/systemmega65.cpp \
+    source/Compiler/systems/systemfoenix.cpp \
     source/Compiler/systems/systemmsx.cpp \
     source/Compiler/systems/systemok64.cpp \
+    source/Compiler/systems/systemoric.cpp \
+    source/Compiler/systems/systempcw.cpp \
+    source/Compiler/systems/systempdp11.cpp \
     source/Compiler/systems/systemplus4.cpp \
+    source/Compiler/systems/systempokemonmini.cpp \
+    source/Compiler/systems/systemprimo.cpp \
+    source/Compiler/systems/systemsnes.cpp \
     source/Compiler/systems/systemspectrum.cpp \
+    source/Compiler/systems/systemthomson.cpp \
     source/Compiler/systems/systemtiki100.cpp \
+    source/Compiler/systems/systemtim.cpp \
+    source/Compiler/systems/systemtrs80.cpp \
+    source/Compiler/systems/systemtrs80coco.cpp \
+    source/Compiler/systems/systemtvc.cpp \
+    source/Compiler/systems/systemvectrex.cpp \
+    source/Compiler/systems/systemvz200.cpp \
+    source/Compiler/systems/systemwonderswan.cpp \
+    source/Compiler/systems/systemx16.cpp \
     source/Compiler/systems/systemx86.cpp \
     source/Compiler/systems/systemz80.cpp \
     source/ImageEditor/abstractimageeditor.cpp \
@@ -170,6 +222,19 @@ SOURCES += main.cpp\
     source/ImageEditor/glwidget.cpp \
     source/ImageEditor/hexview.cpp \
     source/ImageEditor/qlabellimage.cpp \
+    source/LeLib/limage/limageagon.cpp \
+    source/LeLib/limage/limagecga_hires.cpp \
+    source/LeLib/limage/limagecoco3.cpp \
+    source/LeLib/limage/limagelevelgeneric.cpp \
+    source/LeLib/limage/limageprimo.cpp \
+    source/LeLib/limage/limagesnesgeneric.cpp \
+    source/LeLib/limage/limagethomson.cpp \
+    source/LeLib/limage/limagetimgen.cpp \
+    source/LeLib/limage/limagetvc.cpp \
+    source/LeLib/util/cpmtools/cpmfs.c \
+    source/LeLib/util/cpmtools/cpmtools.c \
+    source/LeLib/util/cpmtools/device.c \
+    source/LeLib/util/dirartd64.cpp \
     source/LeLib/bbc/asmexception.cpp \
     source/LeLib/bbc/discimage.cpp \
     source/LeLib/bbc/globaldata.cpp \
@@ -179,19 +244,29 @@ SOURCES += main.cpp\
     source/LeLib/limage/lcolor.cpp \
     source/LeLib/limage/limageamstradcpc.cpp \
     source/LeLib/limage/limageamstradgeneric.cpp \
+    source/LeLib/limage/limageamstradsprites.cpp \
     source/LeLib/limage/limageatari520st.cpp \
     source/LeLib/limage/limagebbc.cpp \
+    source/LeLib/limage/limagecga160x100.cpp \
+    source/LeLib/limage/limagecustomc64multicolor.cpp \
     source/LeLib/limage/limagefooter.cpp \
     source/LeLib/limage/limagegamboy.cpp \
+    source/LeLib/limage/limagegeneric.cpp \
+    source/LeLib/limage/limagegenericsprites.cpp \
     source/LeLib/limage/limagehybridcharset.cpp \
+    source/LeLib/limage/limagejdh8.cpp \
     source/LeLib/limage/limagelevelgameboy.cpp \
     source/LeLib/limage/limagelevelnes.cpp \
+    source/LeLib/limage/limagelevelsnes.cpp \
     source/LeLib/limage/limagemetablocksprites.cpp \
     source/LeLib/limage/limagemetachunk.cpp \
     source/LeLib/limage/limagenes.cpp \
     source/LeLib/limage/limageok64.cpp \
+    source/LeLib/limage/limagesnes.cpp \
     source/LeLib/limage/limagespectrum.cpp \
     source/LeLib/limage/limagevga.cpp \
+    source/LeLib/limage/limagevz200.cpp \
+    source/LeLib/limage/limagetim.cpp \
     source/LeLib/limage/limagex16.cpp \
     source/LeLib/limage/lpen.cpp \
     source/LeLib/limage/pixelchar.cpp \
@@ -199,6 +274,7 @@ SOURCES += main.cpp\
 #    source/LeLib/miniaudio.c \
 #    source/LeLib/miniaudio_engine.c \
     source/LeLib/ttrfile.cpp \
+    source/LeLib/util/cc1541.cpp \
     source/LeLib/util/fc8/FC8Compression.cpp \
     source/LeLib/util/lz4/lz4.c \
     source/LeLib/util/lz4/lz4hc.c \
@@ -206,17 +282,28 @@ SOURCES += main.cpp\
     source/LeLib/util/tikidisk.cpp \
     source/LeLib/util/tool.cpp \
     source/LeLib/util/utilclasses.cpp \
+    source/LeLib/util/zx0/compress.c \
+    source/LeLib/util/zx0/memory.c \
+    source/LeLib/util/zx0/optimize.c \
+    source/LeLib/util/zx0/zx0.c \
+    source/OrgAsm/morgasm.cpp \
     source/OrgAsm/zorgasm.cpp \
+    source/OrgAsm/orgasm68k.cpp \
     source/PmmEdit/asmhighlighter.cpp \
     source/PmmEdit/fjonghighlighter.cpp \
     source/PmmEdit/trsehighlighter.cpp \
+    source/chip8emu/c8asm.c \
+    source/chip8emu/chip8emu.cpp \
+    source/chip8emu/dialogchip8.cpp \
     source/dialogcolorselect.cpp \
     source/dialogexport3d.cpp \
     source/dialoginfo.cpp \
     source/dialognewproject.cpp \
     source/dialognewtrt.cpp \
     source/dialogselectcharset.cpp \
+    source/dialogselectroom.cpp \
     source/dialogsimplelineedit.cpp \
+    source/dialogsizeanalyser.cpp \
     source/dialogsplash.cpp \
     source/formhelp.cpp \
     source/mynth/ma_context.cpp \
@@ -224,6 +311,7 @@ SOURCES += main.cpp\
     source/toolboxitem.cpp \
     source/trsedocuments/dialogcustomwarning.cpp \
     source/trsedocuments/formhexedit.cpp \
+    source/trsedocuments/formrtf.cpp \
     source/trsedocuments/formttredit.cpp \
     source/trsedocuments/helpdocumentbuilder.cpp \
     source/trsedocuments/ttrview.cpp \
@@ -257,9 +345,7 @@ SOURCES += main.cpp\
     source/Compiler/symboltable.cpp \
     source/Compiler/syntax.cpp \
     source/Compiler/token.cpp \
-    source/Compiler/assembler/asmpascal.cpp \
     source/Compiler/assembler/assembler.cpp \
-    source/Compiler/assembler/mos6502/mos6502.cpp \
     source/Compiler/ast/ast.cpp \
     source/Compiler/ast/node.cpp \
     source/Compiler/ast/nodeasm.cpp \
@@ -278,10 +364,8 @@ SOURCES += main.cpp\
     source/Compiler/ast/nodestring.cpp \
     source/Compiler/ast/nodeunaryop.cpp \
     source/Compiler/ast/nodevar.cpp \
-    source/Compiler/ast/nodevararray.cpp \
     source/Compiler/ast/nodevardecl.cpp \
     source/Compiler/ast/nodevartype.cpp \
-    source/Compiler/ast/nodewhileloop.cpp \
     source/Compiler/misc/sidfile.cpp \
     source/LeLib/data.cpp \
     source/LeLib/limage/c64fullscreenchar.cpp \
@@ -310,16 +394,13 @@ SOURCES += main.cpp\
     source/Compiler/misc/machinecodeanalyzer.cpp \
     source/dialogprojectsettings.cpp \
     source/OrgAsm/orgasm.cpp \
-    source/Compiler/Opcodes/opcodes6502.cpp \
+    source/Compiler/opcodes/opcodes6502.cpp \
     source/OrgAsm/orgasmlexer.cpp \
     source/dialogdonate.cpp \
     source/dialogfindfile.cpp \
     source/LeLib/limage/limagevic20.cpp \
     source/LeLib/limage/limagesprites2.cpp \
     source/LeLib/limage/limagecontainer.cpp \
-    source/Compiler/assembler/abstractastdispatcher.cpp \
-    source/Compiler/assembler/mos6502/astdispatcher6502.cpp \
-    source/Compiler/assembler/mos6502/methods6502.cpp \
     source/dialogeffects.cpp \
     source/effects/abstractdemoeffect.cpp \
     source/effects/demoeffecttwister.cpp \
@@ -347,9 +428,6 @@ SOURCES += main.cpp\
     source/Compiler/systems/systemc128.cpp \
     source/Compiler/systems/systemm6800.cpp \
     source/Compiler/systems/systemamiga.cpp \
-    source/Compiler/assembler/astdispatcher68000.cpp \
-    source/Compiler/assembler/AsmM68000.cpp \
-    source/Compiler/assembler/methods68000.cpp \
     source/dialogcolors.cpp \
     source/LeLib/limage/bitmapfont.cpp \
     source/Raytracer/particles.cpp \
@@ -361,46 +439,110 @@ SOURCES += main.cpp\
 
 
 HEADERS  += mainwindow.h \
+    LeLib/Util/tcencode.h \
+    formtutorialitem.h \
     imageworker.h \
-    source/Compiler/assembler/abstractmethods.h \
+    source/Compiler/assembler/asm68000.h \
+    source/Compiler/assembler/asm6809.h \
+    source/Compiler/assembler/asmTripe.h \
+    source/Compiler/assembler/asmarm.h \
+    source/Compiler/assembler/asmchip8.h \
+    source/Compiler/assembler/asmjdh8.h \
+    source/Compiler/assembler/asmpdp11.h \
     source/Compiler/assembler/asmx86.h \
     source/Compiler/assembler/asmz80.h \
-    source/Compiler/assembler/astdispatcherx86.h \
-    source/Compiler/assembler/dispatcherz80.h \
-    source/Compiler/assembler/factorymethods.h \
-    source/Compiler/assembler/methods68000atari.h \
-    source/Compiler/assembler/methods6800amiga.h \
-    source/Compiler/assembler/methodsz80.h \
-    source/Compiler/assembler/mos6502/methods6502c64.h \
-    source/Compiler/assembler/mos6502/methods6502ok64.h \
-    source/Compiler/assembler/mos6502/methods6502vic20.h \
-    source/Compiler/assembler/methodsx86.h \
+    source/Compiler/ast/nodecast.h \
+    source/Compiler/codegen/codegen_6809.h \
+    source/Compiler/codegen/codegen_arm.h \
+    source/Compiler/codegen/codegen_chip8.h \
+    source/Compiler/codegen/codegen_jdh8.h \
+    source/Compiler/codegen/codegen_pdp11.h \
+    source/Compiler/codegen/codegen_s1c88.h \
+    source/Compiler/codegen/codegen_tripe.h \
+    source/Compiler/codegen/codegen_x86.h \
+    source/Compiler/codegen/codegen_z80.h \
     source/Compiler/ast/nodecase.h \
     source/Compiler/ast/nodecontrolstatement.h \
+    source/Compiler/ast/nodefactory.h \
     source/Compiler/ast/noderepeatuntil.h \
+    source/Compiler/codegen/abstractcodegen.h \
+    source/Compiler/codegen/codegen_6502.h \
+    source/Compiler/codegen/codegen_m68k.h \
+    source/Compiler/codegen/codegen_x86.h \
+    source/Compiler/codegen/codegen_z80.h \
+    source/Compiler/codegen/methods/abstractmethods.h \
+    source/Compiler/codegen/methods/factorymethods.h \
+    source/Compiler/codegen/methods/methods6502.h \
+    source/Compiler/codegen/methods/methods6502c64.h \
+    source/Compiler/codegen/methods/methods6502ok64.h \
+    source/Compiler/codegen/methods/methods6502vic20.h \
+    source/Compiler/codegen/methods/methods68000.h \
+    source/Compiler/codegen/methods/methods68000atari.h \
+    source/Compiler/codegen/methods/methods6800amiga.h \
+    source/Compiler/codegen/methods/methods6809.h \
+    source/Compiler/codegen/methods/methodsx86.h \
+    source/Compiler/codegen/methods/methodsz80.h \
+    source/Compiler/codegen/registerstack.h \
     source/Compiler/compilers/compiler6502.h \
+    source/Compiler/compilers/compiler65c816.h \
+    source/Compiler/compilers/compiler6809.h \
+    source/Compiler/compilers/compilerarm.h \
+    source/Compiler/compilers/compilerchip8.h \
     source/Compiler/compilers/compilergbz80.h \
+    source/Compiler/compilers/compilerjdh8.h \
     source/Compiler/compilers/compilerm68k.h \
+    source/Compiler/compilers/compilerpdp11.h \
+    source/Compiler/compilers/compilers1c88.h \
     source/Compiler/compilers/compilerx86.h \
     source/Compiler/compilers/compilerz80.h \
     source/Compiler/compilers/factorycompiler.h \
     source/Compiler/optimiser/postoptimiser.h \
+    source/Compiler/optimiser/postoptimizer6809.h \
     source/Compiler/optimiser/postoptimizerm68k.h \
     source/Compiler/optimiser/postoptimizerx86.h \
     source/Compiler/optimiser/postoptimizerz80.h \
+    source/Compiler/systems/system65c816.h \
+    source/Compiler/systems/system6809.h \
+    source/Compiler/systems/systemacorn.h \
+    source/Compiler/systems/systemagon.h \
     source/Compiler/systems/systemamstradcpc.h \
     source/Compiler/systems/systemappleii.h \
+    source/Compiler/systems/systemarm.h \
     source/Compiler/systems/systematari2600.h \
     source/Compiler/systems/systematari520st.h \
     source/Compiler/systems/systematari800.h \
     source/Compiler/systems/systembbcm.h \
+    source/Compiler/systems/systembk0010.h \
+    source/Compiler/systems/systemchip8.h \
+    source/Compiler/systems/systemdragon.h \
+    source/Compiler/systems/systempdp11.h \
+    source/Compiler/systems/systemprimo.h \
+    source/Compiler/systems/systemschip.h \
     source/Compiler/systems/systemcoleco.h \
+    source/Compiler/systems/systemcustom.h \
     source/Compiler/systems/systemgameboy.h \
+    source/Compiler/systems/systemjdh8.h \
+    source/Compiler/systems/systemm1arm.h \
+    source/Compiler/systems/systemmega65.h \
+    source/Compiler/systems/systemfoenix.h \
     source/Compiler/systems/systemmsx.h \
     source/Compiler/systems/systemok64.h \
+    source/Compiler/systems/systemoric.h \
+    source/Compiler/systems/systempcw.h \
     source/Compiler/systems/systemplus4.h \
+    source/Compiler/systems/systempokemonmini.h \
+    source/Compiler/systems/systemsnes.h \
     source/Compiler/systems/systemspectrum.h \
+    source/Compiler/systems/systemthomson.h \
     source/Compiler/systems/systemtiki100.h \
+    source/Compiler/systems/systemtim.h \
+    source/Compiler/systems/systemtrs80.h \
+    source/Compiler/systems/systemtrs80coco.h \
+    source/Compiler/systems/systemtvc.h \
+    source/Compiler/systems/systemvectrex.h \
+    source/Compiler/systems/systemvz200.h \
+    source/Compiler/systems/systemwonderswan.h \
+    source/Compiler/systems/systemx16.h \
     source/Compiler/systems/systemx86.h \
     source/Compiler/systems/systemz80.h \
     source/ImageEditor/abstractimageeditor.h \
@@ -408,6 +550,23 @@ HEADERS  += mainwindow.h \
     source/ImageEditor/glwidget.h \
     source/ImageEditor/hexview.h \
     source/ImageEditor/qlabellimage.h \
+    source/LeLib/limage/limageagon.h \
+    source/LeLib/limage/limagecga_hires.h \
+    source/LeLib/limage/limagecoco3.h \
+    source/LeLib/limage/limagelevelgeneric.h \
+    source/LeLib/limage/limageprimo.h \
+    source/LeLib/limage/limagesnesgeneric.h \
+    source/LeLib/limage/limagethomson.h \
+    source/LeLib/limage/limagetim.h \
+    source/LeLib/limage/limagetimgen.h \
+    source/LeLib/limage/limagetvc.h \
+    source/LeLib/util/cpmtools/config.h \
+    source/LeLib/util/cpmtools/cpmdir.h \
+    source/LeLib/util/cpmtools/cpmfs.h \
+    source/LeLib/util/cpmtools/cpmtools.h \
+    source/LeLib/util/cpmtools/device.h \
+    source/LeLib/util/cpmtools/getopt_.h \
+    source/LeLib/util/dirartd64.h \
     source/LeLib/bbc/asmexception.h \
     source/LeLib/bbc/discimage.h \
     source/LeLib/bbc/globaldata.h \
@@ -417,25 +576,36 @@ HEADERS  += mainwindow.h \
     source/LeLib/limage/lcolor.h \
     source/LeLib/limage/limageamstradcpc.h \
     source/LeLib/limage/limageamstradgeneric.h \
+    source/LeLib/limage/limageamstradsprites.h \
     source/LeLib/limage/limageatari520st.h \
     source/LeLib/limage/limagebbc.h \
+    source/LeLib/limage/limagecga160x100.h \
+    source/LeLib/limage/limagecustomc64multicolor.h \
     source/LeLib/limage/limagefooter.h \
     source/LeLib/limage/limagegamboy.h \
+    source/LeLib/limage/limagegeneric.h \
+    source/LeLib/limage/limagegenericsprites.h \
     source/LeLib/limage/limagehybridcharset.h \
+    source/LeLib/limage/limagejdh8.h \
     source/LeLib/limage/limagelevelgameboy.h \
     source/LeLib/limage/limagelevelnes.h \
+    source/LeLib/limage/limagelevelsnes.h \
     source/LeLib/limage/limagemetablocksprites.h \
     source/LeLib/limage/limagemetachunk.h \
     source/LeLib/limage/limagenes.h \
     source/LeLib/limage/limageok64.h \
+    source/LeLib/limage/limagesnes.h \
     source/LeLib/limage/limagespectrum.h \
     source/LeLib/limage/limagevga.h \
+    source/LeLib/limage/limagevz200.h \
+    source/LeLib/limage/limagetim.h \
     source/LeLib/limage/limagex16.h \
     source/LeLib/limage/lpen.h \
     source/LeLib/limage/pixelchar.h \
     source/LeLib/limage/ssim.h \
     source/LeLib/miniaudio.h \
     source/LeLib/ttrfile.h \
+    source/LeLib/util/cc1541.h \
     source/LeLib/util/fc8/FC8Compression.h \
     source/LeLib/util/lz4/lz4.h \
     source/LeLib/util/lz4/lz4hc.h \
@@ -443,17 +613,24 @@ HEADERS  += mainwindow.h \
     source/LeLib/util/tikidisk.h \
     source/LeLib/util/tool.h \
     source/LeLib/util/utilclasses.h \
+    source/LeLib/util/zx0/zx0.h \
+    source/OrgAsm/morgasm.h \
     source/OrgAsm/zorgasm.h \
     source/PmmEdit/asmhighlighter.h \
     source/PmmEdit/fjonghighlighter.h \
     source/PmmEdit/trsehighlighter.h \
+    source/chip8emu/c8asm.h \
+    source/chip8emu/chip8emu.h \
+    source/chip8emu/dialogchip8.h \
     source/dialogcolorselect.h \
     source/dialogexport3d.h \
     source/dialoginfo.h \
     source/dialognewproject.h \
     source/dialognewtrt.h \
     source/dialogselectcharset.h \
+    source/dialogselectroom.h \
     source/dialogsimplelineedit.h \
+    source/dialogsizeanalyser.h \
     source/dialogsplash.h \
     source/formhelp.h \
 #    source/LeLib/miniaudio_engine.h \
@@ -464,6 +641,7 @@ HEADERS  += mainwindow.h \
     source/toolboxitem.h \
     source/trsedocuments/dialogcustomwarning.h \
     source/trsedocuments/formhexedit.h \
+    source/trsedocuments/formrtf.h \
     source/trsedocuments/formttredit.h \
     source/trsedocuments/helpdocumentbuilder.h \
     source/trsedocuments/ttrview.h \
@@ -497,9 +675,8 @@ HEADERS  += mainwindow.h \
     source/Compiler/symboltable.h \
     source/Compiler/syntax.h \
     source/Compiler/token.h \
-    source/Compiler/assembler/asmpascal.h \
     source/Compiler/assembler/assembler.h \
-    source/Compiler/assembler/mos6502/mos6502.h \
+    source/Compiler/assembler/asm6502.h \
     source/Compiler/ast/ast.h \
     source/Compiler/ast/node.h \
     source/Compiler/ast/nodeasm.h \
@@ -518,10 +695,8 @@ HEADERS  += mainwindow.h \
     source/Compiler/ast/nodestring.h \
     source/Compiler/ast/nodeunaryop.h \
     source/Compiler/ast/nodevar.h \
-    source/Compiler/ast/nodevararray.h \
     source/Compiler/ast/nodevardecl.h \
     source/Compiler/ast/nodevartype.h \
-    source/Compiler/ast/nodewhileloop.h \
     source/Compiler/misc/sidfile.h \
     source/LeLib/data.h \
     source/LeLib/limage/c64fullscreenchar.h \
@@ -552,16 +727,13 @@ HEADERS  += mainwindow.h \
     source/Compiler/misc/machinecodeanalyzer.h \
     source/dialogprojectsettings.h \
     source/OrgAsm/orgasm.h \
-    source/Compiler/Opcodes/opcodes6502.h \
+    source/Compiler/opcodes/opcodes6502.h \
     source/OrgAsm/orgasmlexer.h \
     source/dialogdonate.h \
     source/dialogfindfile.h \
     source/LeLib/limage/limagevic20.h \
     source/LeLib/limage/limagesprites2.h \
     source/LeLib/limage/limagecontainer.h \
-    source/Compiler/assembler/abstractastdispatcher.h \
-    source/Compiler/assembler/mos6502/astdispatcher6502.h \
-    source/Compiler/assembler/mos6502/methods6502.h \
     source/dialogeffects.h \
     source/effects/abstractdemoeffect.h \
     source/effects/demoeffecttwister.h \
@@ -589,9 +761,8 @@ HEADERS  += mainwindow.h \
     source/Compiler/systems/systemc128.h \
     source/Compiler/systems/systemm6800.h \
     source/Compiler/systems/systemamiga.h \
-    source/Compiler/assembler/astdispatcher68000.h \
-    source/Compiler/assembler/AsmM68000.h \
-    source/Compiler/assembler/methods68000.h \
+    source/Compiler/codegen/codegen_m68k.h \
+    source/Compiler/assembler/asm68000.h \
     source/dialogcolors.h \
     source/LeLib/limage/bitmapfont.h \
     source/Raytracer/particles.h \
@@ -603,17 +774,22 @@ HEADERS  += mainwindow.h \
 FORMS    += mainwindow.ui \
     dialognewimage.ui \
     dialogimport.ui \
+    formtutorialitem.ui \
+    source/chip8emu/dialogchip8.ui \
     source/dialogcolorselect.ui \
     source/dialogexport3d.ui \
     source/dialoginfo.ui \
     source/dialognewproject.ui \
     source/dialognewtrt.ui \
     source/dialogselectcharset.ui \
+    source/dialogselectroom.ui \
     source/dialogsimplelineedit.ui \
+    source/dialogsizeanalyser.ui \
     source/dialogsplash.ui \
     source/formhelp.ui \
     source/trsedocuments/dialogcustomwarning.ui \
     source/trsedocuments/formhexedit.ui \
+    source/trsedocuments/formrtf.ui \
     source/trsedocuments/formttredit.ui \
     source/trsedocuments/formraseditor.ui \
     source/trsedocuments/formimageeditor.ui \
@@ -644,6 +820,7 @@ RESOURCES += \
 #LELIB INCLUDES
 
 DISTFILES += \
+    resources/bin/bk2010-0.7.jar \
     resources/bin/rasm.exe \
     resources/bin/rasm_osx \
     resources/code/amiga/init_p61_player.s \
@@ -653,9 +830,11 @@ DISTFILES += \
     resources/code/c64_keyboard_input.asm \
     resources/code/gameboy/gbt_player.asm \
     resources/code/gameboy/gbt_player_bank1.asm \
+    resources/code/mega65/init.asm \
     resources/code/vbm/vic20_vbm.asm \
     resources/code/x86/init_cga_scanlines.asm \
     resources/code/x86/init_playnote.asm \
+    resources/images/AGON.png \
     resources/images/AMIGA.png \
     resources/images/ATAR800.png \
     resources/images/ATARI520ST.png \
@@ -663,7 +842,11 @@ DISTFILES += \
     resources/images/OK64.png \
     resources/images/PLUS4.png \
     resources/images/amiga_intro.png \
+    resources/images/portraits/red_sunglasses.png \
+    resources/images/portraits/red_sunglasses_small.png \
     resources/images/tutorials/floskel.png \
+    resources/images/tutorials/small_game_c128.png \
+    resources/images/wormwood.png \
     resources/text/about.txt \
     resources/text/Documentation.txt \
     resources/text/builtinmethods.txt \
@@ -871,6 +1054,9 @@ DISTFILES += \
     resources/text/help/r/begin.rtf \
     resources/text/help/r/byte.rtf \
     resources/text/help/r/chipmem.rtf \
+    resources/text/help/r/cpcexport0.rtf \
+    resources/text/help/r/cpcexportpal.rtf \
+    resources/text/help/r/cpcexporttile0.rtf \
     resources/text/help/r/cstring.rtf \
     resources/text/help/r/define.rtf \
     resources/text/help/r/do.rtf \

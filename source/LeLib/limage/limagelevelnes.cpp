@@ -33,7 +33,7 @@ LImageLevelNES::LImageLevelNES(LColorList::Type t) : ImageLevelEditor(t)
 
     m_GUIParams[btnEditFullCharset] = "";
 
-    m_writeType = Character;
+    m_classvariableType = Character;
 
 //    m_GUIParams[tabSprites] ="Metachunks";
     m_currentChar = 1;
@@ -105,9 +105,9 @@ void LImageLevelNES::setPixel(int x, int y, unsigned int color)
         return; // out of bounds
 
 
-    if (m_writeType==Character  || m_forcePaintColorAndChar)
+    if (m_classvariableType==Character  || m_forcePaintColorAndChar)
         m_currentLevel->m_CharData[pos] = m_currentChar;
-    if (m_writeType==Color  || m_forcePaintColorAndChar)
+    if (m_classvariableType==Color  || m_forcePaintColorAndChar)
         m_currentLevel->m_ColorData[posC] = color;
 
 
@@ -189,8 +189,6 @@ void LImageLevelNES::LoadCharset(QString file, int skipBttes)
 
 void LImageLevelNES::ExportBin(QFile &file)
 {
-
-
     file.write(m_meta.toHeader());
     if (m_levels.count()==0)
         return;
@@ -199,7 +197,7 @@ void LImageLevelNES::ExportBin(QFile &file)
         file.write( l->m_CharData);
 
         QByteArray d;
-        d.resize(l->m_ColorData.count()/4);
+        d.resize(l->m_ColorData.length()/4);
         int j=0;
         int w= m_meta.m_colSizex;
         int h= m_meta.m_colSizey;
@@ -219,7 +217,7 @@ void LImageLevelNES::ExportBin(QFile &file)
             }
         //        qDebug() << d.size();
         file.write(d);
-        if (l->m_ExtraData.count()!=0)
+        if (l->m_ExtraData.length()!=0)
             file.write( l->m_ExtraData);
 
     }

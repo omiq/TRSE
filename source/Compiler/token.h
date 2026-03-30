@@ -23,13 +23,13 @@
 #define TOKEN_H
 
 #include <QString>
-#include <QMap>
+#include <QHash>
 #include "data_pmm.h"
 #include <QDebug>
 
 class TokenType {
 public:
-#define no_types 123
+#define no_types 134
 
     enum Type {
         NONE, INTEGER, PLUS, MINUS, MUL, DIV, LPAREN,
@@ -48,11 +48,12 @@ public:
         GLOBAL, WRAM, HRAM, ALIGNED,BANK, SPRRAM, INLINE, BUILDTABLE,
         USES, FUNCTION, COMPRESSED,
         PPURE, PURE_VARIABLE, PURE_NUMBER, NO_TERM, INVERT, MACRO, REFERENCE, SIGNED,
-        BREAK, CONTINUE, RETURN, ASSIGNOP, RAM, TYPE, BOOLEAN, CLASS, PUBLIC, PRIVATE, SIZEOF
+        BREAK, CONTINUE, RETURN, ASSIGNOP, RAM, TYPE, BOOLEAN, CLASS, PUBLIC, PRIVATE, SIZEOF, BUILDTABLE2D, PERHAPS, MAYBE,
+        BUILDSINETABLE, STACK,LPOINTER,NOT,BITNOT, FORWARD, VOLATILE, ASSEMBLER
 
     };
 
-    static QString types[];
+    static QStringList types;
     static QString getType(Type t) {
         if (t>=no_types || t<=0)
             return types[NADA];
@@ -61,7 +62,7 @@ public:
 
     static Type getType(QString s);
 
-//    QMap<QString, TokenType::Type> m_stringType;
+//    QHash<QString, TokenType::Type> m_stringType;
 
     QString m_value;
     Type m_type;
@@ -83,6 +84,7 @@ public:
     int m_lineNumber=0;
     bool m_isReference = false;
     bool m_isPointer = false;
+    bool m_isBoolean = false;
     QString m_currentLineText="";
     QString getType();
 

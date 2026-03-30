@@ -8,9 +8,11 @@
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QListWidget>
+#include <QTableWidget>
 #include <QComboBox>
+#include <QLabel>
 #include "source/LeLib/util/util.h"
-
+#include "formtutorialitem.h"
 
 class Tutorial {
 public:
@@ -33,12 +35,14 @@ class Tutorials
 public:
     Tutorials();
     QVector<Tutorial> m_tutorials;
-    QMap<QString, QTreeWidgetItem*> m_roots;
+    QHash<QString, QTreeWidgetItem*> m_roots;
+    QVector<FormTutorialItem*> m_widgets;
     void Read(QString );
     void PopulateTreeList(QTreeWidget* tree);
     void PopulateSystemList(QListWidget* w);
     void PopulateSystemCmb(QComboBox* w);
     void PopulateProjectList(QString system, QListWidget* w);
+    void PopulateProjectTable(QString system, QGridLayout* w);
 
     void PopulateTemplateList(QListWidget* w, QString system);
 

@@ -1,0 +1,54 @@
+program Tutorial3_logo;
+var 
+	done : integer = 0;
+	screen : pointer of integer;
+ 	i,time : integer = 0;
+	sin : array[256] of integer = buildsinetable(110);
+
+	// Palette gets exported automatically	
+	@export "images/logo.flf" "images/logo.bin" 256
+	
+	image : incbin("images/logo.bin");
+	image_pal : incbin("images/logo.pal");
+
+/*
+
+This tutorial copies image data to the screen for each frame in a vertical blank irq method	
+
+*/
+
+	
+// Moves the screen data
+procedure UpdateLogo();
+begin
+	GetScreen(screen);
+	i:=sin[(time)&255];
+	i:=i*160;
+	//s:=s+i;
+	memcpy(#image,55*160,screen,i,40*90,4);
+	
+end;
+
+
+interrupt VBLank();
+begin
+	// Update the logo on Vertical Blank
+	UpdateLogo();
+	time:=time+1;
+	done:=keypressed(sc_key_space_pressed);
+end;
+
+begin
+	
+	SetLoRes();
+	
+	memcpy(#image_pal,0,#palette_start,0,15,2);
+	setirq(VBLank(), irq_verticalblank);
+	while (done = false) do
+	begin
+	end;	
+end.
+
+
+
+

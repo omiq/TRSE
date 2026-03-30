@@ -24,7 +24,7 @@
 
 #include <QDialog>
 #include "source/Compiler/assembler/assembler.h"
-#include <QMap>
+#include <QHash>
 #include <QImage>
 #include <QPainter>
 #include <QPixmap>
@@ -42,10 +42,12 @@ class DialogMemoryAnalyze : public QDialog
     int m_fontSize,xsize,ysize,shift;
     QVector<QSharedPointer<MemoryBlock>> m_blocks;
     QSharedPointer<CIniFile> m_iniFile = nullptr;
+    QSharedPointer<CIniFile> m_projectIni = nullptr;
     AbstractSystem *m_system = nullptr;
     QString curT = "";
     QPoint cur;
     QPoint mpos;
+    int curFree = 0;
     float delta;
 
     QPoint zoomCenter;
@@ -54,10 +56,10 @@ class DialogMemoryAnalyze : public QDialog
 
 public:
     bool m_success;
-    explicit DialogMemoryAnalyze(QSharedPointer<CIniFile> ini, AbstractSystem* system, QWidget *parent = 0);
+    explicit DialogMemoryAnalyze(QSharedPointer<CIniFile> ini, QSharedPointer<CIniFile> pini, AbstractSystem* system, QWidget *parent = 0);
     void Initialize(QVector<QSharedPointer<MemoryBlock>>& blocks, int fontSize);
     int m_noBanks = 0;
-    QMap<QString, QColor> m_colors;
+    QHash<QString, QColor> m_colors;
     void InitColors();
     void RenderSystemLabels(QPainter& p,int,int);
     void resizeEvent(QResizeEvent *) override;

@@ -1,0 +1,411 @@
+procedure tank2_0();
+begin
+asm ("
+  ld de, $20
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $ff
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $2b
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $60
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ or $16
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $aa
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ or $06
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $aa
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $dd
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $d0
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+");
+end;
+procedure tank2_1();
+begin
+asm ("
+  ld de, $20
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $3f
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $c0
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $0a
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $d8
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ or $05
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $aa
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $80
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ or $01
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $aa
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $80
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $37
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $74
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+");
+end;
+procedure tank2_2();
+begin
+asm ("
+  ld de, $20
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $0f
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $f0
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $02
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $b6
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ or $01
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $6a
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $a0
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $6a
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $a0
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $0d
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $dd
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+");
+end;
+procedure tank2_3();
+begin
+asm ("
+  ld de, $20
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $03
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $fc
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $ad
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $80
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $5a
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $a8
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $1a
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $aa
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $a8
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ or $03
+ ld [iy+1],a
+ ld a,[ix+2] 
+ or $77
+ ld [iy+2],a
+ ld a,[ix+3] 
+ or $40
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+ ld a,[ix+0] 
+ ld [iy+0],a
+ ld a,[ix+1] 
+ ld [iy+1],a
+ ld a,[ix+2] 
+ ld [iy+2],a
+ ld a,[ix+3] 
+ ld [iy+3],a
+  add iy,de
+  add ix,de
+");
+end;
+var tank2_pi : integer;
+var tank2_buf : integer;
+@donotremove tank2_dst 
+procedure tank2(tank2_src,tank2_dst : pointer; tank2px,tank2py : byte);
+begin
+  tank2_pi:=tank2_dst + tank2py<<5 + tank2px>>2;
+  tank2_buf:=#buf + tank2py<<5 + tank2px>>2;
+asm("  ld ix, [tank2_buf] 
+  ld iy, [tank2_pi]
+");
+ tank2px:=tank2px&3;
+ if (tank2px=0) then tank2_0();
+ if (tank2px=1) then tank2_1();
+ if (tank2px=2) then tank2_2();
+ if (tank2px=3) then tank2_3();
+end;

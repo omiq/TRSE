@@ -22,7 +22,7 @@
 #ifndef NODEBLOCK_H
 #define NODEBLOCK_H
 
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
 #include "source/Compiler/token.h"
 #include "source/Compiler/pvar.h"
@@ -30,9 +30,27 @@
 #include "source/Compiler/errorhandler.h"
 #include "source/Compiler/ast/node.h"
 #include "source/Compiler/ast/nodevar.h"
-//#include "source/Compiler/ast/nodeproceduredecl.h"
 #include "source/Compiler/ast/nodevardecl.h"
+/* 
+    Main block node : var + begin/end. Ie
+    procedure SomeProc();
+    ** NodeBlock starts here
+    var
+       a,b: byte;
+    begin
 
+    ...
+
+
+    end;
+    ** Nodeblock ends here
+    **
+    m_left: unused
+    m_right: unused
+    m_op: unused
+    m_decl : block variable declarations (var)
+    m_compointStatement : list of statements (ie contents of the begin/end block)
+*/
 class NodeBlock : public Node {
 public:
     QVector<QSharedPointer<Node>> m_decl;
@@ -44,7 +62,16 @@ public:
     bool m_isMainBlock = false;
     bool m_isProcedure = false;
     QString m_forceInterupt = "";
+    QString m_initCode = "";
 
+
+    void clearComment() override {
+        m_comment = "";
+        if (m_compoundStatement!=nullptr)
+            m_compoundStatement->clearComment();
+    }
+
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override;
 
     NodeBlock(Token t, QVector<QSharedPointer<Node>> decl, QSharedPointer<Node> comp, bool useOwnSymTab = true):Node() {
         m_compoundStatement = comp;
@@ -54,7 +81,8 @@ public:
     }
 
     void SetParameter(QString name, PVar var);
-    void ReplaceInline(Assembler* as,QMap< QString,QSharedPointer<Node>>& inp) override;
+    void ReplaceInline(Assembler* as,QHash< QString,QSharedPointer<Node>>& inp) override;
+    void ReplaceInlineAssemblerVariables(Assembler* as, QString var, QString val) override;
 
     void PopZeroPointers(Assembler* as);
     void parseConstants(QSharedPointer<SymbolTable>  symTab) override {
@@ -68,9 +96,17 @@ public:
 
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeBlock>(sharedFromThis()));
     }
+    void ResetInlineAssembler() override;
+    void ReplaceVariable(Assembler* as, QString name, QSharedPointer<Node> node) override
+    {
+        Node::ReplaceVariable(as,name,node);
+        m_compoundStatement->ReplaceVariable(as,name,node);
+    }
+    virtual bool Optimize() override;
+
 
 };
 

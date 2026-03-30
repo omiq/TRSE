@@ -1,3 +1,4 @@
+
 /*
  * Turbo Rascal Syntax error, “;” expected but “BEGIN” (TRSE, Turbo Rascal SE)
  * 8 bit software development IDE for the Commodore 64
@@ -24,8 +25,16 @@
 
 #include <QString>
 #include <QObject>
+#include <QColor>
 
 
+class CompileData {
+public:
+    float compileTime, assembleTime;
+    int pascalLines, asmLines;
+    bool ok;
+    int optimizedLines, improved;
+};
 
 
 class Data : public QObject
@@ -40,13 +49,17 @@ public:
     CompilerState compilerState = PREPROCESSOR;
     QString unitPath = "units";
     QString cpuUnitPath = "cpu_specific";
+    QString currentDoc = "";
+    int genLabel = 0;
     bool redrawOutput=false;
     bool redrawInput=false;
     bool forceRedraw = false;
     bool redrawFileList = false;
     bool demomode = false;
     bool abort = false;
+    bool isBuilding = false;
     int imageEvent = 0;
+    QString sparkle;
     bool requestSaveAs = false;
     bool requestCloseWindow = false;
     bool blink = false;
@@ -61,6 +74,11 @@ public:
     static Data data;
     void Redraw();
     void UpdatePens();
+
+    QColor aux1 = Qt::black;
+    QColor aux2 = Qt::black;
+    bool displayAux = false;
+
 signals:
     void EmitPenChanged();
 

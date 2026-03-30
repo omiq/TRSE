@@ -76,13 +76,13 @@ public:
     float m_size = 4;
     float m_type = 0;
 
-    QMap<QString, ToolBoxItemOption*> m_options;
+    QHash<QString, ToolBoxItemOption*> m_options;
 
     virtual void IsPreview(int button, bool& isPreview) { }
 
     virtual void Perform(int x, int y, unsigned char color, LImage* img, bool isPreview, int button) = 0;
     virtual void Init() {}
-
+    QPoint oldPos = QPoint(-1,-1);
 
     void setSize(float f);
     void setRadius(float f);
@@ -211,16 +211,17 @@ public:
     enum Status { Selecting, DoneSelecting, Stamp, Idle };
     static Status m_status;// = Status::Idle;
     static LImage* m_copy;
+    int m_type = 0;
 
-    CopyStamp() {m_status=Idle;}
-    CopyStamp(QString name, QString imagefile, QString tooltip) : ToolboxItem(name, imagefile,tooltip) { }
+    CopyStamp();
+    CopyStamp(QString name, QString imagefile, QString tooltip, int type);
     void IsPreview(int button, bool& isPreview) override {
         if (button==1)
         isPreview = true;
     }
 
     void StampImage(int x, int y, LImage* img);
-    void Init() override { m_status = Status::Idle;}
+    void Init() override;
 
 
 };

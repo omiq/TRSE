@@ -91,12 +91,15 @@ public:
     QPixmap m_pixMapImage;
     bool isPreview;
 
+    int m_displayImageWidth = 320;
+
     void UpdateDrawing();
     void UpdateMousePosition();
     void UpdatePanning();
     void UpdateImage(LImage* mc);
 
     void UpdateMessages();
+    void FillImage(QImage& img);
 
 signals:
     void updateImageSignal();

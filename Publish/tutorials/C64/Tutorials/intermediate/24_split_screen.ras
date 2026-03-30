@@ -1,0 +1,65 @@
+program Splitscreen;
+@use "screen/screen"
+/*
+	Set up a system with a split screen: upper part is an multicolor bitmap image, while
+	lower part displays text
+*/
+var
+@export "resources/images/optic1.flf" "resources/images/optic.bin" 0
+
+	image_color: IncBin("resources/images/optic_color.bin", $5000);
+	image_data: IncBin("resources/images/optic_data.bin", $6000);
+
+	const splitLineY : byte = 193;
+
+interrupt RasterBottom(); forward;
+
+interrupt RasterTop();
+begin
+	startirq(0);
+	
+	Screen::SetMulticolorMode();
+	Screen::SetBitmapMode();
+	// Set data pointer to $6000
+	setcharsetandscreenlocation($6000,$4400);
+	Screen::SetBank(vic_bank1);
+	
+	
+	RasterIRQ(RasterBottom(),splitLineY,0);
+	closeirq();
+end;
+
+interrupt RasterBottom();
+begin
+	startirq(0);
+	wait(13);	
+	settextmode();
+	setregularcolormode();
+	// Set data pointer to $6000
+	setcharsetandscreenlocation($1000,$400);
+	// Set bank 0 ($0000-$3FFF)
+	Screen::SetBank(vic_bank0);
+	
+	
+	RasterIRQ(RasterTop(),0,0);
+	closeirq();
+end;
+
+
+begin
+	// allow all memory usage
+	disableciainterrupts();
+	setmemoryconfig(1,0,0);		
+	// Start the raster chain
+	startrasterchain(RasterTop(),0,0);
+	// Copy color data
+	Screen::CopyImageColorData(#image_color,1);
+	Screen::background:=black;
+	
+	// Clear the screen, print some text
+	clearscreen(key_space,#Screen::Screen0);
+	Screen::PrintStringColor("I FEEL SPLIT",2,20,white);
+	
+	Loop();
+
+end.

@@ -1,3 +1,4 @@
+
 /*
  * Turbo Rascal Syntax error, “;” expected but “BEGIN” (TRSE, Turbo Rascal SE)
  * 8 bit software development IDE for the Commodore 64
@@ -33,21 +34,23 @@
 #include <QTextCursor>
 #include <QFontMetrics>
 #include "source/LeLib/data.h"
-#include "source/LeLib/util/util.h"
 #include <QWheelEvent>
 #include "dialognewimage.h"
 #include "source/dialogabout.h"
 #include "source/LeLib/limage/limageio.h"
 #include <QMessageBox>
 #include <QSettings>
-#include "source/Compiler/assembler/mos6502/mos6502.h"
+#include "source/Compiler/assembler/asm6502.h"
 #include "source/dialogeffects.h"
 #include "source/Compiler/errorhandler.h"
 #include "source/Compiler/parser.h"
 #include "source/Compiler/compilers/compiler.h"
 #include "source/LeLib/data.h"
 #include "source/dialogsplash.h"
+#include <QInputDialog>
+#include "source/dialogsizeanalyser.h"
 
+#include "source/chip8emu/dialogchip8.h"
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -60,17 +63,9 @@ MainWindow::MainWindow(QWidget *parent) :
     Data::data.fontFamily = QFontDatabase::applicationFontFamilies(id).at(0);
 
     TRSEDocument::m_defaultPalette = m_defaultPalette;
-//    qRegisterMetaTypeStreamOperators<CItem>("CItem");
 
-
-    // make me crash
-/*    int a[4];
-    for (int i=0;i<10000;i++)
-    qDebug() << a[i];
-*/
     this->setMouseTracking(true);
     m_currentDoc = nullptr;
-//    setupIcons();
 
 #if defined(Q_OS_MAC)
     Util::path = QCoreApplication::applicationDirPath() + "/../../";
@@ -111,14 +106,15 @@ MainWindow::MainWindow(QWidget *parent) :
 //    m_tutorials.PopulateSystemList(ui->lstSystems);
     m_tutorials.PopulateSystemCmb(ui->cmbSelectSystem);
     m_tutorials.PopulateSystemCmb(ui->cmbSelectSystemRecent);
-    ui->cmbSelectSystemRecent->insertItem(0,"Show all systems");
-    ui->cmbSelectSystem->setCurrentIndex(0);
+    ui->cmbSelectSystem->setCurrentText(m_iniFile->getString("current_display_system"));
+    ui->cmbSelectSystemRecent->insertItem(0,"Show all systems (recent projects)");
+//    ui->cmbSelectSystem->setCurrentIndex(0);
     ui->cmbSelectSystemRecent->setCurrentIndex(0);
     on_cmbSelectSystem_activated(0);
     //ui->lstSystems->setCurrentRow(0);
     setWindowTitle("Turbo Rascal Syntax error, \";\" expected but \"BEGIN\" Version " + Data::data.version);
-    ui->txtChangelog->setText( ui->txtChangelog->toHtml().replace("@version",Data::data.version));
-    ui->txtChangelog->setText( ui->txtChangelog->toHtml().replace("@build",QDate::currentDate().toString()));
+//    ui->txtChangelog->setText( ui->txtChangelog->toHtml().replace("@version",Data::data.version));
+  //  ui->txtChangelog->setText( ui->txtChangelog->toHtml().replace("@build",QDate::currentDate().toString()));
 
     ui->treeSymbols->setHeaderHidden(true);
 
@@ -132,28 +128,42 @@ MainWindow::MainWindow(QWidget *parent) :
             this, SLOT(ShowFileContext(const QPoint &)));
 
 
-    m_splash = QSharedPointer<DialogSplash>(new DialogSplash(this));
+/*    m_splash = QSharedPointer<DialogSplash>(new DialogSplash(this));
 
 
     m_splash->m_seconds = m_iniFile->getdouble("splash_seconds");
     QTimer::singleShot(10, this, SLOT(ShowSplash()));
-
+*/
     QString t0 = "Number of computer systems supported in TRSE: "+QString::number(ui->cmbSelectSystem->count());
     QString t1 = "Number of sample projects: "+QString::number(Util::CountFilesInAllDirectories(Util::GetSystemPrefix() + "tutorials/",QStringList() <<"trse"));
     QString t2 = "Total number of example source files: "+QString::number(Util::CountFilesInAllDirectories(Util::GetSystemPrefix() + "tutorials/",QStringList() <<"ras"<<"inc"));
     QString t3 = "Total number of units: "+QString::number(Util::CountFilesInAllDirectories(Util::GetSystemPrefix() + "units/",QStringList()<<"tru"));
 
 
-//    ui->lblBrag1->setText(t0);
-    ui->lblBrag2->setText(t0 + "\n" +t1+ "\n" + t2 + "\n" + t3);
+//    ((QObject*)(nullptr))->setObjectName("whoo");
 
-//    setWindowTitle(Util::GetSystemPrefix());
+    ui->txtNews->setText(Util::loadTextFile(":resources/text/news.txt"));
 
+    // Load recent project
+    bool autoLoad = true;
+    if (m_iniFile->contains("auto_load_recent_project_on_startup"))
+        autoLoad = (m_iniFile->getdouble("auto_load_recent_project_on_startup")==1);
 
-//    ui->qsplitter->setSizes(QList<int>() << 5<<15<<10000);
+    if (autoLoad && ui->lstRecentProjects->count()>0) {
+        auto item = ui->lstRecentProjects->itemAt(0,0);
+        m_autoLoadProject = item->data(Qt::UserRole).toString();
+        QTimer::singleShot(50, this, SLOT(slotLoadProject()));
+
+    }
 
 }
 
+
+void MainWindow::slotLoadProject() {
+    LoadProject(m_autoLoadProject);
+    ui->tabMain->setCurrentIndex(0);
+
+}
 
 void MainWindow::InitOpenGLBanners()
 {
@@ -198,6 +208,7 @@ void MainWindow::InitOpenGLBanners()
     ui->glShowcase->m_slides.append(GLSlide(":resources/images/billboard/b27.png","https://csdb.dk/release/?id=193571",""));
     ui->glShowcase->m_slides.append(GLSlide(":resources/images/billboard/b28.png","https://csdb.dk/release/?id=193571",""));
     ui->glShowcase->m_slides.append(GLSlide(":resources/images/billboard/b30.png","https://github.com/omiq/PETFrog",""));
+    ui->glShowcase->m_slides.append(GLSlide(":resources/images/billboard/b31.png","https://waulok.itch.io/millipede",""));
     ui->glShowcase->m_slides.append(GLSlide(":resources/images/billboard/b2.png","https://www.pouet.net/prod.php?which=85300",""));
     ui->glShowcase->m_slides.append(GLSlide(":resources/images/billboard/b4.png","https://csdb.dk/release/?id=188056",""));
 
@@ -278,6 +289,7 @@ void MainWindow::mousePressEvent(QMouseEvent *e)
 
     qDebug() << "WTOF" << m_updateThread->m_currentButton;*/
 
+
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent *e)
@@ -344,8 +356,16 @@ void MainWindow::VerifyDefaults()
     if (!m_iniFile->contains("compile_thread"))
         m_iniFile->setFloat("compile_thread",1);
 
+    if (!m_iniFile->contains("auto_load_recent_project_on_startup"))
+        m_iniFile->setFloat("auto_load_recent_project_on_startup",1);
+
+    if (!m_iniFile->contains("grid_colour"))
+        m_iniFile->setVec("grid_colour",QVector3D(40,80,120));
     if (!m_iniFile->contains("tab_width"))
         m_iniFile->setFloat("tab_width", 4);
+
+    if (!m_iniFile->contains("current_display_system"))
+        m_iniFile->setString("current_display_system", "C64");
 
 
     if (!m_iniFile->contains("splash_seconds"))
@@ -360,6 +380,10 @@ void MainWindow::VerifyDefaults()
 
     if (!m_iniFile->contains("auto_inject"))
         m_iniFile->setFloat("auto_inject", 1);
+
+
+    if (!m_iniFile->contains("always_use_help_window"))
+        m_iniFile->setFloat("always_use_help_window", 1);
 
     if (!m_iniFile->contains("editor_cursor_width"))
         m_iniFile->setFloat("editor_cursor_width",1);
@@ -391,24 +415,29 @@ void MainWindow::VerifyDefaults()
     if (!m_iniFile->contains("memory_analyzer_font_size"))
         m_iniFile->setFloat("memory_analyzer_font_size", 17);
 
-    if (!m_iniFile->contains("memory_analyzer_window_width"))
-        m_iniFile->setFloat("memory_analyzer_window_width", 600);
-    if (!m_iniFile->contains("memory_analyzer_window_height"))
+    if (!m_iniFile->contains("memory_analyzer_window_width")) {
+        m_iniFile->setFloat("memory_analyzer_window_width", 800);
         m_iniFile->setFloat("memory_analyzer_window_height", 600);
+    }
+    if (!m_iniFile->contains("size_analyser_window_width")) {
+        m_iniFile->setFloat("size_analyser_window_width", 800);
+        m_iniFile->setFloat("size_analyser_window_height", 600);
+    }
+
     if (!m_iniFile->contains("image_painter"))
-        m_iniFile->setFloat("image_painter", 0);
+        m_iniFile->setFloat("image_painter", 1);
 
 
 
     //    qDebug() << m_ini->getString("ok64_emulator");
    if (!m_iniFile->contains("ok64_emulator") || m_iniFile->getString("ok64_emulator")=="")
     #ifdef __linux__
-        m_iniFile->setString("ok64_emulator","bin/OK64");
+        m_iniFile->setString("ok64_emulator","OK64");
     #endif
     #ifdef _WIN32
    m_iniFile->setString("ok64_emulator","OK64\\ok64.exe");
    if (!QFile::exists(m_iniFile->getString("ok64_emulator")))
-       m_iniFile->setString("ok64_emulator","OK64\\ok64.exe");
+       m_iniFile->setString("ok64_emulator","ok64.exe");
     #endif
 
 
@@ -419,14 +448,21 @@ void MainWindow::VerifyDefaults()
        m_iniFile->setString("assembler","OrgAsm");
 
    if (!m_iniFile->contains("assembler_z80"))
-       m_iniFile->setString("assembler_z80","Pasmo");
+       m_iniFile->setString("assembler_z80","OrgAsm");
+
+   if (!m_iniFile->contains("assembler_6809"))
+       m_iniFile->setString("assembler_6809","OrgAsm");
 
     // If something else is set, enforce Pasmo
     if (!(m_iniFile->getString("assembler_z80")=="OrgAsm" || m_iniFile->getString("assembler_z80")=="Pasmo"))
-       m_iniFile->setString("assembler_z80","Pasmo");
+       m_iniFile->setString("assembler_z80","OrgAsm");
 
    if (!m_iniFile->contains("editor_autocomplete"))
        m_iniFile->setFloat("editor_autocomplete",1);
+
+   if (!m_iniFile->contains("editor_autocomplete_nobug"))
+       m_iniFile->setFloat("editor_autocomplete_nobug",1);
+
 
     m_iniFile->filename = m_iniFileName;
 
@@ -441,28 +477,36 @@ void MainWindow::VerifyProjectDefaults()
 
 void MainWindow::UpdateSymbolTree(QString search)
 {
-
-    if (m_currentDoc==nullptr) {
+    if (m_currentDoc == nullptr)
+        return;
+    if (m_currentDoc->isBuilding() || Data::data.isBuilding) {
         return;
     }
-    if (!m_currentDoc->isRasFile())
+
+    auto doc = getMainDocument();
+
+
+    if (doc==nullptr) {
+        return;
+    }
+    if (!doc->isRasFile())
         return;
 
 
 
-    if (!m_currentDoc->m_currentFileShort.toLower().endsWith(".ras"))
+    if (!doc->m_currentFileShort.toLower().endsWith(".ras"))
         return;
+
+
+
 
     ui->treeSymbols->setFont(QFont(m_iniFile->getString("editor_font_symbols"),m_iniFile->getInt("font_size_symbols")));
 
-    m_currentDoc->setOutputText(FormRasEditor::m_globalOutput);
-    FormRasEditor* fe = ((FormRasEditor*)m_currentDoc);
-    if (fe)
-        fe->SetLights();
-
-    FormRasEditor* e = dynamic_cast<FormRasEditor*>(m_currentDoc);
+    doc->setOutputText(FormRasEditor::m_globalOutput);
+    auto e = dynamic_cast<FormRasEditor*>(doc);
     if (e==nullptr)
         return;
+    e->SetLights();
 
 
 
@@ -482,7 +526,9 @@ void MainWindow::UpdateSymbolTree(QString search)
     QTreeWidgetItem* Symbols = new QTreeWidgetItem(QStringList() <<"Symbols");
     QTreeWidgetItem* Procedures = new QTreeWidgetItem(QStringList() <<"Procedures");
 
-
+    if (p==nullptr) return;
+    if (p->m_symTab == nullptr)
+        return;
     if (p->m_symTab->m_symbols.keys().count()==0)
         return;
 
@@ -497,6 +543,8 @@ void MainWindow::UpdateSymbolTree(QString search)
 
     for (QString key : p->m_symTab->m_symbols.keys()) {
         QSharedPointer<Symbol> s = p->m_symTab->m_symbols[key];
+        if (s==nullptr)
+            return;
         QString t = s->m_type;
         if (t.toLower()=="array") t = s->m_arrayTypeText.toLower()+"[ "+QString::number(s->m_size)+ " ]";
         //if (t.toLower()=="record") t = s->m_arrayTypeText +"[ "+QString::number(s->m_size)+ " ]";
@@ -510,6 +558,7 @@ void MainWindow::UpdateSymbolTree(QString search)
         QSharedPointer<Node> s = p->m_procedures[key];
         QSharedPointer<NodeProcedureDecl> proc = qSharedPointerDynamicCast<NodeProcedureDecl>(s);
         QString params = "(";
+        // Interesting.. crash here?
         for (QSharedPointer<Node> n: proc->m_paramDecl) {
             QSharedPointer<NodeVarDecl> vd = qSharedPointerDynamicCast<NodeVarDecl>(n);
 //            params+=qSharedPointerDynamicCast<NodeVar>(vd->m_varNode)->value+" : ";
@@ -616,8 +665,9 @@ void MainWindow::cleanSymbol(QTreeWidgetItem* parent, QString on, QString n, int
 
 
 
-
-
+/*
+ *  Todo: Create a form factory class
+ */
 void MainWindow::LoadDocument(QString fileName, bool isExternal)
 {
 
@@ -663,16 +713,19 @@ void MainWindow::LoadDocument(QString fileName, bool isExternal)
         fe->m_projectPath = getProjectPath();
 
     }
-    if (fileName.contains(".ras") || fileName.contains(".asm") || fileName.contains(".inc") || fileName.contains(".tru") ) {
+    if (fileName.contains(".ras") || fileName.contains(".asm") || fileName.contains(".inc") || fileName.contains(".tru") || fileName.contains(".ll")) {
         editor = new FormRasEditor(this);
     }
     if (fileName.contains(".fjo")) {
         editor = new FormFjong(this);
     }
+    if (fileName.contains(".rtf")) {
+        editor = new FormRTF(this);
+    }
     if (fileName.contains(".paw")  ) {
         editor = new FormPaw(this);
     }
-    if (fileName.contains(".bin") || fileName.contains(".prg"))  {
+    if (fileName.contains(".bin") || fileName.contains(".prg") || fileName.contains(".pal"))  {
         editor = new FormHexEdit(this);
     }
     if (fileName.contains(".trt"))  {
@@ -687,6 +740,7 @@ void MainWindow::LoadDocument(QString fileName, bool isExternal)
     QString s = QDir::separator();
     // replace "//" with "/"
     editor->m_currentSourceFile = editor->m_currentSourceFile.replace(s+s,s);
+
 
     if (isExternal) {
         fileName = testFilename; //"[external]"+fileName.split(QDir::separator()).last();
@@ -703,7 +757,8 @@ void MainWindow::LoadDocument(QString fileName, bool isExternal)
 
 
     m_currentProject.m_ini->addStringList("open_files", editor->m_currentFileShort, true);
-    m_currentProject.Save();
+    saveCurrentProject();
+
 
 
 
@@ -752,6 +807,9 @@ void MainWindow::ConnectDocument()
     connect(m_currentDoc, SIGNAL(emitSuccess()), this, SLOT(HandleBuildSuccess()));
     connect(m_currentDoc, SIGNAL(emitFailure()), this, SLOT(UpdateFailure()));
 
+    connect(m_currentDoc, SIGNAL(emitOutputTextChanged()), this, SLOT(PropagateMainOutput()));
+    connect(m_currentDoc, SIGNAL(emitMemoryAnalyse()), this, SLOT(AcceptMemoryAnalyse()));
+    connect(m_currentDoc, SIGNAL(emitSizeAnalyse()), this, SLOT(on_btnSizeAnalyser_clicked()));
 
 
 //    connect(m_currentDoc, SIGNAL(NotifyOtherSourceFiles()), this, SLOT(AcceptUpdateSourceFiles()));
@@ -761,6 +819,7 @@ void MainWindow::ConnectDocument()
         connect(m_currentDoc, SIGNAL(OpenOtherFile(QString, int )), this, SLOT(ForceOpenFile(QString , int)));
         connect(m_currentDoc, SIGNAL(emitGotoSymbol(QString)), this, SLOT(GotoSymbol(QString)));
         connect(m_currentDoc, SIGNAL(emitGotoAssemblerLine(QString, int)), this, SLOT(GotoAssemblerLine(QString, int)));
+        connect(m_currentDoc, SIGNAL(emitRequestSystemChange(QString)), this, SLOT(AcceptRequestSystemChange(QString)));
     }
 
 }
@@ -886,7 +945,7 @@ void MainWindow::AddTreeFileItem(QStandardItem *parent, QString file, QStringLis
    }
    else
    if (fi.isDir()) {
-//       qDebug() << "DIR " << file;
+//       qDebug() << "DIR " << file<<"HAS NEXT";
        QDirIterator iterator(fi.absoluteFilePath(), exts, QDir::NoDotAndDotDot | QDir::AllEntries, QDirIterator::Subdirectories);
        if (iterator.hasNext()) {
          QStandardItem* it = new QStandardItem(fi.fileName());
@@ -894,7 +953,7 @@ void MainWindow::AddTreeFileItem(QStandardItem *parent, QString file, QStringLis
          QBrush b;
          b.setColor(m_fileColors["dir"]);
          it->setForeground(b);
-         //it->setData(finfo.absoluteFilePath(), QtCore.Qt.UserRole)
+         it->setData(fi.absoluteFilePath().remove(m_currentPath), Qt::UserRole);
          QStandardItem* srt = new QStandardItem("AAAAA" + fi.fileName());
 
          parent->appendRow(QList<QStandardItem*>() <<it << srt);
@@ -904,6 +963,20 @@ void MainWindow::AddTreeFileItem(QStandardItem *parent, QString file, QStringLis
 
          //it->sortChildren(0);
         }
+       else
+       {
+           QStandardItem* it = new QStandardItem(fi.fileName());
+           it->setEditable(false);
+           QBrush b;
+           b.setColor(m_fileColors["dir"]);
+           it->setForeground(b);
+           it->setData(fi.absoluteFilePath().remove(m_currentPath), Qt::UserRole);
+           //it->setData(finfo.absoluteFilePath(), QtCore.Qt.UserRole)
+           QStandardItem* srt = new QStandardItem("AAAAA" + fi.fileName());
+
+           parent->appendRow(QList<QStandardItem*>() <<it << srt);
+
+       }
 
     }
    for (QList<QStandardItem*> si : lstFiles) {
@@ -944,6 +1017,41 @@ void MainWindow::VerifyTRSEVersion()
     }
 }
 
+void MainWindow::PopulateTutorialTable()
+{
+
+}
+
+void MainWindow::AcceptRequestSystemChange(QString system)
+{
+    system = system.toUpper();
+    // Ensure faulty systems aren't applied
+    AbstractSystem::System sys = AbstractSystem::SystemFromString(system);
+    system = AbstractSystem::StringFromSystem(sys);
+
+    m_currentProject.m_ini->setString("system",system);
+    Syntax::s.m_systemString = system;
+    Syntax::s.Init(sys,m_iniFile, m_currentProject.m_ini);
+    QTimer::singleShot(200, this, SLOT(UpdateOutputSystemChange()));
+
+}
+
+void MainWindow::AcceptMemoryAnalyse()
+{
+    auto doc = getMainDocument();
+    auto d = dynamic_cast<FormRasEditor*>(doc);
+    if (d==nullptr)
+        return;
+    d->MemoryAnalyze(false);
+
+}
+
+void MainWindow::UpdateOutputSystemChange()
+{
+    m_currentDoc->setOutputText("Current system changed to "+m_currentProject.m_ini->getString("system")+"! Please rebuild to apply.");
+
+}
+
 void MainWindow::AcceptUpdateSourceFiles(QSharedPointer<SourceBuilder> sourceBuilder)
 {
     FormRasEditor::m_broadcast=false;
@@ -951,7 +1059,7 @@ void MainWindow::AcceptUpdateSourceFiles(QSharedPointer<SourceBuilder> sourceBui
     QStringList files;
     if (sourceBuilder==nullptr)
         return;
-    for (FilePart& fp: sourceBuilder->compiler->m_parser.m_lexer->m_includeFiles)
+    for (FilePart& fp: sourceBuilder->compiler->m_parser.m_lexer->getIncludeFiles())
         files<<fp.m_name;
   //  qDebug() << files;
     for (TRSEDocument* t : m_documents) {
@@ -975,8 +1083,9 @@ void MainWindow::AcceptUpdateSourceFiles(QSharedPointer<SourceBuilder> sourceBui
     FormRasEditor::m_broadcast=true;
 }
 
-void MainWindow::acceptBuildMain(bool run) {
-    if (m_currentDoc->isBuilding()) {
+void MainWindow::acceptBuildMain(bool run
+                                 ) {
+    if (m_currentDoc->isBuilding() || Data::data.isBuilding) {
         return;
     }
     m_keepFile = m_currentDoc->m_currentFileShort;
@@ -1058,6 +1167,10 @@ void MainWindow::setupIcons()
     m_icons["asm"] = QIcon(QPixmap::fromImage(img));
     m_fileColors["asm"] = QColor(32,120,32);
 
+    img.load(":resources/images/asm_icon.png");
+    m_icons["ll"] = QIcon(QPixmap::fromImage(img));
+    m_fileColors["ll"] = QColor(32,120,64);
+
     img.load(":resources/images/image_icon.png");
     m_icons["flf"] = QIcon(QPixmap::fromImage(img));
     m_fileColors["flf"] = QColor(c1,c4,c4);
@@ -1084,13 +1197,20 @@ void MainWindow::setupIcons()
     m_fileColors["sid"] = QColor(c1,c1,c3);
 
 
+    img.load(":resources/images/help_icon.png");
+    m_icons["rtf"] = QIcon(QPixmap::fromImage(img));
+    m_fileColors["rtf"] = QColor(c1,c2,c3);
+
+
     m_fileColors["dir"] = QColor(c2,c2,c2);
 
 
     img.load(":resources/images/bin.png");
     m_icons["bin"] = QIcon(QPixmap::fromImage(img));
+    m_icons["pal"] = QIcon(QPixmap::fromImage(img));
     m_icons["bin_c"] = QIcon(QPixmap::fromImage(img));
     m_icons["prg"] = QIcon(QPixmap::fromImage(img));
+    m_fileColors["pal"] = QColor(c4,c3,c2);
     m_fileColors["bin"] = QColor(c4,c4,c4);
     m_fileColors["bin_c"] = QColor(c4,c4,c4);
     m_fileColors["prg"] = QColor(c4,c4,c4);
@@ -1139,7 +1259,6 @@ void MainWindow::OnQuit()
     while (Data::data.isCompiling) {
         this->thread()->sleep(25);
     }
-
     m_currentProject.Save();
 //    qDebug() << m_currentProject.m_ini->getString("current_file");
 
@@ -1179,10 +1298,11 @@ void MainWindow::ForceOpenFile(QString s, int ln)
 //    qDebug() << "FIle exists : " <<QFile::exists(s) <<s;
 
     LoadDocument(s,isExternal);
-    m_currentDoc->GotoLine(ln);
+    if (ln!=0)
+        m_currentDoc->GotoLine(ln);
     FormRasEditor* fe = dynamic_cast<FormRasEditor*>(m_currentDoc);
     if (fe!=nullptr)
-        fe->SetOutputText(txt);
+        fe->setOutputText(txt);
 }
 
 void MainWindow::closeWindowSlot()
@@ -1234,7 +1354,7 @@ bool MainWindow::SaveAs()
     QFileDialog dialog;
     dialog.setFileMode(QFileDialog::AnyFile);
     QString f = ext +" Files (*."+ext+")";
-    QString filename = dialog.getSaveFileName(NULL, "Save file as",getProjectPath(),f);
+    QString filename = dialog.getSaveFileName(this, "Save file as",getProjectPath(),f);
 
     if (filename=="")
         return false;
@@ -1257,10 +1377,12 @@ bool MainWindow::SaveAs()
 void MainWindow::SaveAllRas()
 {
     for (auto doc:m_documents) {
-        if (dynamic_cast<FormRasEditor*>(doc)!=nullptr)
+        if (dynamic_cast<FormRasEditor*>(doc)!=nullptr) {
             if (doc->m_currentSourceFile!="")
                 if (!doc->m_currentFileShort.toLower().endsWith("asm"))
                    doc->SaveCurrent();
+        }
+        else doc->SaveCurrent();
     }
 }
 
@@ -1281,10 +1403,6 @@ bool MainWindow::RemoveTab(int idx, bool save)
 
     if (doc==nullptr)
         return false;
-    if (save) {
-        m_currentProject.m_ini->removeFromList("open_files", doc->m_currentFileShort);
-        m_currentProject.Save();
-    }
 
 
 //    disconnect(m_currentDoc, SIGNAL(requestCloseWindow()), this, SLOT(closeWindowSlot()));
@@ -1295,6 +1413,9 @@ bool MainWindow::RemoveTab(int idx, bool save)
     m_documents[idx];
     m_documents.remove(idx);
 
+
+    if (save)
+        saveCurrentProject();
 
 //    m_updateThread->SetCurrentImage(nullptr, nullptr, nullptr);
 
@@ -1345,6 +1466,7 @@ QStringList MainWindow::getTRUPaths()
 
     // Then, system dir
     QString s2 =  Util::path + QDir::separator() + Data::data.unitPath+QDir::separator() + Data::data.cpuUnitPath + QDir::separator() + Syntax::s.m_currentSystem->StringFromProcessor(system) +  QDir::separator();
+    s2 = s2.replace("EZ80","Z80");
     s2 = s2.replace("\\\\","\\");
     if (s2.startsWith("\\")) s2 = s2.remove(0,1);
 
@@ -1361,6 +1483,7 @@ QStringList MainWindow::getTRUPaths()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    saveCurrentProject();
     if (CloseAll()) {
         QSettings settings("LemonSpawn", "TRSE");
         settings.setValue("MainWindow/geometry", saveGeometry());
@@ -1464,20 +1587,52 @@ void MainWindow::ShowFileContext(const QPoint &pos)
     QMenu contextMenu(tr("Menu"), this);
 
     QAction action1("Delete file", this);
+    QAction action4("Duplicate file", this);
+    QAction action6("New .ras file", this);
+    QAction action61("New .inc file", this);
+    QAction action7("New .tru file", this);
+    QAction action7_rtf("New .rtf file", this);
+    QAction action71("New .fjo ray tracer file", this);
+    QAction action72("New .flf image", this);
+    QAction action5("Rename file", this);
+    QAction action51("Add existing file", this);
+    QAction action8("New folder", this);
     QAction action3("Help - what is this type of file?", this);
-    connect(&action1, SIGNAL(triggered()), this, SLOT(on_actionDelete_file_triggered()));
-    connect(&action3, SIGNAL(triggered()), this, SLOT(on_helpFileType()));
-    contextMenu.addAction(&action1);
-    contextMenu.addAction(&action3);
+    connect(&action1, SIGNAL(triggered()), this, SLOT(xon_actionDelete_file_triggered()));
+    connect(&action3, SIGNAL(triggered()), this, SLOT(xon_helpFileType()));
+    connect(&action4, SIGNAL(triggered()), this, SLOT(xon_duplicate_file()));
+    connect(&action6, SIGNAL(triggered()), this, SLOT(xon_new_ras_file()));
+    connect(&action61, SIGNAL(triggered()), this, SLOT(xon_new_inc_file()));
+    connect(&action7, SIGNAL(triggered()), this, SLOT(xon_new_tru_file()));
+    connect(&action7_rtf, SIGNAL(triggered()), this, SLOT(xon_new_rtf_file()));
+    connect(&action71, SIGNAL(triggered()), this, SLOT(xon_new_fjo_file()));
+    connect(&action72, SIGNAL(triggered()), this, SLOT(xon_new_flf_file()));
+    connect(&action8, SIGNAL(triggered()), this, SLOT(xon_new_folder()));
+    connect(&action5, SIGNAL(triggered()), this, SLOT(xon_rename_file()));
+    connect(&action51, SIGNAL(triggered()), this, SLOT(xon_add_existing_file()));
+
+    contextMenu.addAction(&action8); // New Folder
+    contextMenu.addAction(&action6); // New RAS
+    contextMenu.addAction(&action61); // New INC
+    contextMenu.addAction(&action7); // New TRU
+    contextMenu.addAction(&action71); // New fjo
+    contextMenu.addAction(&action72); // New flf
+    contextMenu.addAction(&action7_rtf); // New rtf
+    contextMenu.addAction(&action51); // add existing file
+    contextMenu.addAction(&action5); // Rename
+    contextMenu.addAction(&action4); // Duplicate
+    contextMenu.addAction(&action1); // Delete
+    contextMenu.addAction(&action3); // Help
 
     contextMenu.exec(mapToGlobal(pos));
 
 }
 
+
 void MainWindow::FindFileDialog()
 {
 
-    QStringList lst = QStringList() <<"*.asm" << "*.ras" << "*.tru"<< "*.fjo" << "*.flf" << "*.paw" << "*.sid" << "*.trt";
+    QStringList lst = QStringList() <<"*.asm" << "*.ras" << "*.tru"<< "*.fjo" << "*.flf" << "*.paw" << "*.sid" << "*.trt"<<"*.rtf" << "*.ll";
     QDirIterator it(getProjectPath(), lst, QDir::Files, QDirIterator::Subdirectories);
     QVector<QString> files;
     while (it.hasNext()) {
@@ -1512,7 +1667,6 @@ void MainWindow::onImageMouseMove()
 void MainWindow::on_treeFiles_doubleClicked(const QModelIndex &index)
 {
 
-
     QString path = FindPathInProjectFolders(index);
 
     // Finally load file!
@@ -1521,6 +1675,9 @@ void MainWindow::on_treeFiles_doubleClicked(const QModelIndex &index)
         s = s.remove(Util::path);
 
     QString file = QDir::toNativeSeparators(index.data(Qt::UserRole).toString());
+
+    if (QDir(path+file).exists()) // is a directory, abort
+        return;
 
     file = file.replace("\\\\","\\");
     file = file.replace("//","/");
@@ -1535,12 +1692,18 @@ void MainWindow::on_treeFiles_doubleClicked(const QModelIndex &index)
         return;
     }
 
-    if (file.toLower().endsWith(".tru") || file.toLower().endsWith(".ras") || file.toLower().endsWith(".asm")
+
+/*    if (file.toLower().endsWith(".tru") || file.toLower().endsWith(".ras") || file.toLower().endsWith(".asm")
             || file.toLower().endsWith(".inc") || file.toLower().endsWith(".flf")
             || file.toLower().endsWith(".paw") || file.toLower().endsWith(".fjo")
-        || file.toLower().endsWith(".bin_c") || file.toLower().endsWith(".bin") || file.toLower().endsWith(".prg") || file.toLower().endsWith(".sid")|| file.toLower().endsWith(".trt") ) {
-        LoadDocument(path + file);
-    }
+        || file.toLower().endsWith(".bin_c") || file.toLower().endsWith(".bin") || file.toLower().endsWith(".prg") || file.toLower().endsWith(".sid")|| file.toLower().endsWith(".trt")) {
+*/
+        bool ok=false;
+        for (QString& tst:allowedOpenExtensions)
+            if (file.toLower().endsWith(tst)) ok=true;
+
+        if (ok)
+            LoadDocument(path + file);
 
     Data::data.Redraw();
     Data::data.forceRedraw = true;
@@ -1563,12 +1726,14 @@ void MainWindow::on_helpFileType()
 
 void MainWindow::on_tabMain_currentChanged(int index)
 {
-    FormImageEditor* imageedit = dynamic_cast<FormImageEditor*>(ui->tabMain->widget(index));
-    FormRasEditor* rasedit = dynamic_cast<FormRasEditor*>(ui->tabMain->widget(index));
+//    FormImageEditor* imageedit = dynamic_cast<FormImageEditor*>(ui->tabMain->widget(index));
+  //  FormRasEditor* rasedit = dynamic_cast<FormRasEditor*>(ui->tabMain->widget(index));
 
 
-    for (TRSEDocument* doc : m_documents)
+    for (TRSEDocument* doc : m_documents) {
         doc->m_hasFocus = false;
+        doc->LoseFocus();
+    }
 
     if (dynamic_cast<TRSEDocument*>(ui->tabMain->widget(index))!=nullptr) {
         m_currentDoc = dynamic_cast<TRSEDocument*>(ui->tabMain->widget(index));
@@ -1578,6 +1743,7 @@ void MainWindow::on_tabMain_currentChanged(int index)
         }
         if (m_currentDoc!=nullptr && index!=0) {
             m_currentDoc->Reload();
+            m_currentDoc->SetFocus();
             m_currentDoc->m_hasFocus = true;
         }
 
@@ -1588,6 +1754,62 @@ void MainWindow::on_tabMain_currentChanged(int index)
         m_currentDoc=nullptr;
     }
     UpdateSymbolTree();
+    PropagateMainOutput();
+}
+
+TRSEDocument* MainWindow::getMainDocument()
+{
+    auto mainFile = m_currentProject.m_ini->getString("main_ras_file");
+    if (mainFile=="none")
+        return m_currentDoc;
+
+
+    TRSEDocument* main = m_currentDoc;
+    for (auto doc : m_documents)  {
+        if (doc->m_currentFileShort==mainFile) {
+            main = doc;
+        }
+    }
+
+    return main;
+}
+
+void MainWindow::saveCurrentProject()
+{
+    QStringList files;
+    // Order files according to the tab list
+    for (int i=0;i<ui->tabMain->count();i++)
+        files << ui->tabMain->tabText(i);
+
+    m_currentProject.m_ini->setStringList("open_files",files);
+
+    m_currentProject.Save();
+
+}
+
+
+
+
+void MainWindow::PropagateMainOutput()
+{
+    if (m_currentDoc == nullptr) return;
+
+    auto main = getMainDocument();
+
+    if (m_currentDoc == main)
+        return;
+
+    if (main==nullptr)
+        return;
+
+    auto mn = dynamic_cast<FormRasEditor*>(main);
+
+    if (mn==nullptr)
+        return;
+
+
+
+    m_currentDoc->setOutputText(main->getBuildText());
 
 }
 
@@ -1603,24 +1825,194 @@ void MainWindow::UpdateFailure()
     m_currentDoc->setOutputText(FormRasEditor::m_globalOutput);
 }
 
+
+void MainWindow::xon_duplicate_file()
+{
+    QModelIndex qlst = ui->treeFiles->currentIndex();
+    if (qlst.data(Qt::UserRole).toString()=="")
+        return;
+
+    QString path = getProjectPath();
+    QString filename = path + qlst.data(Qt::UserRole).toString();
+
+    if (!QFile::exists(filename))
+        return;
+
+    int i = 1;
+    QString nf = filename;
+    QString end = "."+QFileInfo(nf).suffix();
+
+    nf = nf.replace(end,QString::number(i)+end);
+    while (QFile::exists(nf)) {
+        i++;
+        nf = filename;
+        nf = nf.replace(end,QString::number(i)+end);
+    }
+    Util::CopyFileMSVCBug(filename,nf);
+    RefreshFileList();
+
+}
+
+
+void MainWindow::xon_rename_file()
+{
+
+    QModelIndex qlst = ui->treeFiles->currentIndex();
+    if (qlst.data(Qt::UserRole).toString()=="")
+        return;
+
+    QString path = getProjectPath();
+    QString filename = qlst.data(Qt::UserRole).toString();
+
+    bool ok;
+        QString text = QInputDialog::getText(this, tr("New filename"),
+                                             tr("New name"), QLineEdit::Normal,
+                                             filename, &ok);
+    if (ok && !text.isEmpty()) {
+        QString of = path + filename;
+        QString nf = path + text;
+        if (of.endsWith(".ras") && !nf.endsWith(".ras"))
+            nf = nf+".ras";
+        if (of.endsWith(".tru") && !nf.endsWith(".tru"))
+            nf = nf+".tru";
+        QFile::rename(of,nf);
+        RefreshFileList();
+    }
+}
+
+void MainWindow::xon_new_folder()
+{
+    QModelIndex qlst = ui->treeFiles->currentIndex();
+    QString path = getProjectPath();
+
+    QString fn = qlst.data(Qt::UserRole).toString();
+    QString subPath = "";
+    if (QDir(path+fn).exists())
+        subPath = fn+QDir::separator();
+
+    QString filename = "new";
+    bool ok;
+        QString text = QInputDialog::getText(this, tr("New folder"),
+                                             tr("New folder"), QLineEdit::Normal,
+                                             filename, &ok);
+    if (ok && !text.isEmpty()) {
+
+        QDir dir = QDir(path+subPath+text);
+        if (!dir.exists())
+            dir.mkpath(".");
+
+        RefreshFileList();
+    }
+
+}
+
+void MainWindow::xon_new_file(QString name)
+{
+    QModelIndex qlst = ui->treeFiles->currentIndex();
+    QString fn = qlst.data(Qt::UserRole).toString();
+
+
+    QString path = getProjectPath();
+    QString subPath = "";
+    if (QDir(path+fn).exists())
+        subPath = fn+QDir::separator();
+
+    QString filename = "new."+name;
+    bool ok;
+        QString text = QInputDialog::getText(this, tr("New file"),
+                                             tr("New file"), QLineEdit::Normal,
+                                             filename, &ok);
+    if (ok && !text.isEmpty()) {
+        QString nf = path + subPath +text;
+        if (!nf.endsWith("."+name))
+            nf+="."+name;
+        if (name!="fjo")
+            Util::SaveTextFile(nf,"");
+        else Util::CopyFileMSVCBug(":resources/code/fjong_template.fjo",nf);
+
+        RefreshFileList();
+        LoadDocument(nf.remove(path));
+    }
+
+}
+
+void MainWindow::xon_new_flf_file()
+{
+    on_actionImage_triggered();
+}
+
+void MainWindow::xon_add_existing_file()
+{
+    QFileDialog dialog;
+    QString filename = dialog.getOpenFileName(this, "Import existing file",getProjectPath(),"*.*");
+    if (filename=="")
+        return;
+
+    QModelIndex qlst = ui->treeFiles->currentIndex();
+    QString fn = qlst.data(Qt::UserRole).toString();
+
+    QString path = getProjectPath();
+    if (QDir(path+fn).exists())
+        path += fn+QDir::separator();
+
+    QString filenameShort = QFileInfo(filename).fileName();
+    QString nf = path +filenameShort;
+    Util::CopyFileMSVCBug(filename,nf);
+    RefreshFileList();
+
+}
+
+void MainWindow::xon_new_ras_file()
+{
+    xon_new_file("ras");
+}
+void MainWindow::xon_new_inc_file()
+{
+    xon_new_file("inc");
+}
+
+void MainWindow::xon_new_fjo_file()
+{
+    xon_new_file("fjo");
+}
+
+void MainWindow::xon_new_tru_file()
+{
+    xon_new_file("tru");
+}
+
+void MainWindow::xon_new_rtf_file()
+{
+    xon_new_file("rtf");
+}
+
 // New source file
 void MainWindow::on_actionRas_source_file_triggered()
 {
     CreateNewSourceFile("ras");
 }
 
-void MainWindow::on_actionDelete_file_triggered()
+void MainWindow::xon_actionDelete_file_triggered()
 {
 //    qDebug() << (ui->treeFiles->SelectedClicked);
     QModelIndex qlst = ui->treeFiles->currentIndex();
     if (qlst.data().toString()=="")
         return;
-    QString path = getProjectPath() + FindPathInProjectFolders(qlst);
-    QString filename = qlst.data().toString();
+//    qDebug() << qlst.data(Qt::UserRole).toStringList();
+    QString path = getProjectPath();
+    QString filename = qlst.data(Qt::UserRole).toString();
+
+
+
+
 
     QMessageBox msgBox;
+    bool isDir = QDir(path+filename).exists();
+    QString dirWarning ="";
+    if (isDir)
+        dirWarning = "\nALL FILES IN SUBFOLDERS WILL BE DELETED!";
     msgBox.setWindowTitle("Warning");
-    msgBox.setInformativeText("Are you sure you wish to delete '"+filename+"'");
+    msgBox.setInformativeText("Are you sure you wish to delete '"+filename+"'"+dirWarning);
     msgBox.setText("Warning!                                         ");
     msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
     msgBox.setDefaultButton(QMessageBox::Cancel);
@@ -1637,6 +2029,10 @@ void MainWindow::on_actionDelete_file_triggered()
                     break;
                 }
 
+        }
+        if (isDir) {
+            QDir d(path+filename);
+            d.removeRecursively();
         }
 
         RefreshFileList();
@@ -1840,7 +2236,7 @@ void MainWindow::LoadProject(QString filename)
     CloseAll();
     ClearSymbols();
     m_currentProject.Load(filename);
-    m_currentPath = QFileInfo(QFile(filename)).absolutePath();
+    m_currentPath = QFileInfo(QFile(filename)).canonicalPath();
 
 
 
@@ -1864,28 +2260,9 @@ void MainWindow::LoadProject(QString filename)
     // Set compiler syntax based on system
     QString system = m_currentProject.m_ini->getString("system").toUpper();
     Syntax::s.m_systemString = system;
+
     Syntax::s.Init(AbstractSystem::SystemFromString(system),m_iniFile, m_currentProject.m_ini);
-  //  if (Syntax::s.m_currentSystem->m_system==AbstractSystem::AMIGA)
-   //     Messages::messages.DisplayMessage(Messages::messages.AMIGA_WARNING);
 
-
-/*    QString link = m_currentPath+QDir::separator() + "trse_units";
-    QString truPath = Util::path+ QDir::separator() + "tutorials"+QDir::separator() + system+QDir::separator() + "tru"+QDir::separator();
-//    qDebug() <<link << truPath;
-
-  //  qDebug() << "LINK : " <<
-    if (QDir().exists(truPath)) {
-
-        #ifdef Q_OS_UNIX
-            QFile::link(truPath, link);
-        #endif
-
-        #ifdef Q_OS_WIN
-            QFile::link(truPath, link.append(".lnk"));
-        #endif
-
-    }
-*/
     QImage sysImg(":resources/images/" +system+".png");
     ui->lblCommodoreImage->setPixmap(QPixmap::fromImage(sysImg));
 
@@ -1901,18 +2278,39 @@ void MainWindow::LoadProject(QString filename)
 
     QStringList files = m_currentProject.m_ini->getStringList("open_files");
 
-    QString focusFile = m_currentProject.m_ini->getString("current_file");
-    for (int i=0;i<files.count();i++) {
-        QString f = files[files.count()-1-i];
-        if (QFile::exists(getProjectPath() + "/"+ f))
-            LoadDocument(f);
-    }
 
+    QString focusFile = m_currentProject.m_ini->getString("current_file");
+    QStringList updatedFiles;
+    for (int i=0;i<files.count();i++) {
+        QString f = files[i].replace("\\","/");
+        if (QFile::exists(getProjectPath() + "/"+ f)) {
+            LoadDocument(f);
+            updatedFiles << f;
+        }
+        else
+        if (f.contains("[ext]")) {
+            QString fn = Util::path +  f;
+            fn = fn.remove("[ext]");
+            if (QFile::exists(fn)) {
+                LoadDocument(fn, true);
+                updatedFiles << f;
+            }
+        }
+    }
+    m_currentProject.m_ini->setStringList("open_files", updatedFiles);
 //    qDebug() << f;
     if (QFile::exists(getProjectPath() + "/"+ focusFile))
         if (!(QDir(getProjectPath() + "/"+ focusFile).exists()))
             LoadDocument(focusFile);
 
+
+    if (m_documents.count()==0) { // No documents - load default
+        if (QFile::exists(getProjectPath() + "/readme.rtf"))
+            LoadDocument("readme.rtf");
+        else
+        if (QFile::exists(getProjectPath() + "/index.rtf"))
+            LoadDocument("index.rtf");
+    }
 
     m_watcher = QSharedPointer<QFileSystemWatcher>(new QFileSystemWatcher());
     m_watcher->addPath(getProjectPath());
@@ -2190,13 +2588,19 @@ void MainWindow::on_btnBuildAll_clicked()
 }
 
 void TRSEProject::VerifyDefaults() {
+    ConvertFromOldDiskSystem();
+
     if (!m_ini->contains("zeropages"))
-        m_ini->setStringList("zeropages", AsmMOS6502::m_defaultZeroPointers.split(","));
+        m_ini->setStringList("zeropages", Asm6502::m_defaultZeroPointers.split(","));
 
+    if (!m_ini->contains("use_track_19"))
+        m_ini->setFloat("use_track_19",1);
 
+    if (!m_ini->contains("disable_compiler_comments"))
+        m_ini->setFloat("disable_compiler_comments",0);
 
     if (!m_ini->contains("temp_zeropages"))
-        m_ini->setStringList("temp_zeropages", AsmMOS6502::m_defaultTempZeroPointers.split(","));
+        m_ini->setStringList("temp_zeropages", Asm6502::m_defaultTempZeroPointers.split(","));
 
     if (!m_ini->contains("zeropage_screenmemory"))
         m_ini->setString("zeropage_screenmemory","$fd");
@@ -2217,16 +2621,14 @@ void TRSEProject::VerifyDefaults() {
     if (!m_ini->contains("zeropage_decrunch4"))
         m_ini->setString("zeropage_decrunch4","$4B");
 
-
     if (!m_ini->contains("pascal_settings_use_local_variables"))
-        m_ini->setFloat("pascal_settings_use_local_variables", 0);
+        m_ini->setFloat("pascal_settings_use_local_variables", 1);
 
     if (!m_ini->contains("system"))
         m_ini->setString("system", "C64");
 
     if (!m_ini->contains("main_ras_file"))
         m_ini->setString("main_ras_file", "none");
-
 
 
     if (!m_ini->contains("zeropage_internal1"))
@@ -2281,6 +2683,9 @@ void TRSEProject::VerifyDefaults() {
     if (!m_ini->contains("show_all_files"))
         m_ini->setFloat("show_all_files",1);
 
+    if (!m_ini->contains("use_vice_c1541"))
+        m_ini->setFloat("use_vice_c1541",0);
+
     if (m_ini->getString("system")=="X86") {
         if (!m_ini->contains("dosbox_x86_system"))
             m_ini->setString("dosbox_x86_system","default");
@@ -2301,7 +2706,7 @@ void TRSEProject::VerifyDefaults() {
             m_ini->setString("vic_memory_config","none");
 
         if (!m_ini->contains("via_zeropages")) {
-            m_ini->setStringList("via_zeropages", AsmMOS6502::m_defaultViaZeroPointers.split(","));
+            m_ini->setStringList("via_zeropages", Asm6502::m_defaultViaZeroPointers.split(","));
         }
 
     }
@@ -2310,6 +2715,8 @@ void TRSEProject::VerifyDefaults() {
     if (!m_ini->contains("background_color"))
         m_ini->setFloat("background_color",0);
 
+    if (!m_ini->contains("use_python"))
+        m_ini->setFloat("use_python",0);
 
     if (!m_ini->contains("override_target_settings"))
         m_ini->setFloat("override_target_settings",0);
@@ -2337,7 +2744,7 @@ void TRSEProject::VerifyDefaults() {
 
 }
 
-void MainWindow::on_treeTutorials_itemDoubleClicked(QTreeWidgetItem *item, int column)
+/*void MainWindow::on_treeTutorials_itemDoubleClicked(QTreeWidgetItem *item, int column)
 {
     if (item->data(0,Qt::UserRole).toString()=="")
         return;
@@ -2348,16 +2755,28 @@ void MainWindow::on_treeTutorials_itemDoubleClicked(QTreeWidgetItem *item, int c
     VerifyTRSEVersion();
 
 }
+*/
+void MainWindow::LoadTutorialProject(QString file)
+{
+//    qDebug() << "MainWindow tutorial: "<<file;
+    QString dir = Util::GetSystemPrefix() + "tutorials/"+file;
 
-void MainWindow::on_treeTutorials_currentItemChanged(QTreeWidgetItem *current, QTreeWidgetItem *previous)
+    QString fileName = Util::findFileInDirectory("",dir,"trse");
+    LoadProject(fileName);
+    VerifyTRSEVersion();
+
+}
+
+
+/*void MainWindow::on_treeTutorials_currentItemChanged(QTreeWidgetItem *current, QTreeWidgetItem *previous)
 {
     if (current->data(0,Qt::UserRole).toString()=="")
         return;
     QString text = current->data(0,Qt::UserRole).toString().split(";")[1];
-    ui->txtTutorials->setText(text+"<p><font color=\"#A0FFA0\">Double click to load the project!</font>");
+    //ui->txtTutorials->setText(text+"<p><font color=\"#A0FFA0\">Double click to load the project!</font>");
 
 }
-
+*/
 void MainWindow::on_action_Project_Settings_triggered()
 {
     OpenProjectSettings();
@@ -2372,6 +2791,7 @@ void MainWindow::on_actionBuild_C_b_triggered()
 
 void MainWindow::on_actionBuild_All_triggered()
 {
+    SaveAllRas();
     BuildAll();
 }
 
@@ -2456,7 +2876,11 @@ void MainWindow::GotoSymbol(QString s)
 
 void MainWindow::GotoAssemblerLine(QString s, int lineNumber)
 {
-    QString asmSrc = s.split(".")[0] + ".asm";
+    QString type = ".asm";
+
+    if (s.toLower().contains(".asm"))
+        type = ".ras";
+    QString asmSrc = s.split(".")[0] + type;
 //    qDebug() << "Exists : " + m_currentPath+ asmSrc;
  //   qDebug() << QFile::exists(m_currentPath+ asmSrc);
     if (!QFile::exists(m_currentPath+ QDir::separator() + asmSrc))
@@ -2464,7 +2888,8 @@ void MainWindow::GotoAssemblerLine(QString s, int lineNumber)
 
     ForceOpenFile(asmSrc,0);
     m_currentDoc->Focus();
-    m_currentDoc->SearchInSource("linenumber: "+QString::number(lineNumber+1));
+    if (type==".asm")
+        m_currentDoc->SearchInSource("linenumber: "+QString::number(lineNumber+1));
 //    qDebug() << "Searching for line : " << lineNumber+2;
 //    m_currentDoc->SearchInSource("lineumber:");
 }
@@ -2515,7 +2940,6 @@ void MainWindow::LoadIniFile()
 
     m_iniFile->isMainSettings = true;
     auto path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-//    qDebug() << "MAIN " <<path;
     if (!QDir().exists(path)) {
         QDir().mkdir(path);
     }
@@ -2523,17 +2947,14 @@ void MainWindow::LoadIniFile()
 
     if (QFile::exists(m_iniFileName)) {
        m_iniFile->Load(m_iniFileName);
-//       qDebug() << "Loading NEW file type "<<m_iniFileName;
        if (m_iniFile->getString("amstradcpc464_emulator") != "" &&
            m_iniFile->getString("amstradcpc_emulator") == "") {
-           qDebug() << "Transparently migrating amstradcpc464_emulator to amstradcpc_emulator. See https://github.com/leuat/TRSE/pull/604.";
            m_iniFile->setString("amstradcpc_emulator", m_iniFile->getString("amstradcpc464_emulator"));
        }
     }
     else {
         if (QFile::exists(m_iniFileNameOld)) {
             m_iniFile->Load(m_iniFileNameOld);
-  //          qDebug() << "Loading OLD file type";
         }
     }
 
@@ -2553,13 +2974,15 @@ void MainWindow::LoadIniFile()
 
 
 
-void MainWindow::on_lstSystems_currentItemChanged(QListWidgetItem *current, QListWidgetItem *previous)
+/*void MainWindow::on_lstSystems_currentItemChanged(QListWidgetItem *current, QListWidgetItem *previous)
 {
     QString key = current->data(Qt::UserRole).toString();
-    m_tutorials.PopulateProjectList(key,ui->lstSampleProjects);
+    //m_tutorials.PopulateProjectList(key,ui->lstSampleProjects);
 
 }
+*/
 
+/*
 void MainWindow::on_lstSampleProjects_currentItemChanged(QListWidgetItem *current, QListWidgetItem *previous)
 {
     if (current==nullptr)
@@ -2569,7 +2992,7 @@ void MainWindow::on_lstSampleProjects_currentItemChanged(QListWidgetItem *curren
 
 
     QString text = current->data(Qt::UserRole).toString().split(";")[1];
-    ui->txtTutorials->setText(text+"<p><font color=\"#A0FFA0\">Double click to load the project!</font>");
+    //ui->txtTutorials->setText(text+"<p><font color=\"#A0FFA0\">Double click to load the project!</font>");
 
 }
 
@@ -2584,12 +3007,11 @@ void MainWindow::on_lstSampleProjects_itemDoubleClicked(QListWidgetItem *item)
     LoadProject(fileName);
     VerifyTRSEVersion();
 }
-
+*/
 void MainWindow::removeFromRecentList()
 {
     int idx = ui->lstRecentProjects->currentRow();
     QStringList l = m_iniFile->getStringList("recent_projects");
-//    qDebug() << idx << l[idx] << ui->lstRecentProjects->currentItem()->text();
     l.removeAt(idx);
     m_iniFile->setStringList("recent_projects",l);
     UpdateRecentProjects();
@@ -2608,8 +3030,13 @@ void MainWindow::on_btnClearProject_clicked()
 
 void MainWindow::HandleBuildSuccess()
 {
+
     RefreshFileList();
     UpdateSymbolTree();
+    auto main = getMainDocument();
+    if (main!=m_currentDoc && m_currentDoc!=nullptr)
+        m_currentDoc->ApplySymbolList(((FormRasEditor*)main)->m_builderThread.m_builder.get());
+
 }
 
 void MainWindow::on_actionTRSE_Showcases_triggered()
@@ -2625,23 +3052,34 @@ void MainWindow::on_btnShowcases_clicked()
 void MainWindow::on_cmbSelectSystem_activated(int index)
 {
     QString key = ui->cmbSelectSystem->currentData(Qt::UserRole).toString();
-    m_tutorials.PopulateProjectList(key,ui->lstSampleProjects);
 
-}
+    m_iniFile->setString("current_display_system", key);
 
-void MainWindow::on_btnChangelog_clicked()
-{
-/*    DialogAbout* ab = new DialogAbout();
-    ab->SetText("Changelog", ui->txtChangelog->toHtml());
-    ab->exec();
-    delete ab;*/
-    QDesktopServices::openUrl(QUrl("https://lemonspawn.com/turbo-rascal-syntax-error-expected-but-begin/downloads/", QUrl::TolerantMode));
+    //m_tutorials.PopulateProjectList(key,ui->lstSampleProjects);
+/*    QWidget *scrollWidget = new QWidget;
+    ui->scrollArea->setWidget(scrollWidget);
+    scrollWidget->setLayout(ui->tblTutorials);*/
+
+    for (auto w:m_tutorials.m_widgets)
+        disconnect( w, SIGNAL(emitLoadTutorialProject(QString)),this, SLOT(LoadTutorialProject(QString)));
+
+    auto scrollWidget = new QWidget;
+    auto area= ui->scrollArea;
+    area->setWidget(scrollWidget);
+    auto    layoutWithLabels = new QGridLayout;
+    scrollWidget->setLayout(layoutWithLabels);
+    //    m_tutorials.PopulateProjectTable(key,ui->tblTutorials);
+
+
+    m_tutorials.PopulateProjectTable(key,layoutWithLabels);
+    for (auto w:m_tutorials.m_widgets)
+        connect( w, SIGNAL(emitLoadTutorialProject(QString)),this, SLOT(LoadTutorialProject(QString)));
 
 }
 
 void MainWindow::on_actionView_changelog_triggered()
 {
-    on_btnChangelog_clicked();
+    QDesktopServices::openUrl(QUrl("https://lemonspawn.com/turbo-rascal-syntax-error-expected-but-begin/downloads/", QUrl::TolerantMode));
 }
 
 void MainWindow::on_action_Comment_Uncomment_triggered()
@@ -2661,7 +3099,6 @@ void MainWindow::on_action_Rename_current_file_triggered()
 {
     QString orgFile = m_currentPath + QDir::separator() + m_currentDoc->m_currentFileShort;
     if (SaveAs()) {
-//        qDebug() << orgFile;
         QFile::remove(orgFile);
     }
     RefreshFileList();
@@ -2713,14 +3150,6 @@ void MainWindow::on_actionTRSE_Tracker_File_trt_triggered()
 
 }
 
-void MainWindow::on_checkBox_stateChanged(int arg1)
-{
-/*    if (m_currentProject.m_filename=="")
-        return;
-    m_currentProject.m_ini->setFloat("show_all_files",ui->chkShowAllFiles->isChecked());
-    RefreshFileList();
-    qDebug() << "HERE";*/
-}
 
 void MainWindow::on_chkShowAllFiles_clicked()
 {
@@ -2730,3 +3159,35 @@ void MainWindow::on_chkShowAllFiles_clicked()
     RefreshFileList();
 
 }
+
+void MainWindow::on_actionSave_All_triggered()
+{
+    SaveAllRas();
+}
+
+
+void MainWindow::on_btnSizeAnalyser_clicked()
+{
+    auto doc = getMainDocument();
+    auto d = dynamic_cast<FormRasEditor*>(doc);
+    if (d==nullptr)
+        return;
+    if (d->m_builderThread.m_builder==nullptr)
+        return;
+    if (d->m_builderThread.m_builder->compiler==nullptr)
+        return;
+
+
+    DialogSizeAnalyser* ds = new DialogSizeAnalyser();
+    ds->Initialize(d->m_builderThread.m_builder.get(),m_iniFile.get(),m_iniFile->getdouble("memory_analyzer_font_size"));
+    ds->resize(m_iniFile->getdouble("size_analyser_window_width"),m_iniFile->getdouble("size_analyser_window_height"));
+    ds->exec();
+    delete ds;
+
+}
+
+
+void MainWindow::on_actionChip_8_emulator_triggered()
+{
+}
+

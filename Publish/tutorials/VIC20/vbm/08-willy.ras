@@ -72,14 +72,13 @@ var
 
 
 begin
-
 	// set the default display mode showing all 20 columns
 	vbmSetDisplayMode( 0 );
 	vbmClear( 0 );
 	vbmClearColor( WHITE );
 	SCREEN_BG_COLOR := BLACK + SCREEN_BG_BLACK;
 
-	vbmDrawTileMap(lvlData, adrChars, 0,0, 20,184);
+	vbmDrawTileMap(#lvlData, #adrChars, 0,0, 20,184);
 
 	xp := 64; yp := 160; dir := 1;
 	

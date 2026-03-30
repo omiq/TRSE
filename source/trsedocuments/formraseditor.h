@@ -95,7 +95,7 @@ public:
     BuilderThread m_builderThread;
     QElapsedTimer m_timer;
     int m_lastBuild= 0;
-    QVector3D m_curCol = QVector3D(180,160,50);;
+    QVector3D m_curCol = QVector3D(180,160,50);
     QVector3D m_startCol = QVector3D(64,32,0);
     QVector3D m_endCol = QVector3D(255,200,100);
 
@@ -111,9 +111,7 @@ public:
 
     void FocusOnOutput();
 
-    void setOutputText(QString text) override;
 
-    void LoadRasFile(QString fileName);
     void ExecutePrg(QString fileName);
     void InitDocument(WorkerThread *t, QSharedPointer<CIniFile> ini, QSharedPointer<CIniFile> iniProject) override;
     void setupEditor();
@@ -123,9 +121,13 @@ public:
     void Setup();
     void VerifyCommodoreStartChange();
 
+    void ApplySymbolList(SourceBuilder* c) override;
+
     void Focus() override;
 
     bool isBuilding() override;
+
+    QString getBuildText() override;
 
     void Run() override;
     void SetLights();
@@ -160,15 +162,15 @@ public:
 
     Ui::FormRasEditor* UI(){return ui;}
 
-    void SetOutputText(QString txt);
+    void setOutputText(QString txt) override;
 
     void BuildNes(QString prg);
-    void LookupSymbolUnderCursor() override;
     void LookupAssemblerUnderCursor() override;
     void ToggleComment() override;
 
 public slots:
     void HandleBuildComplete();
+    void LookupSymbolUnderCursor() override;
 
 private:
 
@@ -180,12 +182,8 @@ private:
 
 
 
-signals:
-    void emitSearchSymbols();
-    void OpenOtherFile(QString filename, int ln);
-    void NotifyOtherSourceFiles(QSharedPointer<SourceBuilder> builder);
-    void emitFailure();
 private slots:
+    void AcceptRequestSystemChange(QString val);
     void ShadowBuild();
 
     void on_leSearch2_textChanged();
@@ -210,6 +208,7 @@ private slots:
     void on_chkDisplayAddresses_stateChanged(int arg1);
     void on_chkDisplayCycles_stateChanged(int arg1);
     void on_btnViewHelp_clicked();
+    void on_btnAsm_clicked();
 };
 
 #endif // FORMRASEDITOR_H

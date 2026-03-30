@@ -1,0 +1,22 @@
+program MyProgram;
+
+@use "Screen"
+@use "Memory"
+@use "Input"
+
+ var
+	u, v : byte;
+
+begin
+	
+	Memory::DisableInterrupts();
+	Screen::SetMode(1);	
+	Screen::Cls(1);
+	while (true) do 	
+		begin
+		v := Input::GetPressedKey();
+		if (v = Input::Key_A) then Screen::Poke(28672,v);
+		u := Screen::Peek(28672);
+		if (u = v) then Screen::Poke(28672+32,u);
+	end;
+end.

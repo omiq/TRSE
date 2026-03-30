@@ -33,13 +33,17 @@ class CharmapLevel {
 public:
 //    uchar m_col0, m_col1, m_col2;
     QByteArray m_CharData;
+    QByteArray m_CharDataHi;
     QByteArray m_ColorData;
     QByteArray m_ExtraData;
+    CharmapLevel() {
 
+    }
 
-    void Clear() {
-        for (int i=0;i<m_CharData.count();i++) {
-            m_CharData[i] = 0x20;
+    void Clear(int val) {
+        for (int i=0;i<m_CharData.length();i++) {
+            m_CharData[i] = val;
+            m_CharDataHi[i] = val;
             m_ColorData[i] = 0x5;
         }
     }
@@ -50,6 +54,7 @@ public:
 
     CharmapLevel(int sizeChar, int sizeExtraData) {
         m_CharData.resize(sizeChar);
+        m_CharDataHi.resize(sizeChar);
         m_ColorData.resize(sizeChar);
         m_ExtraData.resize(sizeExtraData);
         if (sizeExtraData!=0)
@@ -59,10 +64,10 @@ public:
 
         for (int i=0;i<m_ExtraData.size();i++)
             m_ExtraData[i]=0;
-        Clear();
+        Clear(0);
     }
 
-    QImage createImage(int size, LColorList& lst, int width, int height);
+    QImage createImage(int size, LColorList& lst, int width, int height, bool hasBorder);
 
 };
 
@@ -76,6 +81,7 @@ private:
 
 public:
     bool m_useColors=true;
+    bool m_is16bit = false;
     int m_width=40, m_height=25;
     int m_sizex, m_sizey;
     int m_colSizex=-1, m_colSizey=-1;
@@ -101,14 +107,19 @@ public:
             m_colSizey = m_sizey;
         }
         m_dataSize = m_width*m_height;
+
         m_levelSize = m_dataSize + m_extraDataSize;
         if (m_useColors)
             m_levelSize +=m_colSizex*m_colSizey + m_extraDataSize;
 
 //        m_headerSize = 1 + 1 + 1 + 1 + 1 + 1 + 2 + 1;
         m_headerSize = 32;
+       // int scale = 1;
+        scale = 1;
+        if (m_is16bit)
+            scale = 2;
         // w/h sx/sy  stx/sty   levelSize
-        m_totalSize = m_levelSize*m_sizex*m_sizey + m_headerSize;
+        m_totalSize = m_levelSize*m_sizex*m_sizey*m_is16bit + m_headerSize;
     }
 
 
@@ -132,6 +143,7 @@ public:
         ba[10] = (uint)m_colSizex;
         ba[11] = (uint)m_colSizey;
         ba[12] = (uint)m_displayMultiColor;
+        ba[13] = (uint)m_is16bit;
         return ba;
     }
 
@@ -158,6 +170,7 @@ public:
         m_displayMultiColor = ba[12];
 
         m_useColors = ((uchar)ba[9]==1);
+        m_is16bit = ((uchar)ba[13]==1);
 
         if (m_useColors)
         if (m_colSizex <=0 || m_colSizey <=0) {
@@ -183,9 +196,11 @@ public:
     QPoint m_currentLevelPos = QPoint(0,0);
     CharmapLevel* m_currentLevel = nullptr;
     QVector<CharmapLevel*> m_levels;
+    bool first = false;
     bool m_isRightButtonClick = false;
     CharmapLevel* getLevel(int i, int j);
     CharmapGlobalData m_meta;
+    QPoint curPos;
 
     void ExportFrame(QFile& file, int p1, int p2, int p3, int p4, int p5, int p6, int p7, int p8) override;
 
@@ -195,20 +210,30 @@ public:
             m_charset->SetBank(bnk);
     }
 
+    virtual bool isLevelEditor() override { return true; }
 
-    void SetLevel(QPoint f);
+    void SetLevel(QPoint f, bool updateUi=true);
     ImageLevelEditor(LColorList::Type t);
 //    void Initialize(CharmapGlobalData meta);
     void ReInitialize() override;
 
+    void InitPens() override;
+
     QString GetCurrentDataString() override;
 
+    void setBasePixel(int x, int y) override;
 
     void BeforeRightButton() override { m_isRightButtonClick = true;}
     void AfterRightButton()  override{m_isRightButtonClick = false;}
 
 
     void CtrlLeftShift(int x, int y ) override;
+    void ShiftXY(int dx, int dy) override;
+
+    static CharmapLevel m_copyLevel;
+    void CopyChar() override;
+
+    void PasteChar() override;
 
 
     virtual bool isNes() override {
@@ -216,15 +241,20 @@ public:
             return m_charset->isNes();
         return false;
     }
+    virtual bool isSnes() override {
+        if (m_charset!=nullptr)
+            return m_charset->isSnes();
+        return false;
+    }
 
     void SetColor(uchar col, uchar idx) override;
-    void Clear() override;
+    void Clear(int val) override;
     void SaveBin(QFile& f) override;
     void LoadBin(QFile& f) override;
 //    void FromRaw(QByteArray& arr);
 //    void ToRaw(QByteArray& arr);
 
-    CharsetImage* getCharset() override {
+    LImage* getCharset() override {
         return m_charset;
     }
 
@@ -233,7 +263,7 @@ public:
 
     bool KeyPress(QKeyEvent *e) override;
 
-    virtual QPoint GetCurrentPosInImage(float x, float y) {
+    virtual QPoint GetCurrentPosInImage(float x, float y) override {
         return QPoint(x/8,y/8);
     }
     QVector<QPixmap> CreateIcons();

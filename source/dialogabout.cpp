@@ -25,6 +25,7 @@
 #include <QFile>
 #include <QDate>
 #include <QFontDatabase>
+#include <QDebug>
 
 DialogAbout::DialogAbout(QWidget *parent) :
     QDialog(parent),
@@ -49,7 +50,9 @@ DialogAbout::DialogAbout(QWidget *parent) :
     //this->setFixedHeight(this->height());
     ui->lblHeader->setFont(fntH);
     ui->lblHeader->setText("Version "+Data::data.version);
-    ui->lblDate->setText("Build: "+QDate::currentDate().toString());
+//    qDebug() << QDate::currentDate().toString();
+//    ui->lblDate->setText("Build: "+QDate::currentDate().toString());
+    ui->lblDate->setText("Build date : "+QStringLiteral(__DATE__));
     ui->lblHeader2->setFont(fntH);
     ui->lblHeader2->setStyleSheet("QLabel { color : yellow; }");
     ui->lblHeader->setStyleSheet("QLabel { color : yellow; }");

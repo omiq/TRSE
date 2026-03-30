@@ -1,0 +1,353 @@
+unit PolyCGA;
+@use "system/screen"
+@use "system/memory"
+var
+	p1,p2 : ^byte;	
+	
+code : array[556] of byte =( 
+	$55,$fc,$30,$c9,$89,$ce,$30,$ed,$51,$38,$d8,$76,$01,$93,$38,$d0,
+	$76,$01,$92,$38,$d3,$76,$02,$87,$d3,$89,$c5,$31,$ff,$30,$e4,$a8,
+	$01,$74,$04,$81,$c7,$00,$20,$24,$fe,$d1,$e0,$d1,$e0,$d1,$e0,$01,
+	$c7,$d1,$e0,$d1,$e0,$01,$c7,$89,$e8,$89,$d1,$28,$d9,$74,$3c,$fe,
+	$c1,$28,$fd,$73,$1b,$f6,$dd,$bd,$29,$c5,$89,$2e,$24,$15,$bd,$88,
+	$f5,$55,$bd,$38,$ee,$55,$bd,$fe,$c6,$55,$bd,$28,$e6,$55,$eb,$17,
+	$bd,$01,$c5,$89,$2e,$24,$15,$bd,$88,$f1,$55,$bd,$38,$f1,$55,$bd,
+	$fe,$ce,$55,$bd,$00,$e6,$55,$fe,$c5,$53,$51,$28,$c2,$fe,$c2,$28,
+	$e6,$73,$20,$f6,$de,$bd,$28,$c2,$89,$2e,$3c,$14,$bd,$fe,$c2,$89,
+	$2e,$50,$14,$bd,$38,$ea,$89,$2e,$52,$14,$bd,$88,$d5,$89,$2e,$56,
+	$14,$eb,$1c,$bd,$00,$c2,$89,$2e,$3c,$14,$bd,$fe,$ca,$89,$2e,$50,
+	$14,$bd,$38,$d1,$89,$2e,$52,$14,$bd,$88,$d1,$89,$2e,$56,$14,$fe,
+	$c6,$88,$e5,$88,$e1,$89,$cd,$28,$c3,$fe,$c3,$28,$e7,$73,$20,$f6,
+	$df,$b9,$28,$e6,$89,$0e,$3a,$14,$b9,$fe,$c6,$89,$0e,$44,$14,$b9,
+	$38,$ee,$89,$0e,$46,$14,$b9,$88,$f5,$89,$0e,$4a,$14,$eb,$1c,$b9,
+	$00,$e6,$89,$0e,$3a,$14,$b9,$fe,$ce,$89,$0e,$44,$14,$b9,$38,$f1,
+	$89,$0e,$46,$14,$b9,$88,$f1,$89,$0e,$4a,$14,$fe,$c7,$88,$d9,$30,
+	$ed,$09,$ce,$30,$c9,$31,$c0,$88,$e8,$00,$f8,$10,$e4,$f6,$f3,$88,
+	$e5,$30,$e4,$86,$c1,$00,$f0,$10,$e4,$f6,$f2,$86,$cc,$51,$52,$57,
+	$89,$ea,$89,$e9,$38,$cd,$72,$02,$86,$e9,$00,$e6,$00,$c2,$89,$d5,
+	$08,$e4,$74,$08,$fe,$ce,$38,$f1,$77,$02,$88,$f1,$08,$c0,$74,$08,
+	$fe,$ca,$38,$d0,$77,$02,$88,$d0,$28,$e9,$fe,$c1,$88,$e8,$30,$e4,
+	$d0,$e8,$d0,$e8,$01,$c7,$b6,$ff,$80,$e5,$03,$f6,$dd,$80,$c5,$04,
+	$38,$cd,$72,$1a,$d0,$e1,$d2,$ee,$88,$e9,$d0,$e1,$d2,$c6,$89,$f0,
+	$26,$8a,$05,$20,$f0,$f6,$d6,$20,$f4,$08,$e0,$aa,$eb,$43,$28,$e9,
+	$d0,$e5,$86,$e9,$d2,$e6,$86,$e9,$89,$f0,$26,$8a,$05,$20,$f0,$f6,
+	$d6,$20,$f4,$08,$e0,$aa,$88,$ce,$d0,$e9,$d0,$e9,$74,$08,$89,$f0,
+	$88,$e0,$30,$ed,$f3,$aa,$80,$e6,$03,$74,$16,$88,$f1,$b6,$ff,$d0,
+	$e1,$d2,$ee,$89,$f0,$26,$8a,$05,$20,$f0,$f6,$d6,$20,$f4,$08,$e0,
+	$aa,$5f,$5a,$59,$81,$c7,$00,$20,$81,$ff,$00,$40,$73,$0a,$4e,$f7,
+	$c6,$ff,$00,$74,$11,$e9,$2d,$ff,$81,$ef,$b0,$3f,$4e,$f7,$c6,$ff,
+	$00,$74,$03,$e9,$1f,$ff,$5b,$09,$db,$74,$2e,$58,$30,$c0,$95,$30,
+	$e4,$09,$c5,$88,$d8,$09,$c6,$4e,$58,$a3,$3a,$14,$58,$a3,$44,$14,
+	$58,$a3,$46,$14,$58,$a3,$4a,$14,$31,$c0,$88,$f8,$f6,$f3,$88,$e5,
+	$88,$c4,$30,$c0,$01,$c5,$e9,$ec,$fe,$5d,$c3);
+	
+procedure Init();
+begin
+	p1:=#code;	
+	p2:=ptr(0,$1300);
+	asm("
+		mov ax,ds
+;		mov ax,
+		mov [PolyCGA_p2+2],ax
+	");
+	memcpy8(p1,p2,556);
+end;	
+
+procedure Pre() inline;
+begin
+	asm("
+		mov ax,$b800
+		mov es,ax
+	
+	");
+	
+end;
+
+
+
+procedure Draw(_ah, _al, _bh, _bl, _dh, _dl, _ch : byte) inline;
+begin
+	asm("
+		call 0x1300
+	
+	");
+end;	
+	
+
+var	
+	tab40 : array[200] of integer = buildtable("i*40");
+
+	maskOut : array[4] of byte = (%11000000,%11110000, %11111100, %11111111);
+	@donotremove maskIn
+	maskIn : array[4] of byte = (%11111111,%00111111, %00001111, %00000011);
+
+	maskBit : array[4] of byte =( %00111111,  %11001111, %11110011,%11111100);
+	@donotremove maskBitInv
+	maskBitInv : array[4] of byte =(%11000000,   %00110000,%00001100,%00000011 );
+
+	dx1, dx2, ex1, ex2, i : integer;
+	y: signed integer;
+	@donotremove buf1
+	@donotremove buf2
+	lx1, lx2, lx3,xx1,buf1, xx2, buf2 : signed integer;
+	dst,p,screen : pointer;
+	v1,v2,j,d1,d2,d3,v3,v4,c1,v1x,v2x: byte;
+	@donotremove val1
+	@donotremove val2
+	@donotremove buf3
+	val, val1,buf3,val2: byte;
+	
+	const shift : byte = 8;
+
+
+
+procedure hline() inline;
+begin
+//	dx1:=xx1>>8;
+//	dx2:=xx2>>8;
+	
+	asm("
+		mov bp,di ; save di
+;		push di
+;		and bp,1
+;		mov cl,8
+;		mov ah,0
+;		mov bh,0
+		; high 8 bit
+		mov ax,[PolyCGA_xx1+1]
+		mov bx,[PolyCGA_xx2+1]
+;		shr  ax,cl
+;		shr  bx,cl
+
+				
+		cmp ax,bx
+		jbe {label0}
+		xchg ax,bx
+
+{label0}:		
+		
+		mov word [PolyCGA_dx1],ax
+		mov word [PolyCGA_dx2],bx
+
+
+		
+		; find mask values block		
+		
+		and ax,3
+		and bx,3
+		mov cl,[ds:si+bx] ; mask out
+		mov [PolyCGA_v2],cl
+		xor cl,255     ; inverse mask
+		mov [PolyCGA_v2x],cl
+		mov bx,ax
+		mov dl,[ds:si+bx+4] ; mask in
+		mov dh,dl
+		xor dh,255     ; invert
+
+
+
+		mov ax,[PolyCGA_dx1]
+		mov bx,[PolyCGA_dx2]
+
+	;	mov cl,2
+	 	; /4, find position in di + write length
+		shr ax,1
+		shr bx,1
+		shr ax,1
+		shr bx,1
+		
+;		jmp {label2}
+
+
+;		mov [PolyCGA_ex1],ax		
+;		mov [PolyCGA_ex2],bx		
+		
+;		les di,[PolyCGA_dst]
+
+		add di,ax ; x start pos
+		sub bx,ax  ;subtract counter
+
+;		cmp bx,0
+		
+		jne {label3} ; if equal, just do 1 write. 
+			
+		mov bx,[PolyCGA_dx1]
+		mov cx,[PolyCGA_dx2]		
+		and cx,3
+		and bx,3
+		cmp cx,bx
+		je {label2}
+
+; this part draws single-byte parts
+		mov al,[es:di]
+		push si
+		
+{label1}:
+		and al,[si+bx] ; j:=j & maskBit[d1];
+		mov ah, [PolyCGA_val]
+		and ah, [si+bx+4] ; and with maskinv
+		or al,ah		
+		inc bx
+		cmp cx, bx
+		jne {label1}
+		
+		mov [es:di],al
+		pop si
+		jmp {label2}		
+
+; this part draws first byte + last byte
+{label3}:		
+			mov al,[PolyCGA_val]
+;			add di,[PolyCGA_ex1]
+;			mov bx,[PolyCGA_ex1]
+
+			; first byte 
+			and [es:di], dh  ; mask
+			mov ah,al   ; get value
+			and ah,dl ;[PolyCGA_v1]  ; mask in value
+			; write first byte
+			or byte [es:di],ah
+
+
+			mov dh, [PolyCGA_v2x]
+			and [es:di+bx],dh
+			mov ah,al
+			and ah,[PolyCGA_v2]
+			or [es:di+bx],ah
+						
+		inc di
+		mov cx, bx
+		dec cx		
+		rep stosb
+		
+; actually slower		
+
+;		test cl,1
+;		jz {label4}		
+;		stosb
+;		dec cx		
+;{label4}:
+;		mov ah,al
+;		shr cx,1
+;	 	rep stosw		
+	 	
+		
+{label2}:
+		mov di,bp
+		add di,80
+		");
+		
+end;
+
+
+
+
+
+
+procedure Poly(x1,y1,x2,y2,x3,y3:integer;
+                val : global byte);
+
+
+begin
+	if ( y1>y3 ) then
+	begin
+		Memory::Swap(x1,x3);
+		Memory::Swap(y1,y3);
+
+	end;
+	
+	
+	if ( y2>y3 ) then
+	begin
+		Memory::Swap(x2,x3);
+		Memory::Swap(y2,y3);
+
+	end;
+	if ( y1>y2 ) then
+	begin
+		Memory::Swap(x1,x2);
+		Memory::Swap(y1,y2);
+
+    end;
+    y1-=2;
+    y3+=2;
+    	y1:=y1&$FFFE;
+    	y2:=y2&$FFFE;
+    	y3:=y3&$FFFE;
+
+
+	if ( (y1-y3)=0 ) then y3+=2;
+	if ( (y1-y2)=0 ) then y2+=2;
+	if ( (y2-y3)=0 ) then y3+=2;
+
+	lx1 := ((x1-x3))<<shift;
+	lx2 := ((x1-x2))<<shift;
+	lx3 := ((x2-x3))<<shift;
+	
+	
+	lx1 := lx1/(y1-y3);
+	lx2 := lx2/(y1-y2);
+	lx3 := lx3/(y2-y3);
+	
+	
+    xx1:=x1 << (shift);
+	xx2:=xx1;
+	y:=y1;
+	dst := screen +tab40[y];//ptr($B800,y*40);
+	lx1*=2;
+	lx2*=2;
+	lx3*=2;
+	asm("
+		mov al,[PolyCGA_val]
+		mov [PolyCGA_val1],al
+		ror al,1
+		ror al,1
+		ror al,1
+		ror al,1
+		mov [PolyCGA_val2],al
+	");
+	asm("
+		mov si,PolyCGA_maskOut
+		les di,[PolyCGA_dst]
+	
+	");
+	while (y2>y) do
+	
+	begin
+		asm("
+			mov bx,ax;[PolyCGA_y]
+			and bx,2
+			mov al,[PolyCGA_val1+bx]
+			mov [PolyCGA_val],al
+		");		
+		
+		hline();		      
+        y+=2;
+	
+		xx1+=lx1;
+		xx2+=lx2;
+
+	end;
+	
+	while (y3>y) do
+	begin
+		asm("
+			mov bx,ax;[PolyCGA_y]
+			and bx,2
+			mov al,[PolyCGA_val1+bx]
+			mov [PolyCGA_val],al
+		");		
+		hline();		      
+        y+=2;
+	
+		xx1+=lx1;
+		xx2+=lx3;
+
+	end;
+
+end;
+
+	
+	
+	
+end.

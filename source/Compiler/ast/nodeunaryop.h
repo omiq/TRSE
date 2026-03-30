@@ -31,8 +31,13 @@
 #include "source/Compiler/ast/nodenumber.h"
 #include "source/Compiler/ast/nodevar.h"
 #include "source/Compiler/ast/nodebinop.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
-
+#include "source/Compiler/codegen/abstractcodegen.h"
+/* 
+    a Node for a unary operation (such as -a)
+    m_left: undefined
+    m_right: the value to perform the unary operation on. 
+    m_op: the unary operation
+*/
 class NodeUnaryOp : public Node {
 public:
     NodeUnaryOp(Token t, QSharedPointer<Node> right);
@@ -52,7 +57,7 @@ public:
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override {
         m_right->ExecuteSym(symTab);
     }
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeUnaryOp>(sharedFromThis()));
     }
 

@@ -4,12 +4,12 @@ LImageSpectrum::LImageSpectrum(LColorList::Type t) : LImageQImage(t)
 {
     m_width = 256;
     m_height = 192;
-    Initialize(m_width,m_height);
     m_scaleX = 1.0f;
     m_noColors = 8;
     m_scale = 1;
     m_type = LImage::Type::Spectrum;
     m_colorList.m_supportsFooterPen = true;
+    Initialize(m_width,m_height);
 
     m_supports.koalaExport = false;
     m_supports.koalaImport = false;
@@ -33,6 +33,12 @@ LImageSpectrum::LImageSpectrum(LColorList::Type t) : LImageQImage(t)
     m_exportParams["VIC20mode"] = 0;
   */
     m_supports.displayCharOperations = true;
+    m_GUIParams[tabCharset] = "Charset";
+    m_GUIParams[tabData] = "";
+    m_GUIParams[tabLevels] = "";
+    m_GUIParams[tabEffects] = "Effects";
+
+    m_GUIParams[btnEditFullCharset] = "Char";
 
     m_colorList.InitSPECTRUM();
     //    InitPens();
@@ -93,10 +99,12 @@ void LImageSpectrum::OrdererdDither(QImage &img, LColorList &colors, QVector3D s
             winners.resize(16);
             for (int i=0;i<winners.count();i++)
                 winners[i] = QPoint(i,0);
+
             for (int j=0;j<8;j++) {
                 for (int i=0;i<8;i++) {
                     int w = m_qImage->pixel(i+ix,j+iy);
-                    winners[w].setY(winners[w].y()+1);
+                    if (w<winners.count())
+                        winners[w].setY(winners[w].y()+1);
                 }
             }
             std::sort(winners.begin(), winners.end(),sortFunc);

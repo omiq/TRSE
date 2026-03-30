@@ -11,6 +11,7 @@
 #include "systemplus4.h"
 #include "systemok64.h"
 #include "systemx86.h"
+#include "systemx16.h"
 #include "systemgameboy.h"
 #include "systemspectrum.h"
 #include "systemtiki100.h"
@@ -22,6 +23,29 @@
 #include "systematari800.h"
 #include "systemmsx.h"
 #include "systemappleii.h"
+#include "systemm1arm.h"
+#include "systemoric.h"
+#include "systemsnes.h"
+#include "systemmega65.h"
+#include "systemcustom.h"
+#include "systemvz200.h"
+#include "systemacorn.h"
+#include "systemjdh8.h"
+#include "systempokemonmini.h"
+#include "systemtrs80.h"
+#include "systemtrs80coco.h"
+#include "systemwonderswan.h"
+#include "systemtim.h"
+#include "systemtvc.h"
+#include "systemvectrex.h"
+#include "systemthomson.h"
+#include "systemchip8.h"
+#include "systempcw.h"
+#include "systembk0010.h"
+#include "systemdragon.h"
+#include "systemfoenix.h"
+#include "systemagon.h"
+#include "systemprimo.h"
 #include "source/LeLib/util/cinifile.h"
 
 class FactorySystem
@@ -29,56 +53,7 @@ class FactorySystem
 public:
     FactorySystem();
 
-    static AbstractSystem* Create(AbstractSystem::System type,QSharedPointer<CIniFile> settings, QSharedPointer<CIniFile> proj) {
-        AbstractSystem* s = nullptr;
-        if (type==AbstractSystem::C64)
-            return new SystemC64(settings, proj);
-        if (type==AbstractSystem::C128)
-            return new SystemC128(settings, proj);
-        if (type==AbstractSystem::PET)
-            return new SystemPET(settings, proj);
-        if (type==AbstractSystem::VIC20)
-            return new SystemVIC20(settings, proj);
-        if (type==AbstractSystem::NES)
-            return new SystemNES(settings, proj);
-        if (type==AbstractSystem::AMIGA)
-            return new SystemAmiga(settings, proj);
-        if (type==AbstractSystem::PLUS4)
-            return new SystemPlus4(settings, proj);
-        if (type==AbstractSystem::OK64)
-            return new SystemOK64(settings, proj);
-        if (type==AbstractSystem::X16)
-            return new SystemX16(settings, proj);
-        if (type==AbstractSystem::X86)
-            return new SystemX86(settings, proj);
-        if (type==AbstractSystem::GAMEBOY)
-            return new SystemGameboy(settings, proj);
-        if (type==AbstractSystem::SPECTRUM)
-            return new SystemSpectrum(settings, proj);
-        if (type==AbstractSystem::TIKI100)
-            return new SystemTiki100(settings, proj);
-        if (type==AbstractSystem::ATARI2600)
-            return new SystemAtari2600(settings, proj);
-        if (type==AbstractSystem::ATARI520ST)
-            return new SystemAtari520ST(settings, proj);
-        if (type==AbstractSystem::AMSTRADCPC)
-            return new SystemAmstradCPC(settings, proj);
-        if (type==AbstractSystem::COLECO)
-            return new SystemColeco(settings, proj);
-        if (type==AbstractSystem::MEGA65)
-            return new SystemMEGA65(settings, proj);
-        if (type==AbstractSystem::BBCM)
-            return new SystemBBCM(settings, proj);
-        if (type==AbstractSystem::ATARI800)
-            return new SystemAtari800(settings, proj);
-        if (type==AbstractSystem::MSX)
-            return new SystemMSX(settings, proj);
-        if (type==AbstractSystem::APPLEII)
-            return new SystemAppleII(settings, proj);
-
-
-        return s;
-    }
+    static AbstractSystem* Create(AbstractSystem::System type,QSharedPointer<CIniFile> settings, QSharedPointer<CIniFile> proj);
 
 
 };

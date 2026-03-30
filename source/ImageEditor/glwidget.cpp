@@ -99,7 +99,7 @@ void GLWidget::setTexture(QImage &img, QImage& grid)
     update();
   //  update();
 }
-
+/*
 void GLWidget::resizeGL(int width, int height)
 {
     int side = qMin(width, height);
@@ -113,21 +113,49 @@ void GLWidget::resizeGL(int width, int height)
     glOrtho(-0.5, +0.5, -0.5, +0.5, 4.0, 15.0);
 #endif
     glMatrixMode(GL_MODELVIEW);
+
 }
+*/
+void GLWidget::resizeEvent(QResizeEvent *event)
+{
+    if (event!=nullptr)
+        event->accept();
+
+    float scale = 1;
+    if (m_aspectType==2)
+        scale = 1.5;
+    if (m_aspectType>2) {
+        scale = m_aspectType;
+    }
+//    qDebug() << m_aspectType;
+
+
+
+    if (m_aspectType!=0) {
+        // Fixed 1:1
+
+        int m = std::min((float)event->size().width(),event->size().height()*scale);
+
+        QWidget::resize(m,m/scale);
+
+    }
+    QOpenGLWidget::resizeEvent(event);
+}
+
 
 void GLWidget::mouseMoveEvent(QMouseEvent *e)
 {
     if (AIE_mouseMoveEvent(e,this))
 
 
-  //  qDebug() << (m_updateThread->m_prevPos- m_updateThread->m_currentPos);
+        //  qDebug() << (m_updateThread->m_prevPos- m_updateThread->m_currentPos);
 
-//    if ((m_updateThread->m_prevPos-m_updateThread->m_currentPos).manhattanLength()>0.0)
+        //    if ((m_updateThread->m_prevPos-m_updateThread->m_currentPos).manhattanLength()>0.0)
+//        qDebug() << "HERE "<<rand()%100 ;
+        emit EmitMouseMove(e);
 
-           emit EmitMouseMove(e);
 
-
-//    emit EmitMouseMove();
+    //    emit EmitMouseMove();
 
 }
 

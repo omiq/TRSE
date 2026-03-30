@@ -16,6 +16,16 @@ DialogColors::~DialogColors()
     delete ui;
 }
 
+void DialogColors::Initialize(LImage *img, LColorList *lc, QString path) {
+    m_org = lc;
+    m_img = img;
+    m_lst = new LColorList();
+    m_lst->CopyFrom(m_org);
+    //        m_lst->m_list = m_org->m_list;
+    toGUI();
+    m_projectPath = path;
+}
+
 void DialogColors::toGUI()
 {
     m_lst->FillComboBox(ui->cbmColors);
@@ -41,9 +51,9 @@ void DialogColors::setColor(int cc, int ty) {
         ui->leRGB4->setText(m_lst->get(m_curCol).toRGB4());
     }
     if (ty==1)
-    ui->leRGB->setText(m_lst->get(m_curCol).toRGB8());
+        ui->leRGB->setText(m_lst->get(m_curCol).toRGB8());
     if (ty==2)
-    ui->leRGB4->setText(m_lst->get(m_curCol).toRGB4());
+        ui->leRGB4->setText(m_lst->get(m_curCol).toRGB4());
 
     ui->lblRGB4->setText("$"+QString::number(m_lst->get(m_curCol).get12BitValue(),16));
 
@@ -52,7 +62,19 @@ void DialogColors::setColor(int cc, int ty) {
 void DialogColors::on_pushButton_clicked()
 {
     //m_org->m_list = m_lst->m_list;
-    m_org->CopyFrom(m_lst);
+//    m_org->CopyFrom(m_lst);
+    // WTF? Why does everything crash if you change color 0?
+    for (int i=1;i<m_org->m_list.count();i++) {
+//        qDebug() << m_org->m_list[i].color<<m_lst->m_list[i].color;
+        if (i<m_img->m_colorList.m_list.count() && i<m_lst->m_list.count())
+        m_img->m_colorList.m_list[i].color = m_lst->m_list[i].color;
+
+    }
+//    m_org->m_list = m_lst->m_list;
+    if (Syntax::s.m_currentSystem->m_system==AbstractSystem::SNES || Syntax::s.m_currentSystem->m_system==AbstractSystem::AMIGA ) {
+        m_org->setNoBitplanes(m_lst->m_bpp.x());
+    }
+
     close();
 }
 
@@ -96,7 +118,7 @@ void DialogColors::on_btnLoad_clicked()
         LImage* img = LImageIO::Load(f);
 
         if (m_img!=nullptr && img!=nullptr) {
-                            qDebug() << "HER " << f;
+//                            qDebug() << "HER " << f;
             m_lst->CopyFrom(&img->m_colorList);
         }
 
@@ -135,8 +157,13 @@ void DialogColors::on_pushButton_2_clicked()
 
 void DialogColors::on_cbmBitplanes_currentIndexChanged(int index)
 {
-    if (Syntax::s.m_currentSystem->m_processor == AbstractSystem::M68000)
+    if (Syntax::s.m_currentSystem->m_processor == AbstractSystem::M68000 ||
+       Syntax::s.m_currentSystem->m_system==AbstractSystem::SNES ) {
         m_lst->setNoBitplanes(index+1);
+//        qDebug() << index+1;
+
+    }
+
     toGUI();
 }
 

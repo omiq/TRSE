@@ -20,179 +20,87 @@
 */
 
 
+
+
 #include "mainwindow.h"
 #include <QApplication>
 #include <QStyleFactory>
 #include <QSettings>
 #include "trc.h"
-/*
-void ConvertPerlin(QString input, QString out, float div) {
-    QImage img;
-    img.load(input);
-
-    QByteArray a;
-    int xw = img.width()/div;
-    int xh = img.height()/div;
-    a.resize(xw*xh);
-
-//    qDebug() << "Converting file: " << xw;
-
-    for (int x=0;x<xw;x++)
-        for (int y=0;y<xh;y++) {
-
-            a[x + y*xw]=QColor(img.pixel(x*div, y*div)).red();
-//            if (rand()%100>98)
-  //              qDebug() << a[x + y*xw];
-        }
-
-    QFile f(out);
-    f.open(QFile::WriteOnly);
-    f.write(a);
-    f.close();
-}
-
-
-void SineTable(QString fn) {
-    QFile f(fn);
-    f.open(QFile::WriteOnly);
-    QByteArray b;
-    for (int i=0;i<256;i++)
-        b.append(sin((i/256.0)*3.14159265*2)*127+128);
-    f.write(b);
-    f.close();
-
-}
-
-void SineTablei(QString fn) {
-    QFile f(fn);
-    f.open(QFile::WriteOnly);
-    QByteArray b;
-    for (int i=0;i<256;i++) {
-        b.append(sin((i/256.0)*3.14159265*2)*127+128);
-    }
-    f.write(b);
-    f.close();
-
-}
-
-
-void RandTable(QString fn) {
-    QFile f(fn);
-    f.open(QFile::WriteOnly);
-    QByteArray b;
-    for (int i=0;i<256;i++)
-        b.append(rand()%0xFF);
-    f.write(b);
-    f.close();
-
-}
-
-void TanTable(QString fn) {
-    QFile f(fn);
-    f.open(QFile::WriteOnly);
-    QByteArray b;
-    float ss = 0.8;
-    float div = 1.0f;
-    for (int i=0;i<256;i++) {
-//        b.append(1+tan((i/256.0)*3.14159265/2 + 3.14159)*127+128);
-//      b.append(1+tan((i/256.0)*PI/2.83)*127+128);
-        float v = tan( ((i/256.0)*PI*ss+PI/2.0 + (PI/2.0*(1-ss)/1) ) )*0.4;
-        if (v>div) v=div;
-        if (v<-div) v=-div;
-        v=v/div;
-//        qDebug() << i<< " : " << v;
-      b.append((v+1)*127+128);
-}
-//    for (int i=0;i<256;i++)
-  //      qDebug() << QString::number(i)  << " : " << QString::number(b[i]);
-
-    f.write(b);
-    f.close();
-
-}
-
-void ColumnTab()
-{
-    int k=0xFF;
-    QByteArray columntab;
-    columntab.resize(256);
-    for (int i=0;i<256;i++) {
-        if (i==0xff-0x80)  k=0x70;
-        if (i==0xff-0x40)  k=0x60;
-        if (i==0xff-0x20)  k=0x50;
-        if (i==0xff-0x10)  k=0x40;
-        if (i==0xff-0x08)  k=0x30;
-        if (i==0xff-0x04)  k=0x20;
-        if (i==0xff-0x02)  k=0x10;
-        if (i==0xff-0x01) k=0x00;
-
-        columntab[i]=k/16;
-    }
-    QFile f("columntab.bin");
-    f.open(QFile::WriteOnly);
-    f.write(columntab);
-    f.close();
-
-}
-*/
-/*
-
-void CircleAndAtan(QString f1, QString f2, int w, int h) {
-    QByteArray b1,b2;
-    for (int j=0;j<h;j++)
-        for (int i=0;i<w;i++) {
-            float y = (j-h/2)/(float)h;
-            float x = (i-w/2)/(float)w;
-            float s = sqrt(x*x+y*y);
-            b1.append((char)(s*15.0));
-            float s2 = atan2(x,y);
-            b2.append((char)(s2*15.0));
-
-        }
-
-    Util::SaveByteArray(b1,f1);
-    Util::SaveByteArray(b2,f2);
-}
-
-
-void TestSSIM() {
-    LImageQImage ia, ib;
-    ia.LoadQImage("/home/leuat/Pictures/jupiter1.jpg");
-    ib.LoadQImage("/home/leuat/Pictures/jupiter1.jpg");
-    qDebug() <<" Self : " <<ia.CalcSSIM(&ib);
-    ib.LoadQImage("/home/leuat/Pictures/jupiter2.jpg");
-    qDebug() <<" jup 2 : " <<ia.CalcSSIM(&ib);
-    ib.LoadQImage("/home/leuat/Pictures/skullsanta.jpeg");
-    qDebug() <<" santa : " <<ia.CalcSSIM(&ib);
-    ib.LoadQImage("/home/leuat/Pictures/avail.png");
-    qDebug() <<" avail : " <<ia.CalcSSIM(&ib);
-}
-
-
-//https://www.c64-wiki.com/wiki/Commodore_Plus/4
-*/
 
 void fixCurrentDir(QString execFile) {
-    QStringList al = execFile.split(QDir::separator());
-    al.removeLast();
-    QString dir = QDir::separator();
-    for (QString s : al)
-        dir +=s+QDir::separator();
+    QFileInfo exec(execFile);
+    QDir::setCurrent(exec.absoluteDir().absolutePath());
+}
 
-    QDir::setCurrent(dir);
+#include "source/LeLib/limage/multicolorimage.h"
+void CreateVICCharset() {
+    QByteArray ba;
+    for (int i=0;i<256;i++) {
+        PixelChar pc;
+        for (int j=0;j<8;j++) {
+            //0000
+            //0000
+            if (((i>>j)&1)==1) {
+                int x = j%4;
+                int y = (int)(j/4);
+                for (int dy=0;dy<4;dy++)
+                    for (int dx=0;dx<2;dx++)
+                        pc.set(x*2+dx,y*4+dy,1,0b1);
+            }
+        }
+        for (int i=0;i<8;i++)
+            ba.append(PixelChar::reverse(pc.p[i]));
+    }
+    Util::SaveByteArray(ba,"/Users/leuat/code/TRSE/Publish/tutorials/VIC20/tutorials/resources/charsets/gen.bin");
 
+}
+
+void CreateMergedTorus() {
+
+//    QString p = "SPECTRUM/tutorials";
+//    QString p = "/Users/leuat/code/TRSE/Publish/tutorials/TIM/tutorials";
+
+    QString p = "/Users/leuat/Dropbox/TRSE/dos_cga_party/";
+    auto b1 = Util::loadBinaryFile(p+"/data/inside_torus.bin");
+    auto b2 = Util::loadBinaryFile(p+"/data/inside_torus2.bin");
+    QByteArray d;
+    for (int i=0;i<b1.size();i++)
+        d.append(((b2[i]/16)&15) | (((b1[i]/8)&15)<<4));
+
+    Util::SaveByteArray(d,p+"/data/combined.bin");
+
+
+}
+
+void RandomList() {
+    QVector<int> b;
+    for (int i=0;i<200;i++) {
+        b.append(i);
+    }
+    for (int i=1; i<200; i++) {
+        qSwap (b[i],b[rand()%b.length()]);
+    }
+    qDebug() << b;
 }
 
 int main(int argc, char *argv[])
 {
+
+#ifdef _WIN32
+/*    // Make sure that stdout attaches itself to the console window on win32 for cli stuff
+    if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+        freopen("CONOUT$", "w", stdout);
+        freopen("CONOUT$", "w", stderr);
+    }
+*/
+#endif
     if (argc>=2) {
         if (QString(argv[1])=="-cli") {
             ClascExec ras(argc, argv);
             return ras.Perform();
         }
     }
-
-
     QApplication a(argc, argv);
     a.setOrganizationDomain("lemonspawn.com");
     a.setApplicationName("TRSE");
@@ -205,6 +113,5 @@ int main(int argc, char *argv[])
     w.show();
     w.AfterStart(oldCurDir);
     w.RestoreSettings();
-
     return a.exec();
 }

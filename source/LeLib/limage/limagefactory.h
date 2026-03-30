@@ -22,6 +22,7 @@
 #ifndef LIMAGEFACTORY_H
 #define LIMAGEFACTORY_H
 
+#include "source/LeLib/limage/limage.h"
 #include "source/LeLib/limage/limageqimage.h"
 #include "source/LeLib/limage/multicolorimage.h"
 #include "source/LeLib/limage/standardcolorimage.h"
@@ -52,6 +53,25 @@
 #include "source/LeLib/limage/limagebbc.h"
 #include "source/LeLib/limage/limagevga.h"
 #include "source/LeLib/limage/limagespectrum.h"
+#include "source/LeLib/limage/limagesnes.h"
+#include "source/LeLib/limage/limagelevelsnes.h"
+#include "source/LeLib/limage/limagevz200.h"
+#include "source/LeLib/limage/limagecustomc64multicolor.h"
+#include "source/LeLib/limage/limagejdh8.h"
+#include "source/LeLib/limage/limagegeneric.h"
+#include "source/LeLib/limage/limagegenericsprites.h"
+#include "source/LeLib/limage/limagecga160x100.h"
+#include "source/LeLib/limage/limageamstradsprites.h"
+#include "source/LeLib/limage/limagesnesgeneric.h"
+#include "source/LeLib/limage/limagetim.h"
+#include "source/LeLib/limage/limagetvc.h"
+#include "source/LeLib/limage/limagecoco3.h"
+#include "source/LeLib/limage/limagethomson.h"
+#include "source/LeLib/limage/limagetimgen.h"
+#include "source/LeLib/limage/limagelevelgeneric.h"
+#include "source/LeLib/limage/limageagon.h"
+#include "source/LeLib/limage/limageprimo.h"
+#include "source/LeLib/limage/limagecga_hires.h"
 
 class LImageFactory {
 public:

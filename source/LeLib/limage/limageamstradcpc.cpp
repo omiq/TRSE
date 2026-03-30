@@ -14,6 +14,7 @@ LImageAmstradCPC::LImageAmstradCPC(LColorList::Type t)  : LImageQImage(t)
     m_supports.flfSave = true;
     m_supports.flfLoad = true;
     m_colorList.m_supportsFooterPen = true;
+    usePens = true;
 
 /*    m_metaParams.append(new MetaParameter("mode","Mode",0,3,3));
     m_metaParams.append(new MetaParameter("screen_width","Screen width",160,2,1000));
@@ -23,7 +24,7 @@ LImageAmstradCPC::LImageAmstradCPC(LColorList::Type t)  : LImageQImage(t)
 
 }
 
-uchar LImageAmstradCPC::AmstradCrazySwap(uchar c) {
+uchar LImageAmstradCPC::AmstradMode0BitPattern(uchar c) {
 //    return ((c&0b11000000) | ((c&0b00000011)<<2) | ((c&0b00001100)<<2) | ((c&0b00110000)>>4));
     return (((c&0b00000011)<<6) | ((c&0b00001100)<<0) | ((c&0b00110000)<<0) | ((c&0b11000000)>>6));
 }
@@ -60,7 +61,7 @@ void LImageAmstradCPC::InitPens()
     //  m_colorList.InitPalettePens(m_colors);
 }
 
-
+/*
 void LImageAmstradCPC::setPixel(int x, int y, unsigned int color)
 {
     if (m_qImage==nullptr)
@@ -77,6 +78,7 @@ void LImageAmstradCPC::setPixel(int x, int y, unsigned int color)
     if (x>=0 && x<m_qImage->width() && y>=0 && y<m_qImage->height())
         m_qImage->setPixel(x,y,QRgb(m_colorList.getPenIndex(color)));
 }
+*/
 /*
 unsigned int LImageAmstradCPC::getPixel(int x, int y)
 {
@@ -90,22 +92,9 @@ unsigned int LImageAmstradCPC::getPixel(int x, int y)
     return 0;
 }
 */
-void LImageAmstradCPC::ToQImage(LColorList &lst, QImage &img, float zoom, QPointF center)
+void LImageAmstradCPC::ToQImage(LColorList &lst, QImage &img, double zoom, QPointF center)
 {
-#pragma omp parallel for
-    for (int i=0;i<m_width;i++)
-        for (int j=0;j<m_height;j++) {
-
-            float xp = ((i-center.x())*zoom)+ center.x();
-            float yp = ((j-center.y())*zoom) + center.y();
-
-            unsigned int pen = getPixel(xp,yp);// % 16;
-            unsigned int col = m_colorList.getPen(pen);
-
-            //            img->setPixel(i,j,QRgb(col));
-            img.setPixel(i,j,lst.get(col).color.rgb());
-        }
-    //return img;
+    ToQImageUsingPens(lst, img, zoom, center);
 }
 /*
 void LImageAmstradCPC::OrdererdDither(QImage &img, LColorList &colors, QVector3D strength, QPoint size, float gamma)
@@ -144,6 +133,104 @@ void LImageAmstradCPC::OrdererdDither(QImage &img, LColorList &colors, QVector3D
 
 }
 */
+
+// exports a portion of a screen in CPC Mode 0 format,
+void LImageAmstradCPC::CPCExport0(QFile &file, int xpos, int ypos, int width, int height)
+{
+    QByteArray data;
+    //QVector<PixelChar*> pcList;
+
+    //qDebug() <<"Param2" << xpos << ypos << width << height;
+
+    // loop through all pixels
+    for (int yy=ypos; yy<ypos+height; yy++) {
+
+        char c = 0;
+        int curBit = 0;
+
+        for (int xx=xpos; xx<=xpos+width; xx++) {
+
+            int pixel = getPixel(xx,yy);
+            //qDebug() << pixel << xx << yy;
+
+            c|=table160[pixel]<<(1-curBit);
+
+            curBit+=1;
+
+            if (curBit>=2) {
+                curBit=0;
+                data.append((AmstradMode0BitPattern(c)));
+                //qDebug() << pixel << AmstradMode0BitPattern(c);
+                c=0;
+            }
+
+        }
+    }
+    file.write(data);
+
+}
+
+// exports a tiles from a screen in CPC Mode 0 format,
+void LImageAmstradCPC::CPCExportTile0(QFile &file, int start, int end, int width, int height)
+{
+    QByteArray data;
+    //QVector<PixelChar*> pcList;
+
+    for (int i=start;i<end;i++) { // walk characters
+
+        int tiles_per_row = m_width / width;
+
+        int col = i % tiles_per_row;
+        int row = i / tiles_per_row;
+
+        int x = col * width;
+        int y = row * height;
+
+        //qDebug() << "Start tile" << i << x << y;
+
+        for (int yy=y;yy<y+height;yy++) { // walk line height
+
+            char c = 0;
+            int curBit = 0;
+
+            for (int xx=x; xx<=x+width; xx++) {
+
+                int pixel = getPixel(xx,yy);
+                //qDebug() <<"Get data from " << xx << yy;
+
+                c|=table160[pixel]<<(1-curBit);
+
+                curBit+=1;
+
+                if (curBit>=2) {
+                    curBit=0;
+                    data.append((AmstradMode0BitPattern(c)));
+                    //qDebug() << pixel << AmstradMode0BitPattern(c);
+                    c=0;
+                }
+
+            }
+
+        }
+        //        qDebug() << x << y;
+    }
+    file.write(data);
+
+}
+void LImageAmstradCPC::CPCExportPal(QFile &ofile)
+{
+
+    QByteArray palette;
+
+    QVector<int> lst = m_colorList.getPenList();
+    for (auto i : lst)
+        palette.append(((unsigned char)i));
+    //    qDebug() << lst;
+
+    ofile.write(palette);
+
+}
+
 void LImageAmstradCPC::ExportBin(QFile &ofile)
 {
 
@@ -187,7 +274,7 @@ void LImageAmstradCPC::ExportBin(QFile &ofile)
 
             if (curBit>=2) {
                 curBit=0;
-                data.append((AmstradCrazySwap(c)));
+                data.append((AmstradMode0BitPattern(c)));
 //                data.append(c);
                 c=0;
             }

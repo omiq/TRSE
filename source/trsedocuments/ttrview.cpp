@@ -49,7 +49,7 @@ void TTRView::Calculate()
 
 QString TTRView::UnpackLine(QByteArray &d, int pos)
 {
-    if (pos+4>d.count())
+    if (pos+4>d.length())
         return "";
 //    qDebug() << "unpackline : "<<pos;
     QByteArray line = d.mid(pos,4);
@@ -105,7 +105,7 @@ void TTRView::PackLine(QByteArray &d, int pos, QString line)
     //if (lst[0]!="--" )
     int note = -1;
     lst[0] = lst[0].toUpper();
-    if (lst[0].count()==1) lst[0]+="-";
+    if (lst[0].length()==1) lst[0]+="-";
     if (notes.contains(lst[0]))
         note = notes.indexOf(lst[0]);
 
@@ -248,7 +248,10 @@ void TTRView::paintEventOld(QPaintEvent *event) {
 
 
     painter.setFont(font());
-    painter.fillRect(event->rect(), m_colors->getColor("backgroundcolor"));
+    if (m_writeMode)
+        painter.fillRect(event->rect(), m_colors->getColor("backgroundcolor"));
+    else
+        painter.fillRect(event->rect(), m_colors->getColor("commentcolor"));
 
     QColor addressAreaColor = QColor(m_colors->getColor("linenumbersbackground"));
     painter.fillRect(QRect(m_posAddr, event->rect().top(), m_posHex - GAP_ADR_HEX + 2 , height()), addressAreaColor);
@@ -460,7 +463,10 @@ void TTRView::paintEvent(QPaintEvent *event)
 
 
     painter.setFont(font());
-    painter.fillRect(event->rect(), m_colors->getColor("backgroundcolor"));
+    if (m_writeMode)
+        painter.fillRect(event->rect(), m_colors->getColor("backgroundcolor"));
+    else
+        painter.fillRect(event->rect(), m_colors->getColor("currentline"));
 
     QColor addressAreaColor = QColor(m_colors->getColor("linenumbersbackground"));
     painter.fillRect(QRect(m_posAddr, event->rect().top(), m_posHex - GAP_ADR_HEX + 2 , height()), addressAreaColor);
@@ -721,21 +727,22 @@ void TTRView::keyPressEvent(QKeyEvent *event)
         setVisible = true;
     }
     if (event->matches(QKeySequence::SelectStartOfDocument))
-    {
-        int pos = 0;
+    { int pos = 0;
         setCursorPos(pos);
         setSelection(pos);
         setVisible = true;
     }
 
-    if (event->key()==Qt::Key_I)
+    if (event->key()==Qt::Key_Plus)
     {
         int pos = m_cursorPos/(BYTES_PER_LINE*2)*DISPLAY_DATA_PER_LINE;
-        m_pdata->m_data.remove(m_pdata->m_data.count()-DISPLAY_DATA_PER_LINE,DISPLAY_DATA_PER_LINE);
+        m_pdata->m_data.remove(m_pdata->m_data.length()-DISPLAY_DATA_PER_LINE,DISPLAY_DATA_PER_LINE);
         for (int i=0;i<DISPLAY_DATA_PER_LINE;i++)
         m_pdata->m_data.insert(pos,(char)0);
         setVisible = true;
     }
+    if (event->key()==Qt::Key_Space)
+        m_writeMode=!m_writeMode;
 
 //    if (event->matches(QKeySequence::Delete))
      if (event->key()==Qt::Key_Backspace)
@@ -743,7 +750,7 @@ void TTRView::keyPressEvent(QKeyEvent *event)
         int pos = m_cursorPos/(BYTES_PER_LINE*2)*DISPLAY_DATA_PER_LINE;
         m_pdata->m_data.remove(pos,DISPLAY_DATA_PER_LINE);
         for (int i=0;i<DISPLAY_DATA_PER_LINE;i++)
-        m_pdata->m_data.insert(m_pdata->m_data.count(),(char)0);
+        m_pdata->m_data.insert(m_pdata->m_data.length(),(char)0);
         setVisible = true;
     }
 
@@ -799,14 +806,30 @@ void TTRView::keyPressEvent(QKeyEvent *event)
     }
 
 */
-    if (t!="" && (validInput.contains(t.toLower()))) {
+
+    int octAdd = 0;
+    bool pianoOK = false;
+    if (m_pianoInput) {
+        if (m_pianoData.contains(t.toLower())) {
+//            t = m_
+            pianoOK = true;
+        }
+    }
+    else
+        if (validInput.contains(t.toLower()))
+          pianoOK = true;
+
+    if (t=="-") pianoOK =  true;
+
+    if (t!=""  && pianoOK) {
         t = t.toLower();
         int curP = (m_cursorPos%(BYTES_PER_LINE*2));
         int curPSet = curP + (int)(curP/2);
         bool isNote =  curP<3;
         QString line = UnpackLine(m_pdata->m_data,m_curLinePos);
-
+        QString keepLine = line;
 //        qDebug() << line;
+
         if (curP==0){
             if (validNotes1.contains(t))
                 line[curPSet] = t[0];
@@ -830,14 +853,35 @@ void TTRView::keyPressEvent(QKeyEvent *event)
             m_lastLine = line;
         else {
             if (m_lastLine!="")
-                line = line.mid(0,3) + m_lastLine.mid(3,m_lastLine.count());
+                line = line.mid(0,3) + m_lastLine.mid(3,m_lastLine.length());
         }
-         PackLine(m_pdata->m_data,m_curLinePos,line);
-         if (isNote)
-             emit emitSound(m_pdata->m_data.mid(m_curLinePos,DISPLAY_DATA_PER_LINE));
 
-        setCursorPos(m_cursorPos + BYTES_PER_LINE * 2);
-        resetSelection(m_cursorPos);
+        if (t=='q' || t=='Q') {
+            line = "-- 00 00 00 0F 00";
+        }
+        if (m_pianoInput && curP<2 && t!="-") {
+            // Override piano input
+            int pos = m_pianoData.indexOf(t.toLower());
+            int oct = pos/12 + m_curOctave;
+            pos = pos%12;
+            line[0] = notes[pos][0];
+            line[1] = notes[pos][1];
+            QString o = QStringLiteral("%1").arg(oct, 2, 16, QLatin1Char('0'));
+            line[3] = o[0];
+            line[4] = o[1];
+//            qDebug() << line;
+        }
+
+        PackLine(m_pdata->m_data,m_curLinePos,line);
+        if (isNote)
+            emit emitSound(m_pdata->m_data.mid(m_curLinePos,DISPLAY_DATA_PER_LINE));
+
+        if (!m_writeMode) // Restore original line!
+            PackLine(m_pdata->m_data,m_curLinePos,keepLine);
+        else {
+            setCursorPos(m_cursorPos + BYTES_PER_LINE * 2);
+            resetSelection(m_cursorPos);
+        }
         setVisible = true;
         m_isChanged = true;
     }

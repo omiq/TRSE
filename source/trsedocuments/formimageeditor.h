@@ -1,3 +1,4 @@
+
 /*
  * Turbo Rascal Syntax error, “;” expected but “BEGIN” (TRSE, Turbo Rascal SE)
  * 8 bit software development IDE for the Commodore 64
@@ -50,7 +51,6 @@ namespace Ui {
 class Formimageeditor;
 }
 
-
 class ByteDelegate : public QItemDelegate
 {
 public:
@@ -77,24 +77,26 @@ public:
 
     WorkerThread m_updateThread;
     bool m_ignoreMC = false;
+    bool m_dontUpdateAspect = false;
     LImageQImage m_grid;
     Toolbox m_toolBox;
     LColorList* m_currentColorList = nullptr;
     LImageEffects m_imageEffects;
-    QMap<QString, QLineEdit*> m_imageEffectsLineEdits;
+    QHash<QString, QLineEdit*> m_imageEffectsLineEdits;
     LImageEffect* m_currentImageEffect = nullptr;
     QString m_projectPath;
     QVector<int> m_keepSpriteChar;
     QString m_currentFilename = "";
     QSize m_windowSize;
+    bool m_isFreeAspect = false;
 
     enum PainterType {OpenGL, QtPaint };
     PainterType m_painterType = OpenGL;
     bool m_isInitialized = false;
     float m_scaley = 1.0;
-
+    int m_zReset = 0;
     int m_oldWidth = 600;
-
+    QList<int> m_keepSplitterSizes;
     int m_prefMode=1, m_keepMode=0;
 //    CharsetImage::Mode m_prefMode = CharsetImage::Mode::CHARSET1x1;
 //    CharsetImage::Mode m_keepMode = CharsetImage::Mode::CHARSET1x1;
@@ -103,13 +105,16 @@ public:
     void updateCharSet();
     void updateSingleCharSet();
     void InitQtPainter();
-
+    void FixSplitting(QWidget* w, bool sideVisible);
+    QList<int> m_lastSizes; // Last qsplitter sizes
     void PrepareImageTypeGUI();
     void Initialize();
     void SetSingleCharsetEdit();
 
     void SetFooterData(int pos, uchar val);
     uchar GetFooterData(int pos);
+
+
 
 
 
@@ -127,6 +132,7 @@ public:
 
 
     void OpenSelectCharset();
+    void OpenSelectRoom();
     void Reload() override;
 
     bool eventFilter(QObject *ob, QEvent *e) override;
@@ -167,6 +173,12 @@ public:
 
     void Update();
 
+
+    void LoseFocus() override;
+
+    void SetFocus() override;
+
+
 /*signals:
     void EmitMouseEvent();
 */
@@ -175,9 +187,10 @@ private:
     QWidget* getCurrentPainter();
 
 private slots:
+    void forceAspect();
+    void UpdatePenShot();
     void UpdateAspect();
     void UpdateMulticolorImageSettings();
-    void InitAspect();
     void onSwapDisplayMode();
     void onImageMouseEvent(QEvent* e);
     void onPenChanged();
@@ -289,6 +302,8 @@ private slots:
     void on_pushButton_clicked();
     void on_cmbCharX_currentIndexChanged(int index);
     void on_cmbCharY_currentIndexChanged(int index);
+    void on_cmbTileStampX_currentIndexChanged(int index);
+    void on_cmbTileStampY_currentIndexChanged(int index);
     void on_btnRepeating_clicked();
     void on_btnShiftLeft_clicked();
     void on_btnShiftRight_clicked();
@@ -300,9 +315,20 @@ private slots:
     void on_lstCharMap_itemClicked(QTableWidgetItem *item);
     void Aspect1();
     void AspectDone();
-    void on_btnInv_clicked();
+    void on_btnInvert_clicked();
     void on_chkHybrid_clicked(bool checked);
     void on_cbmGridSize_currentTextChanged(const QString &arg1);
+    void on_btnImportMain_clicked();
+    void on_cmbFixedfD800_activated(int index);
+    void on_cmbZoomLevel_activated(int index);
+    void on_cmbAspect_activated(int index);
+    void on_btnDuplicate_clicked();
+    void on_btnPanUp_clicked();
+    void on_btnPanLeft_clicked();
+    void on_btnGridType_clicked();
+    void on_btnRoomSelect_clicked();
+    void on_splitter_splitterMoved(int pos, int index);
+    void on_btnSpritepad_clicked();
 };
 
 

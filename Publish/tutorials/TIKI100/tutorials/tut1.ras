@@ -1,0 +1,44 @@
+program Tiki100_Tutorial1;
+@use "system/system"
+
+var
+	k : byte=0;
+	j,la,time : byte=0;
+	p1:pointer;
+	y:byte;
+
+@setvalue exomizer_toggle 1
+
+
+
+
+procedure RenderRandomStuff();
+begin
+	p1:=$0000;
+	j:=time;
+	for k:=0 to 64 do  
+	begin
+		fill(p1,j,255);
+		p1:=p1+$100;
+		
+		j:=j+10;
+	end;
+end;
+
+
+procedure Run();
+begin
+	while (true) do
+	begin
+		RenderRandomStuff();
+		time:=time+1;
+	end;
+	
+end;
+
+begin
+	System::Init();
+	System::SetMode(System::mode_16_colors);	
+	Run();
+end.
+

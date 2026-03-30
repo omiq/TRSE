@@ -1,0 +1,35 @@
+program Tut1;
+@use "system/system"
+@use "system/schip"
+
+@export "resources/charsets/charset1.flf" "resources/charsets/charset1.bin" 26
+@bin2inc "resources/charsets/charset1.bin" "charset.inc" chars
+var
+	x,y,z,c,v : byte;
+	p,src : pointer;
+	s1 : string ="HELLO";
+	@donotremove MainProgram_stringassignstr24
+	@donotremove Text_PrintXY
+@define CHARSET "charset.inc"
+@use "text"
+
+
+
+	
+begin
+	System::Clear();
+	System::Beep(10);
+	asm(";here");
+	Text::PrintXY("UHM", 0,0);
+
+
+	begin
+		z:=System::Random();
+//		System::DrawLine(x,x,%10000001);
+	end;	
+
+
+	while(1) do; 
+	
+	
+end.

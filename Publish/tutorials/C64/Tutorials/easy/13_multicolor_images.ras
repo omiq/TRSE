@@ -1,5 +1,7 @@
 program Display_multicolor_image;
+@use "screen/screen"
 var
+	zp:pointer;
 /*
 	Open your ".flf" 320x200 image and click "export", then type in the "base name" of the files to output.
 	The first file (.. _data.bin) contains pixel data, while the second file (..._color.bin) contains color data. 
@@ -8,14 +10,8 @@ var
 */
 
 // Exports flf image directly to binary with each build. Select between image 1 or 2
-@define img 1
 
-@if img=1
-	@export "resources/images/neo_rider_by_the_diad.flf" "resources/images/neo_rider.bin" 0
-@endif
-@if img=2
-	@export "resources/images/jack.flf" "resources/images/neo_rider.bin" 0
-@endif
+@export "resources/images/neo_rider_by_the_diad.flf" "resources/images/neo_rider.bin" 0
 
 	image_color: IncBin("resources/images/neo_rider_color.bin", $5000);
 	image_data: IncBin("resources/images/neo_rider_data.bin", $6000);
@@ -23,31 +19,29 @@ var
 
 // basically the same as the built-in method copyimagecolordatamanually
 procedure CopyImageColordataManually();
-var
-  zp:pointer;
 begin
 	zp:=#image_color;
-	screen_bg_col:=zp[0]; // first byte is border color
+	Screen::border:=zp^;
 	zp+=1;
-	screen_fg_col:=zp[0]; // 2nd byte is foreground color 
+	Screen::background:=zp^; // 2nd byte is foreground color 
 	zp+=1;
-	copyfullscreen(zp,screen_char_loc2); // Copy first 1000 bytes (1 screen worth of data) to bank 1
-	zp+=1000; // point to next screen 
-	copyfullscreen(zp,screen_col_loc); // copy 1 screen worth of data to color ram
+	Screen::CopyFull(zp, #Screen::screen1);
+	Screen::CopyFull(zp+1000, #Screen::color);
 end;
-
 
 begin
 	// Turn off multicolor if you want hires! 
-	setmulticolormode();
-	setbitmapmode();
+		
+	Screen::SetMulticolorMode();
+	Screen::SetBitmapMode();
 	// Set data pointer to $6000
-	vic_data_loc:=$18;
-	setbank(vic_bank1);
+	Screen::SetScreenLocation($4400); // color data
+	Screen::SetCharsetLocation($6000); // bitmap data
+	// Set bank 1 ($4000-$7FFF)
+	Screen::SetBank(vic_bank1);
 	// Copy image color data from $5000 to $4400 (on bank 1) and $D800 
-	copyimagecolordata(#image_color,1);
-	screen_fg_col:=black;
-	
+	Screen::CopyImageColorData(#image_color,1);
+	Screen::background:=black;
 	// Example of how to copy the color data manually
 	CopyImageColordataManually();
 	

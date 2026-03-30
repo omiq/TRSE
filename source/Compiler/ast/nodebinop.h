@@ -31,9 +31,14 @@
 #include "source/Compiler/ast/nodenumber.h"
 #include "source/Compiler/ast/nodeunaryop.h"
 
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
-
+/* 
+    Node for a Binary Operation (such as a+1)
+    m_left: The first operand
+    m_right: The second operand
+    m_op: The Operation
+*/
 class NodeBinOP : public Node {
 public:
     QVector<int> power2 = {1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192, 8192*2,8192*4,8192*8};
@@ -41,29 +46,43 @@ public:
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
 
     QString BothConstants(Assembler* as);
+    NodeType getNodeType() override {
+        return BINOP;
+    }
 
+    bool containsVariables() override;
     bool isPureNumeric() override;
+    bool isPureNumericOrAddress() override;
     bool is8bitValue(Assembler* as) override;
 
     void ApplyFlags() override;
     bool isAddress() override;
 
-    bool m_isCollapsed = false;
     int m_value = 0;
 
     bool isWord(Assembler* as) override;
+    bool isLong(Assembler* as) override;
 
-    void setForceType(TokenType::Type t) override;
+    void setLoadType(TokenType::Type t) override;
+    void setStoreType(TokenType::Type t) override;
 
     bool isPurePointer(Assembler *as) override {
         return m_left->isPurePointer(as) && m_right->isPurePointer(as);
     }
+    TokenType::Type getClassvariableType()  override;
 
     bool isPointer(Assembler *as) override
     {
         return m_left->isPointer(as) | m_right->isPointer(as);
 
     }
+    TokenType::Type getOrgType(Assembler *as) override {
+        auto t1 = m_right->getOrgType(as);
+        auto t2 = m_left->getOrgType(as);
+        if (t1==TokenType::LONG || t2==TokenType::LONG) return TokenType::LONG;
+        if (t1==TokenType::INTEGER || t2==TokenType::INTEGER) return TokenType::INTEGER;
+        return t1;
+     }
 
     QString getAddress() override {
         return HexValue();
@@ -86,9 +105,10 @@ public:
 
 
     QString getValue(Assembler* as)  override;
-    QString getValue8bit(Assembler* as, bool isHi) override;
+    QString getValue8bit(Assembler* as, int isHi) override;
 
     TokenType::Type getType(Assembler *as) override;
+    QString getTypeText(Assembler* as) override;
 
     bool isPure() override;
 
@@ -107,7 +127,7 @@ public:
     int BothPureNumbersBinOp(Assembler *as);
 
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeBinOP>(sharedFromThis()));
     };
 

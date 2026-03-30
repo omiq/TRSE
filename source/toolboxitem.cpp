@@ -51,6 +51,8 @@ void ShapeBox::Perform(int x, int y, unsigned char color, LImage* img, bool isPr
 {
     float m= m_size;
     float ll = 0.66;
+    if (button==-1)
+        return;
     MultiColorImage* mci = dynamic_cast<MultiColorImage*>(img);
     if (mci!=nullptr) {
         if (mci->isMultiColor())
@@ -58,25 +60,38 @@ void ShapeBox::Perform(int x, int y, unsigned char color, LImage* img, bool isPr
     }
     float lw = m_options["lwidth"]->val/10.0;
 
+/*    int sx = fmax(img->m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+    int sy = fmax(img->m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+    int w = fmax(img->m_footer.get(LImageFooter::LImageFooter::POS_CHARSET_WIDTH),1);
+
+    int currentChar = img->m_currentChar;
+*/
+    img->setBasePixel(x,y);
     for (int i=0;i<m;i++)
         for (int j=0;j<m;j++) {
             int d = m/2;
             float xx = i-d;
             float yy = (j-d);
             float l = sqrt(xx*xx*ll + yy*yy);
+    //        img->m_currentChar =currentChar+((i/8)%sx) + ((j/8)%sy)*w;
 
             bool ok = l<m/2.5;
             if (m_type==1)
                 ok = abs(l-m/3)<lw;
-            if (ok)
 
+            if (ok)
                 img->setPixel(x+xx,y+yy,color);
         }
+
+  //  img->m_currentChar = currentChar;
 }
 
 void ShapeBoxFilter::Perform(int x, int y, unsigned char color, LImage* img, bool isPreview, int button)
 {
     float m= m_size;
+    if (button==-1)
+        return;
+    img->setBasePixel(x,y);
     for (int i=0;i<m;i++)
         for (int j=0;j<m;j++) {
             int d = m/2;
@@ -116,6 +131,9 @@ void ShapeBoxFilter::Perform(int x, int y, unsigned char color, LImage* img, boo
 void Spray::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview, int button)
 {
     float m= m_size;
+    img->setBasePixel(x,y);
+    if (button==-1)
+        return;
 
     for (int i=0;i<m;i++)
         for (int j=0;j<m;j++) {
@@ -135,6 +153,8 @@ void Dither::Perform(int x, int y, unsigned char color, LImage *img, bool isPrev
 {
     float m= m_size;
     int shift = m_type;
+    if (button==-1)
+        return;
 
     x = ((int)x/2)*2;
     y = ((int)y/2)*2;
@@ -159,6 +179,7 @@ void Filler::Perform(int x, int y, unsigned char color, LImage *img, bool isPrev
 {
 //    if (isPreview)
   //      return;
+    img->setBasePixel(x,y);
     unsigned char testCol = img->getPixel(x,y);
     if (color == testCol)
         return;
@@ -235,16 +256,36 @@ void Filler::Fill(int i, int j, unsigned char col, unsigned char testCol, LImage
 
 void Line::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview, int button)
 {
+//    if (button==-1)
+  //      return;
+    img->setBasePixel(x,y);
     if (button==0) {
-        m_start = QPoint(x,y);
+        if (m_type==1 && oldPos.x()!=-1) {
+            m_start = oldPos;
+        }
+        else
+            m_start = QPoint(x,y);
+
         return;
     }
-    if (m_type==1) {
+    if (button==1 && m_type==1)
+        oldPos = QPoint(x,y);
+
+    if (button==-1 && m_type==0)
+        oldPos = QPoint(-1,-1);
+
+
+    if (m_type==2) {
         if (abs(m_start.x()-x) > abs(m_start.y()-y)) {
             y = m_start.y();
         }
         else x = m_start.x();
     }
+
+//    if (m_type==1 && button==1) {
+  //      m_start = oldPos;
+   // }
+//    if (!isPreview && button == 0)
 
     img->drawLine(m_start.x(), m_start.y(), x,y, color, m_size);
 
@@ -253,18 +294,18 @@ void Line::Perform(int x, int y, unsigned char color, LImage *img, bool isPrevie
 
 void CopyStamp::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview, int button)
 {
-
+    img->setBasePixel(x,y);
+    img->SetCurrentType(LImage::Character);
     if (button==1 && m_status == Status::Idle) {
         m_status = Status::Selecting;
         m_start = QPoint(x,y);
        // qDebug() << "Start1";
-        if (m_copy==nullptr)
+        if (m_copy == nullptr)
             m_copy = LImageFactory::Create(img->m_type, img->m_colorList.m_type);
         // New from source
         if (m_copy->m_type!=img->m_type) {
             delete m_copy;
             m_copy = LImageFactory::Create(img->m_type, img->m_colorList.m_type);
-
         }
      //   qDebug() << "Start2";
         m_copy->CopyFrom(img);
@@ -274,20 +315,42 @@ void CopyStamp::Perform(int x, int y, unsigned char color, LImage *img, bool isP
 
     if (m_status == Status::Selecting && button==1) {
         m_end = QPoint(x,y);
-        img->drawLine(m_start.x(), m_start.y(), m_start.x(), m_end.y(), frameCol, 1);
-        img->drawLine(m_start.x(), m_start.y(), m_end.x(), m_start.y(), frameCol, 1);
-        img->drawLine(m_start.x(), m_end.y(), m_end.x(), m_end.y(), frameCol, 1);
-        img->drawLine(m_end.x(), m_start.y(), m_end.x(), m_end.y(), frameCol, 1);
+        if (m_type!=1) {
+            img->drawLine(m_start.x(), m_start.y(), m_start.x(), m_end.y(), frameCol, 1);
+            img->drawLine(m_start.x(), m_start.y(), m_end.x(), m_start.y(), frameCol, 1);
+            img->drawLine(m_start.x(), m_end.y(), m_end.x(), m_end.y(), frameCol, 1);
+            img->drawLine(m_end.x(), m_start.y(), m_end.x(), m_end.y(), frameCol, 1);
+        }
+        else // cut
+ //           if (isPreview)
+            for (int i=m_start.x();i<m_end.x();i++)
+                for (int j=m_start.y();j<m_end.y();j++) {
+                    img->setPixel(i,j,Data::data.currentColor);
+                }
     }
 
-    if (m_status== Status::Stamp) {
+    if (m_status== Status::Stamp && button!=1) {
         StampImage(x,y, img);
     }
 
-    if (button==-1 && m_status==Status::Selecting)
+    if (button==-1 && m_status==Status::Selecting) {
         m_status = Status::Stamp;
+        if (m_type==1)
+            for (int i=m_start.x();i<m_end.x();i++)
+                for (int j=m_start.y();j<m_end.y();j++) {
+                    img->setPixel(i,j,Data::data.currentColor);
+                }
+    }
 
 
+}
+
+CopyStamp::CopyStamp() {
+    m_status=Idle;
+}
+
+CopyStamp::CopyStamp(QString name, QString imagefile, QString tooltip, int type) : ToolboxItem(name, imagefile,tooltip) {
+    m_type=type;
 }
 
 LImage* CopyStamp::m_copy=nullptr;
@@ -299,11 +362,17 @@ CopyStamp::Status CopyStamp::m_status;// = Idle;
 
 void CopyStamp::StampImage(int x, int y, LImage* img)
 {
+    if (m_copy == nullptr)
+        return;
+    img->SetCurrentType(LImage::Character);
+    m_copy->SetCurrentType(LImage::LevelCharacter);
     int w = abs(m_end.x()-m_start.x());
     int h = abs(m_end.y()-m_start.y());
+    img->setBasePixel(x,y);
     for (int i=0;i<w;i++)
         for (int j=0;j<h;j++) {
             unsigned int col = m_copy->getPixel(m_start.x() + i-0.5, m_start.y()+j-0.5);
+            img->m_currentChar = col;
             if (m_type==1)
                 img->setPixel(i-w/2+x,j-h/2+y, col);
             else
@@ -312,12 +381,21 @@ void CopyStamp::StampImage(int x, int y, LImage* img)
 //                for (int xd=0;xd<m_copy->m_scale;xd++)
   //                  img->setPixel(i-w/2.0+x + xd,j-h/2.0+y, col);
         }
+ //   m_copy->SetCurrentType(LImage::Color);
+   // img->SetCurrentType(LImage::Color);
+}
+
+void CopyStamp::Init() {
+    m_status = Status::Idle;
+    if (m_type==2) // paste only
+        m_status = Status::Stamp;
 }
 
 
 
 void RotateAround::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview, int button)
 {
+    img->setBasePixel(x,y);
     if (button==1 && m_status == Status::Idle) {
         m_status = Status::Down;
         m_start = QPoint(x,y);
@@ -353,6 +431,7 @@ void RotateAround::Perform(int x, int y, unsigned char color, LImage *img, bool 
 
 void Circle::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview, int button)
 {
+    img->setBasePixel(x,y);
     if (button==0) {
         m_start = QPoint(x,y);
         return;
@@ -375,6 +454,7 @@ void Circle::Perform(int x, int y, unsigned char color, LImage *img, bool isPrev
 
 void Box::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview, int button)
 {
+    img->setBasePixel(x,y);
     if (button==0) {
         m_start = QPoint(x,y);
         return;
@@ -382,6 +462,7 @@ void Box::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview
     int width = 0;
     if (m_type ==1)
         width = 1;
+
     img->RBox(m_start.x(), m_start.y(), x,y, color, width);
 
 
@@ -389,6 +470,7 @@ void Box::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview
 
 void WetBrush::Perform(int x, int y, unsigned char color, LImage *img, bool isPreview, int button)
 {
+    img->setBasePixel(x,y);
     float m= m_size;
     float ll = 0.66;
     MultiColorImage* mci = dynamic_cast<MultiColorImage*>(img);
@@ -569,6 +651,7 @@ void ToolBoxItemOptionFileList::Build(QGridLayout *gl, int row)
 
 void ShapePNGColor::Perform(int x, int y, unsigned char color, LImage* img, bool isPreview, int button)
 {
+    img->setBasePixel(x,y);
     float m= m_size;
 //    float str = m_options["strength"]->val/50.0;
     QImage scaled = m_shape.scaled(m_size, m_size,Qt::KeepAspectRatio, Qt::TransformationMode::SmoothTransformation);

@@ -1,0 +1,325 @@
+procedure tank_0();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$0a
+ ld [ix+1],a
+ ld a,$40
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$02
+ ld [ix+0],a
+ ld a,$aa
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$80
+ ld [ix+3],a
+  add ix,de
+ ld a,$02
+ ld [ix+0],a
+ ld a,$aa
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$ee
+ ld [ix+1],a
+ ld a,$ec
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+procedure tank_1();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$2a
+ ld [ix+2],a
+ ld a,$80
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$02
+ ld [ix+1],a
+ ld a,$90
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$aa
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$a0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$aa
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$80
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$3b
+ ld [ix+1],a
+ ld a,$bb
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+procedure tank_2();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$0a
+ ld [ix+2],a
+ ld a,$a0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$a4
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$2a
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$a8
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$2a
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$a0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$0e
+ ld [ix+1],a
+ ld a,$ee
+ ld [ix+2],a
+ ld a,$c0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+procedure tank_3();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$02
+ ld [ix+2],a
+ ld a,$a8
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$29
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$0a
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$aa
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$0a
+ ld [ix+1],a
+ ld a,$aa
+ ld [ix+2],a
+ ld a,$a8
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$03
+ ld [ix+1],a
+ ld a,$bb
+ ld [ix+2],a
+ ld a,$b0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+var tank_pi : integer;
+@donotremove tank_dst 
+procedure tank(tank_src,tank_dst : pointer; tankpx,tankpy : byte);
+begin
+  tank_pi:=tank_dst + tankpy<<5 + tankpx>>2;
+asm("  ld ix, [tank_pi]
+");
+ tankpx:=tankpx&3;
+ if (tankpx=0) then tank_0();
+ if (tankpx=1) then tank_1();
+ if (tankpx=2) then tank_2();
+ if (tankpx=3) then tank_3();
+end;

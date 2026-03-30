@@ -30,13 +30,18 @@
 #include "source/Compiler/ast/nodeassign.h"
 #include "source/Compiler/ast/nodevar.h"
 
-#include "source/Compiler/assembler/abstractastdispatcher.h"
-
+#include "source/Compiler/codegen/abstractcodegen.h"
+/* 
+    A node representing a for loop, for example "for i:=0 to 100 do"
+    m_left: assign statment, i:=0
+    m_right: target value, ie 100
+    m_op: undefined
+    m_block : the for loop block statement list
+*/
 class NodeForLoop : public Node {
 public:
 
-    QSharedPointer<Node> m_a=nullptr, m_b = nullptr;
-    QSharedPointer<Node> m_block=nullptr;
+    QSharedPointer<Node> m_block = nullptr;
     bool m_unroll = false;
     QSharedPointer<Node> m_step = nullptr;
     int m_loopCounter=0;
@@ -44,16 +49,26 @@ public:
 
     NodeForLoop(QSharedPointer<Node> a, QSharedPointer<Node> b, QSharedPointer<Node> block, QSharedPointer<Node> step, bool unroll, int forcePage, int loopCounter, bool inclusive);
 
+    void clearComment() override {
+        m_comment = "";
+        if (m_block!=nullptr)
+        m_block->clearComment();
+    }
+
 
     void parseConstants(QSharedPointer<SymbolTable>  symTab) override {
-        if (m_a!=nullptr)
-            m_a->parseConstants(symTab);
-        if (m_b!=nullptr)
-            m_b->parseConstants(symTab);
+        if (m_left!=nullptr)
+            m_left->parseConstants(symTab);
+        if (m_right!=nullptr)
+            m_right->parseConstants(symTab);
         if (m_block!=nullptr)
             m_block->parseConstants(symTab);
         if (m_step!=nullptr)
             m_step->parseConstants(symTab);
+    }
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override {
+        if (m_block!=nullptr)
+            m_block->FindPotentialSymbolsInAsmCode(lst);
     }
 
 
@@ -63,7 +78,7 @@ public:
     }
 
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeForLoop>(sharedFromThis()));
     }
 

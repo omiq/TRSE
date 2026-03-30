@@ -28,7 +28,7 @@ NodeBinOP::NodeBinOP(QSharedPointer<Node> left, Token op, QSharedPointer<Node> r
     m_op = op;
 
     if (Syntax::s.m_currentSystem->m_system == AbstractSystem::GAMEBOY)
-    if (m_right->isPureNumeric()) {
+    if (m_right->isPureNumericOrAddress()) {
         int val = m_right->getValueAsInt(nullptr);
         if (power2.contains(val)) {
             int idx = power2.indexOf(val);
@@ -44,7 +44,6 @@ NodeBinOP::NodeBinOP(QSharedPointer<Node> left, Token op, QSharedPointer<Node> r
             }
         }
     }
-
     ApplyFlags();
 }
 
@@ -59,7 +58,25 @@ bool NodeBinOP::isPureNumeric() {
     if (m_left==nullptr || m_right==nullptr)
         return false;
 
-    return (m_left->isPureNumeric() && m_right->isPureNumeric());
+    return (m_left->isPureNumeric() && m_right->isPureNumeric() &&
+            !m_left->containsVariables() && !m_right->containsVariables()
+
+            );
+}
+
+bool NodeBinOP::containsVariables() {
+    if (m_left==nullptr || m_right==nullptr)
+        return false;
+
+    return ((m_left->containsVariables() || m_right->containsVariables()));
+}
+
+bool NodeBinOP::isPureNumericOrAddress()
+{
+    if (m_left==nullptr || m_right==nullptr)
+        return false;
+
+    return (m_left->isPureNumericOrAddress() && m_right->isPureNumericOrAddress());
 }
 
 bool NodeBinOP::is8bitValue(Assembler *as)
@@ -69,14 +86,9 @@ bool NodeBinOP::is8bitValue(Assembler *as)
 
 void NodeBinOP::ApplyFlags()
 {
-//    qDebug() << "::NodeBinop Applying Flags";
-    bool a = m_left->isWord(nullptr);
-    bool b = m_right->isWord(nullptr);
-
-   // qDebug() << "::NodeBinop a b " << a << b;
-
     if (m_op.m_type==TokenType::MUL) {
      //   if (a || b)
+        // Crash here.. wtf??
             flags["mul16"] = true;
        // if (!a && !b)
             flags["mul8"] = true;
@@ -100,14 +112,37 @@ bool NodeBinOP::isAddress() {
 
 
 bool NodeBinOP::isWord(Assembler *as) {
-    return ((m_left->isWord(as) || m_right->isWord(as)) || (m_forceType==TokenType::INTEGER));
+    return ((m_left->isWord(as) || m_right->isWord(as)) || (m_loadType==TokenType::INTEGER));
 }
 
-void NodeBinOP::setForceType(TokenType::Type t) {
+bool NodeBinOP::isLong(Assembler *as) {
+    return ((m_left->isLong(as) || m_right->isLong(as)) || (m_loadType==TokenType::LONG));
+}
+
+void NodeBinOP::setLoadType(TokenType::Type t) {
 //    qDebug() << "Binop set force type " << TokenType::getType(t);
-    m_forceType  =t;
-    m_left->setForceType(t);
-    m_right->setForceType(t);
+    m_loadType  =t;
+    m_left->setLoadType(t);
+    m_right->setLoadType(t);
+}
+
+/*void NodeBinOP::setLoadTypeFunctions(TokenType::Type t) {
+    m_left->setLoadTypeFunctions(t);
+    m_right->setLoadTypeFunctions(t);
+}*/
+void NodeBinOP::setStoreType(TokenType::Type t) {
+    m_left->setStoreType(t);
+    m_right->setStoreType(t);
+}
+
+TokenType::Type NodeBinOP::getClassvariableType() {
+    if (m_left->getClassvariableType()==TokenType::LONG || m_right->getClassvariableType()==TokenType::LONG)
+        return TokenType::LONG;
+    if (m_left->getClassvariableType()==TokenType::INTEGER || m_right->getClassvariableType()==TokenType::INTEGER)
+        return TokenType::INTEGER;
+    if (m_left->getClassvariableType()==TokenType::BYTE || m_right->getClassvariableType()==TokenType::BYTE)
+        return TokenType::BYTE;
+    return TokenType::NADA;
 }
 
 bool NodeBinOP::containsPointer(Assembler *as)
@@ -150,24 +185,13 @@ bool NodeBinOP::ContainsVariable(Assembler *as, QString var)
 
 void NodeBinOP::parseConstants(QSharedPointer<SymbolTable>  symTab) {
 
- //   qDebug() << "NodeBinOp :: parse HERE1" << m_left->isPureNumeric() <<m_right->isPureNumeric();
-//    int a = m_left->getValueAsInt(nullptr);
-//    int b = m_right->getValueAsInt(nullptr);
- //   qDebug() << a << b;
-
-    if (!isPureNumeric()) {
+    if (!isPureNumericOrAddress()) {
         if (m_left!=nullptr)
             m_left->parseConstants(symTab);
         if (m_right!=nullptr)
             m_right->parseConstants(symTab);
         return;
     }
-//    qDebug() << "NodeBinOp :: parse HERE2";
-//    m_value = numValue();
-  //  m_isCollapsed = true;
-/*    int a = m_left->getValueAsInt(nullptr);
-    int b = m_right->getValueAsInt(nullptr);
-*/
 }
 
 QString NodeBinOP::getValue(Assembler *as) {
@@ -181,7 +205,7 @@ QString NodeBinOP::getValue(Assembler *as) {
     return hash + HexValue();
 }
 
-QString NodeBinOP::getValue8bit(Assembler *as, bool isHi)
+QString NodeBinOP::getValue8bit(Assembler *as, int isHi)
 {   QString hash = "";
     if (as!=nullptr)
         hash = as->m_hash;
@@ -189,7 +213,7 @@ QString NodeBinOP::getValue8bit(Assembler *as, bool isHi)
     if (isAddress()) hash="";
 
     int res = numValue();
-    if (isHi)
+    if (isHi==1)
         return hash + Util::numToHex((int)res>>8);
     else
         return hash + Util::numToHex(((int)res)&0xFF);
@@ -210,6 +234,10 @@ TokenType::Type NodeBinOP::getType(Assembler *as) {
 
 }
 
+QString NodeBinOP::getTypeText(Assembler *as) {
+    return m_left->getTypeText(as);
+}
+
 bool NodeBinOP::isPure() {
     if (isPureNumeric())
         return true;
@@ -226,6 +254,7 @@ TokenType::Type NodeBinOP::VerifyAndGetNumericType() {
             return a;
         if (b==TokenType::ADDRESS)
             return b;
+
         ErrorHandler::e.Error("Binary operations must occur between same token types ("+TokenType::getType(a)+" vs "+TokenType::getType(b)+")", m_op.m_lineNumber);
 
     }
@@ -256,7 +285,7 @@ QString NodeBinOP::getLiteral(Assembler *as) {
 
 
 int NodeBinOP::numValue() {
-    if (!isPureNumeric())
+    if (!isPureNumericOrAddress())
         return 0;
     int a = m_left->numValue();
     int b = m_right->numValue();
@@ -284,7 +313,7 @@ int NodeBinOP::numValue() {
 }
 
 QString NodeBinOP::HexValue() {
-    if (!isPureNumeric())
+    if (!isPureNumericOrAddress())
         return "";
     int res = numValue();
     //qDebug() << QString::number(res, 16);
@@ -294,9 +323,6 @@ QString NodeBinOP::HexValue() {
 int NodeBinOP::BothPureNumbersBinOp(Assembler *as) {
 
 
-    //QSharedPointer<NodeNumber>a = (QSharedPointer<NodeNumber>)dynamic_cast<const QSharedPointer<NodeNumber>>(m_left);
-    //QSharedPointer<NodeNumber>b = (QSharedPointer<NodeNumber>)dynamic_cast<const QSharedPointer<NodeNumber>>(m_right);
-    //BothConstants(as);
     if (qSharedPointerDynamicCast<NodeUnaryOp>(m_left)!=nullptr) {
         QSharedPointer<NodeNumber>b = qSharedPointerDynamicCast<NodeNumber>(m_right);
         if (m_left->m_op.m_type==TokenType::MINUS) {

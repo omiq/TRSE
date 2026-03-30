@@ -23,6 +23,7 @@ void TTRFile::Initialize(int channels, int rows)
     m_currentOrder = 0;
     InsertPattern(0);
     InsertOrder(0);
+    AddInstrument();
 }
 
 void TTRFile::InsertPattern(int pos) {
@@ -31,7 +32,7 @@ void TTRFile::InsertPattern(int pos) {
     ba.fill(0);
     m_patterns.insert(pos,ba);
     for (QByteArray& ba: m_orders){
-        for (int i=0;i<ba.count();i++)
+        for (int i=0;i<ba.length();i++)
             if ((uchar)ba[i]>pos)
                 ba[i]=ba[i]+1;
     }
@@ -44,12 +45,13 @@ void TTRFile::DeletePattern(int pos)
 
     m_patterns.removeAt(pos);
     for (QByteArray& ba: m_orders){
-        for (int i=0;i<ba.count();i++)
+        for (int i=0;i<ba.length();i++)
             if ((uchar)ba[i]>pos)
                 ba[i]=ba[i]-1;
     }
 
 }
+
 
 QVector<QByteArray> TTRFile::getCurrentPattern() {
 /*    QByteArray test;
@@ -118,6 +120,8 @@ void TTRFile::Export(QString filename, int type)
         ExportVIC20C(filename);
     if (type==3)
         ExportBeep(filename);
+    if (type==4)
+        ExportVZ(filename);
 }
 
 // exports to the Vic 20 as a note and octave directly from the TRT data
@@ -181,6 +185,7 @@ void TTRFile::ExportVIC20C(QString filename)
         239
     };
 
+
     int noChannels = m_noChannels > 4 ? 4 : m_noChannels;
 
     QByteArray o;
@@ -209,6 +214,52 @@ void TTRFile::ExportVIC20C(QString filename)
 
                 } 
                 
+            } else {
+
+                snd = 0x00;
+                o.append( snd );
+                //qDebug() << "con=0";
+
+            }
+            //o.append( ba[ i * m_noBytesPerLine ] ); // Only add first byte of music data - ignore rest
+        }
+    }
+
+    Util::SaveByteArray( o, filename );
+
+}
+
+void TTRFile::ExportVZ(QString filename)
+{
+
+    int noChannels = m_noChannels > 4 ? 4 : m_noChannels;
+
+    QByteArray o;
+    // Header first:
+    o.append( noChannels ); // fixed at 4 max
+    o.append( m_patternLength );
+    o.append( m_orders.count() );
+    int pos = m_orders.size() * noChannels; // Start of patterns
+    Util::appendInt16( o, pos ); // pattern start
+
+    for ( QByteArray& ba: m_orders )
+        o.append( ba );
+
+    for ( QByteArray& ba: m_patterns ) {
+        for ( int i = 0; i < m_patternLength; i++ ) {
+            unsigned char snd = ba[ i * m_noBytesPerLine ];  // get first byte of music data (other 3 are not used for VIC)
+            if ( (snd & 0x80) != 0 ) {
+                snd = snd & 0x7f;
+                //qDebug() << "snd=" << snd;
+                unsigned char octave = snd / 12;
+                //qDebug() << "oct=" << octave;
+                if ( octave < 3 ) {
+
+                    o.append( snd );
+                    //qDebug() << "con=" << NOTETABLE[ snd ];
+
+                }
+
             } else {
 
                 snd = 0x00;
@@ -286,11 +337,11 @@ void TTRFile::Load(QString filename) {
     cnt = startText;
     bool done = false;
 //    qDebug() << cnt << d.count();;
-    while (!done && cnt<d.count()) {
+    while (!done && cnt<d.length()) {
         if ((uchar)d[cnt]!=0)
             m_text +=QChar(d[cnt]);
         else done = true;
-        if (cnt++>=d.count())
+        if (cnt++>=d.length())
             done = true;
     }
     //qDebug() << "Patterns: " << m_patterns.count();

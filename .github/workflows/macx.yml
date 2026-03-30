@@ -1,0 +1,72 @@
+name: macx
+
+on:
+  push:
+    tags:
+      - 'nightly'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Increment version. Ideally we would like to do it once for all builds,
+      # but this is complicated as we want to allow to trigger a nightly by
+      # pushing the tag, so this can't be in nightly.yml. One option would be to
+      # have another intermediate workflow, but we take the quik & dirty
+      # solution: increment it in each workflow and push it in one (linux.yml).
+      - name: Increment version
+        id: version
+        run: |
+          version=$(grep "define NIGHTLY" source/LeLib/data.cpp | awk '{ print $3 }')
+          let version=${version}+1
+          # Mac uses BSD sed where -i takes a parameter (an extension for the
+          # backup file, empty string disables backup)
+          sed -i '' "s/define NIGHTLY .*/define NIGHTLY $version/" source/LeLib/data.cpp
+          version=$(grep "define \(MAJOR\|FEATURE\|NIGHTLY\)" source/LeLib/data.cpp | awk '{ print $3 }' | xargs | sed 's/ /\./g')
+          echo "TRSE_VERSION=${version}" >> $GITHUB_OUTPUT
+      - uses: actions/setup-node@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          aqtversion: '==3.1.*'
+          version: '6.6.0'
+          host: 'mac'
+          target: 'desktop'
+          arch: 'clang_64'      
+      - run: brew install libomp
+
+      - run: qmake TRSE.pro
+      - run: make -j 4 arch=arm64
+
+      - name: Codesign executable
+        env: 
+          DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          echo $MACOS_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p hurra build.keychain 
+          security default-keychain -s build.keychain
+          security unlock-keychain -p hurra build.keychain
+          security import certificate.p12 -k build.keychain -P $MACOS_CERTIFICATE_PWD -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k hurra build.keychain
+          security find-identity -v
+          cd Publish/publish_mac && ./publish_mac.sh nightly $DEVELOPER_ID
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: nightly
+          body: TRSE ${{ steps.version.outputs.TRSE_VERSION }} <br/> The latest automated nightly build of TRSE which succeeded. This is the recommended version to use.
+          files: Publish/publish_mac/trse_osx.tar.gz
+          prerelease: false
+          make_latest: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build notification
+        if: failure()
+        uses: adamkdean/simple-slack-notify@master
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          channel: #bugs
+          text: "[GitHub Actions Notification] MacOS build failed: ${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}"

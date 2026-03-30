@@ -25,7 +25,7 @@
 #include <QElapsedTimer>
 #include "source/LeLib/util/util.h"
 #include <QScrollBar>
-
+#include "source/chip8emu/dialogchip8.h"
 
 
 
@@ -59,15 +59,15 @@ FormRasEditor::FormRasEditor(QWidget *parent) :
 
     }
 
-
+    connect(ui->txtEditor, SIGNAL(emitLookupWord()),this,SLOT(LookupSymbolUnderCursor()));
 
 
     // Enable shadow builds?
-/*    QTimer *timer = new QTimer(this);
+    /*    QTimer *timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(ShadowBuild()));
     timer->start(5000); //time specified in ms
 */
-//    ui->txtOutput->set
+    //    ui->txtOutput->set
 }
 
 FormRasEditor::~FormRasEditor()
@@ -83,270 +83,167 @@ void FormRasEditor::UpdateHelpText(QStringList& truFiles)
 
 void FormRasEditor::FocusOnOutput()
 {
-    ui->tabOutputs->setCurrentIndex(0);
+    //ui->tabOutputs->setCurrentIndex(0);
 }
 
 void FormRasEditor::setOutputText(QString text) {
-    ui->txtOutput->setHtml(text);
+
+    QStringList lst = text.split("<br>");
+    QString out, warning;
+    for (auto& s : lst) {
+        if (s.contains("Warning"))
+            warning+=s+"<br>";
+       else
+            out+=s+"<br>";
+    }
+    ui->txtOutput->setHtml(out);
+    ui->txtWarnings->setHtml(warning);
+//    PropagateMainOutput();
 }
+
 
 void FormRasEditor::ExecutePrg(QString fileName)
 {
-    QString emu = m_iniFile->getString("emulator");
+//    QString emu = m_iniFile->getString("emulator");
+    QString emu = Syntax::s.m_currentSystem->getEmulatorName();
+
 
     QStringList params;
 
-    QString name = "emulator_additional_parameters_"+ AbstractSystem::StringFromSystem(Syntax::s.m_currentSystem->m_system);
+    Syntax::s.m_currentSystem->applyEmulatorParameters(params,fileName+".sym", fileName,m_builderThread.m_builder->m_projectIniFile.get());
+    // Add custom emulator params
+    if (m_builderThread.m_builder!=nullptr)
+        if (m_builderThread.m_builder->compiler!=nullptr)
+                params <<m_builderThread.m_builder->compiler->m_parser.m_additionalEmulatorParams;
 
+    if (emu=="internal") {
+        // Internal emulator!
+        if (Syntax::s.m_currentSystem->m_system==AbstractSystem::CHIP8) {
+            dialogchip8* dc8 = new dialogchip8(params[0]);
+            dc8->exec();
+            delete dc8;
+            return;
+        }
+    }
+
+    QString name = "emulator_additional_parameters_"+ AbstractSystem::StringFromSystem(Syntax::s.m_currentSystem->m_system);
+    // Additional parameters
     if (m_iniFile->contains(name)) {
         QStringList pl = m_iniFile->getString(name).trimmed().split(" ");
-//        qDebug() << "Additional params: "<<pl;
+        //        qDebug() << "Additional params: "<<pl;
         pl.removeAll("");
-        params<<pl;
-    }
-
-
-    QString debugFile =Util::getFileWithoutEnding(fileName)+".sym";
-    if (QFile::exists(debugFile) && (
-                Syntax::s.m_currentSystem->m_system == AbstractSystem::VIC20 ||
-                Syntax::s.m_currentSystem->m_system == AbstractSystem::C64 ||
-                Syntax::s.m_currentSystem->m_system == AbstractSystem::C128 ||
-                Syntax::s.m_currentSystem->m_system == AbstractSystem::PET ||
-                Syntax::s.m_currentSystem->m_system == AbstractSystem::OK64
-                ))
-        params<<"-moncommands"<<debugFile;
-
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::VIC20) {
-        emu = m_iniFile->getString("vic20_emulator");
-        params<< "-autostartprgmode" << "1";
-        if (m_builderThread.m_builder==nullptr || m_builderThread.m_builder->compiler==nullptr)
-            params<< "-memory" << m_projectIniFile->getString("vic_memory_config");
-  //          qDebug() <<params;
+        if (Syntax::s.m_currentSystem->m_processor == AbstractSystem::MOS6502)
+            params = pl<<params;
         else
-            params<< "-memory" << m_builderThread.m_builder->compiler->m_parser.m_vicMemoryConfig;
-
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::PET) {
-        emu = m_iniFile->getString("pet_emulator");
-        params<< "-autostartprgmode" << "1";
-        QString petmodel = m_builderThread.m_builder->m_projectIniFile->getString("petmodel");
-        if (petmodel!="") {
-            params << "-model" << petmodel;
-        }
-//        params<< "-memory" << m_projectIniFile->getString("vic_memory_config");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::BBCM) {
-        emu = m_iniFile->getString("bbc_emulator");
-        params<< "-0" << Util::getFileWithoutEnding(fileName) + ".ssd" <<"-b";
-
-//        params<< "-memory" << m_projectIniFile->getString("vic_memory_config");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::C128) {
-        emu = m_iniFile->getString("c128_emulator");
-
-        //params << "-" + m_projectIniFile->getString("columns")+"col";
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::NES) {
-        emu = m_iniFile->getString("nes_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::GAMEBOY) {
-        emu = m_iniFile->getString("gameboy_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::SPECTRUM) {
-        emu = m_iniFile->getString("spectrum_emulator");
-        if (emu.toLower().contains("retro")) {
-            QString addr = QString::number(Syntax::s.m_currentSystem->m_programStartAddress,16);
-            int model = m_projectIniFile->getdouble("spectrum_model");
-            QStringList models = QStringList() <<"zx16k" << "zx48k"<<"zx128k";
-            params<<"-b="+models[model]<<"-j=0x"+addr<<"-l=0x"+addr;
-        }
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::PLUS4) {
-        emu = m_iniFile->getString("plus4_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::ATARI800) {
-        emu = m_iniFile->getString("atari800_emulator");
-        params<< Util::getFileWithoutEnding(fileName) + ".xex";
-    }
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::OK64) {
-        emu = m_iniFile->getString("ok64_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::TIKI100) {
-        emu = m_iniFile->getString("tiki100_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::ATARI2600) {
-        emu = m_iniFile->getString("atari2600_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::AMSTRADCPC) {
-        emu = m_iniFile->getString("amstradcpc_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::MSX) {
-        emu = m_iniFile->getString("msx_emulator");
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::APPLEII) {
-        emu = m_iniFile->getString("appleii_emulator");
-        QString fn = Util::getFileWithoutEnding(fileName) + ".do";
-        if (QFile::exists(fn))
-            fn = QFileInfo(fn).absoluteFilePath();
-
-        if (emu.toLower().contains("microm8")) {
-            params = QStringList() <<"-launch" <<fn;
-//            qDebug() << params;
-        }
-
-    }
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::COLECO) {
-        emu = m_iniFile->getString("coleco_emulator");
-
-    }
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::X86) {
-        emu = m_iniFile->getString("dosbox");
-        QString type = m_projectIniFile->getString("dosbox_x86_system");
-        if (type.toLower()!="default")
-            params << "-machine" << type;
-        params << "-noautoexec";
-
-#ifdef _WIN32
-//        params << "-noconsole";
-#endif
-
+            params<<pl;
     }
 
 
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::MEGA65) {
-        params  <<"-besure" <<"-prgmode" <<"65"<< "-prg";
-        emu = m_iniFile->getString("mega65_emulator");
-    }
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::X16) {
-        emu = m_iniFile->getString("x16_emulator");
-        QString base = emu;
-#ifdef __linux__
-        base = base.remove("x16emu");
-#endif
+    // Macos considerations (.app ending)
 #ifdef __APPLE__
-        base = base.remove("x16emu");
-
-#endif
-#ifdef _WIN32
-        base = base.toLower();
-        base = base.remove("x16emu.exe");
-#endif
-      //  -rom /home/leuat/code/x16/rom.bin -char /home/leuat/code/x16/chargen.bin -prg @prg -run
-        QStringList lst = m_iniFile->getString("x16_emulator_params").trimmed().simplified().split(" ");
-        for (QString s: lst) {
-            if (s.trimmed()!="") {
-                params<<s;
-            }
-        }
-        params<< "-run" << "-prg";
-
+    if (emu.toLower().endsWith(".app") || emu.toLower().endsWith(".app/")) {
+        if (emu.endsWith("/"))
+            emu.remove(emu.length()-1,1);
+        QString ls = emu.split("/").last().remove(".app");
+        emu = emu + "/Contents/MacOS/"+ls;
     }
-#ifdef __APPLE__
-        if (emu.toLower().endsWith(".app") || emu.toLower().endsWith(".app/")) {
-            if (emu.endsWith("/"))
-                emu.remove(emu.count()-1,1);
-                QString ls = emu.split("/").last().remove(".app");
-                emu = emu + "/Contents/MacOS/"+ls;
-
-
-
-        }
 
 #endif
-    if (!QFile::exists(emu)) {
+    // Custom must be at last, since it overwrites parameters
+    if (Syntax::s.m_currentSystem->isCustom()) {
+        emu = m_projectIniFile->getString("custom_system_emulator");
+    }
+
+
+    if (!QFile::exists(emu) && emu!="java") {
         Messages::messages.DisplayMessage(Messages::messages.NO_EMULATOR);
-        ui->txtOutput->setText("Could not find the emulator for system '" + AbstractSystem::StringFromSystem(Syntax::s.m_currentSystem->m_system) + "'\nMake sure you have set a correct path in the TRSE settings dialoge!\n\n"+
-        "Example: VICE 'c64','c128','xvic', 'dosbox' or NES 'mednafen'.");
+        ui->txtOutput->setText("Could not find the emulator for system '" + AbstractSystem::StringFromSystem(Syntax::s.m_currentSystem->m_system) + "' ("+emu+")\nMake sure you have set a correct path in the TRSE settings!\n\n"+
+                               "Example: VICE 'c64','c128','xvic', 'dosbox' or NES 'mednafen'.");
         return;
     }
     QProcess process;
 
+#ifdef __APPLE__
+    if (emu.endsWith(".exe")) {
+        // USE WINE
+        params.insert(0,emu);
+        emu = "/opt/homebrew/bin/wine64";
+        if (!QFile::exists(emu)) {
+            ui->txtOutput->setText("You're running a windows emulator on macos. Please install wine64, and it might just work! TRSE is looking for wine here: "+emu);
+            return;
 
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::VIC20 || Syntax::s.m_currentSystem->m_system == AbstractSystem::C64 || Syntax::s.m_currentSystem->m_system == AbstractSystem::C128)
-        if (m_iniFile->getdouble("auto_inject")==1.0) {
-           params << "-autostartprgmode" << "1";
         }
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::TIKI100) {
-           params << "-diska"<< QDir::toNativeSeparators(fileName)<< "-40x"<< "2"<< "-80x"<< "2";
-    }
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::AMSTRADCPC) {
-        params << "-i";
-    }
-
-    if (!(Syntax::s.m_currentSystem->m_system == AbstractSystem::TIKI100 || Syntax::s.m_currentSystem->m_system == AbstractSystem::BBCM || Syntax::s.m_currentSystem->m_system == AbstractSystem::ATARI800))
-        params << QDir::toNativeSeparators(fileName.replace("//","/"));
-
-
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::AMSTRADCPC) {
-        int num = Syntax::s.m_currentSystem->m_programStartAddress;
-        if (m_projectIniFile->getdouble("exomizer_toggle")==1)
-            num = 0x4000; /// Always start at 0x4000
-        params << "-o" << "0x"+QString::number(num,16);
-        QString amstradcpc_model = m_builderThread.m_builder->m_projectIniFile->getString("amstradcpc_model");
-        QMap<QString, QString> caprice32_models = {
-          { "464", "0" },
-          { "664", "1" },
-          { "6128", "2" },
-          { "6128 Plus", "3" },
-        };
-        amstradcpc_model = caprice32_models[amstradcpc_model];
-        if (amstradcpc_model != "") {
-            params << "-O" << "system.model=" + amstradcpc_model;
-        }
-        QString amstradcpc_options = m_builderThread.m_builder->m_projectIniFile->getString("amstradcpc_options");
-        params << amstradcpc_options.split(' ');
-//        qDebug() <<"CURRADDR" <<"0x"+QString::number(Syntax::s.m_currentSystem->m_programStartAddress,16);
-        process.setWorkingDirectory(QFileInfo(emu).path());
-//        qDebug() << "Setting working dir to "<<QFileInfo(emu).path();
-        QDir::setCurrent(QFileInfo(emu).path());
-
-    }
-
-
+       }
+#endif
 
     process.waitForFinished();
     QString orgDir = QDir::currentPath();
 
+    if (Syntax::s.m_currentSystem->m_requireEmulatorWorkingDirectory) {
+        if (emu.toLower()=="java") {
+            auto p = params[1];
+            process.setWorkingDirectory(QFileInfo(p).path());
+            QDir::setCurrent(QFileInfo(p).path());
+        }
+        else {
+
+            process.setWorkingDirectory(QFileInfo(emu).path());
+            QDir::setCurrent(QFileInfo(emu).path());
+        }
+    }
+
+
+
 #ifdef _WIN32
     QProcess::execute("taskkill /im \"x64.exe\" /f");
 #endif
-//    qDebug() << emu << " " << params <<  QDir::toNativeSeparators(fileName);
+    //    qDebug() << emu << " " << params <<  QDir::toNativeSeparators(fileName);
 #ifdef __APPLE__
-//    qDebug() << emu << params;
-//    qDebug() << emu << params;
+    if (emu.startsWith("x"))
+        QProcess::execute("killall",QStringList() << QFileInfo(emu).fileName());
+
+    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::JDH8)
+        QProcess::execute("killall",QStringList() << "emu");
+
+
+    if (emu.toLower().contains("openemu"))
+        QProcess::execute("killall",QStringList() << QFileInfo(emu).fileName());
+
+    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::M1ARM) {
+
+//        process.startDetached("zsh",QStringList() <<"-c" <<fileName);
+        process.startDetached("open",QStringList()<<"-a"<<"Terminal"<<fileName);
+        QString output(process.readAllStandardOutput());
+        return;
+    }
+
+
     if (emu.endsWith(".app")) {
         process.setArguments(params);
         process.setProgram(emu);
         process.startDetached();
     }
-    else process.startDetached(emu, params);
+    else {
+//        qDebug() <<emu<<params;
+        process.startDetached(emu, params);
 
-//    qDebug() << emu << params;
-//    qDebug() << "FormRasEditor params" << emu << params;
-
-    // Finally, add custom paramters
+    }
 
 
 #else
-//    qDebug()<<"TEST"+QDir::toNativeSeparators(fileName)+"TEST";
-
+    //    qDebug()<<"TEST"+QDir::toNativeSeparators(fileName)+"TEST";
 
 
     process.startDetached(emu, params);
+
     //qDebug() << params;
 #endif
-//    process.pi
-    QString output(process.readAllStandardOutput());
+    //    process.pi
+    QString output(process.readAllStandardOutput()+process.readAllStandardError());
+//    qDebug() <<output;
     QDir::setCurrent(orgDir);
-//    process.waitForFinished();
+    Syntax::s.m_currentSystem->ExtraEmulatorCommands();
+    //    process.waitForFinished();
 }
 
 void FormRasEditor::InitDocument(WorkerThread *t, QSharedPointer<CIniFile> ini, QSharedPointer<CIniFile> pro)
@@ -357,7 +254,10 @@ void FormRasEditor::InitDocument(WorkerThread *t, QSharedPointer<CIniFile> ini, 
     setupEditor();
     ui->txtEditor->m_displayCycles = m_iniFile->getdouble("display_cycles")==1;
     ui->txtEditor->m_displayAddresses = m_iniFile->getdouble("display_addresses")==1;
-    ui->txtEditor->m_autoComplete = m_iniFile->getdouble("editor_autocomplete")==1;
+    ui->txtEditor->m_autoComplete = m_iniFile->getdouble("editor_autocomplete_nobug")==1;
+    ui->txtEditor->m_autoIndent = m_iniFile->getdouble("editor_autocomplete")==1;
+
+    ui->btnAsm->setVisible(m_currentSourceFile.toLower().endsWith(".ras"));
 
 }
 
@@ -372,16 +272,16 @@ void FormRasEditor::setupEditor()
     m_font.setPointSize(m_iniFile->getdouble("font_size"));
     //ui->txtEditor->setTextColor(QColor(220,210,190));
     SetupHighlighter();
-//    highlighter->Save("dark_standard.ini");
+    //    highlighter->Save("dark_standard.ini");
 
     UpdateFromIni();
     ui->txtEditor->setCursorWidth(m_iniFile->getdouble("editor_cursor_width"));
     ui->splitter->setSizes(QList<int>() << 10000 << 3500);
-//    ui->splitter->setStretchFactor(0, 10);
-  //  ui->splitter->setStretchFactor(1, 0);
-//    ui->txtEditor->setTabStopWidth(m_iniFile->getInt("tab_width") * metrics.width(' '));
+    //    ui->splitter->setStretchFactor(0, 10);
+    //  ui->splitter->setStretchFactor(1, 0);
+    //    ui->txtEditor->setTabStopWidth(m_iniFile->getInt("tab_width") * metrics.width(' '));
 
-//    qDebug() << "FILE " <<m_currentSourceFile;
+    //    qDebug() << "FILE " <<m_currentSourceFile;
     if (m_currentFileShort.contains("[ext]")) {
         ui->txtOutput->setHtml("<font color=\"#FF8020\"><b>WARNING: </b></font>You are currently editing an <font color=\"#FF8020\">internal and global TRSE unit</font> that is probably being used by other projects. </font>");
     }
@@ -412,18 +312,18 @@ void FormRasEditor::Build(bool isShadow)
     if (!isShadow)
         SaveCurrent();
 
-//    VerifyCommodoreStartChange();
+    //    VerifyCommodoreStartChange();
 
 
     if (!(QApplication::keyboardModifiers() & Qt::ShiftModifier))
-    if (!isShadow)
-    if (m_projectIniFile->getString("main_ras_file")!="none") {
-        if (m_projectIniFile->getString("main_ras_file")!=m_currentFileShort) {
-            emit requestBuildMain(m_run);
-            return;
-        }
+        if (!isShadow)
+            if (m_projectIniFile->getString("main_ras_file")!="none") {
+                    if (m_projectIniFile->getString("main_ras_file")!=m_currentFileShort) {
+                    emit requestBuildMain(m_run);
+                    return;
+                }
 
-    }
+            }
 
     if (m_currentSourceFile.toLower().endsWith(".inc")) {
         ui->txtOutput->setText("You cannot compile include files");
@@ -432,20 +332,23 @@ void FormRasEditor::Build(bool isShadow)
 
 
 
-//    if (m_builderThread.m_builder!=nullptr)
-  //      delete m_builderThread.m_builder;
+    //    if (m_builderThread.m_builder!=nullptr)
+    //      delete m_builderThread.m_builder;
 
-/*    if (m_builderThread.m_builder!=nullptr) {
+    /*    if (m_builderThread.m_builder!=nullptr) {
 //        m_builderThread.m_builder->Destroy();
         delete m_builderThread.m_builder;
     }
 */
-    if (m_builderThread.m_builder!=nullptr)
+    if (m_builderThread.m_builder!=nullptr) {
         disconnect(m_builderThread.m_builder.get(), SIGNAL(EmitBuildString()), this, SLOT(AcceptBuildString()));
+        disconnect(m_builderThread.m_builder.get(), SIGNAL(emitRequestSystemChange(QString)), this, SLOT(AcceptRequestSystemChange(QString)));
+    }
 
     m_builderThread.m_builder = QSharedPointer<SourceBuilder>(new SourceBuilder(m_iniFile, m_projectIniFile, m_currentDir, m_currentSourceFile));
     m_builderThread.m_builder->m_isShadow = isShadow;
     connect(m_builderThread.m_builder.get(), SIGNAL(EmitBuildString()), this, SLOT(AcceptBuildString()));
+    connect(m_builderThread.m_builder.get(), SIGNAL(emitRequestSystemChange(QString)), this, SLOT(AcceptRequestSystemChange(QString)));
 
 
     emit requestBuild();
@@ -456,21 +359,24 @@ void FormRasEditor::Build(bool isShadow)
     while (m_builderThread.isRunning()) {
 
     }
+    Data::data.isBuilding = true;
     if (m_iniFile->getdouble("compile_thread")==1)
-       m_builderThread.start();
+        m_builderThread.start();
     else
-       m_builderThread.run();
+        m_builderThread.run();
+
+    Data::data.isBuilding = false;
 
 }
 
-
-void FormRasEditor::SetOutputText(QString txt)
+/*
+void FormRasEditor::setOutputText(QString txt)
 {
     ui->txtOutput->setHtml(ErrorHandler::e.m_teOut);
-//    ui->txtOutput->set
+    //    ui->txtOutput->set
 
 }
-
+*/
 
 void FormRasEditor::BuildNes(QString prg)
 {
@@ -482,7 +388,7 @@ void FormRasEditor::BuildNes(QString prg)
     header[2] = 0x53;
     header[3] = 0x1A;
     // 0000 1000
-//    qDebug() << "NES: " <<prg;
+    //    qDebug() << "NES: " <<prg;
     header[4] = m_projectIniFile->getdouble("nes_16k_blocks"); // PRG rom kb
     // 0001 0000
 
@@ -494,11 +400,11 @@ void FormRasEditor::BuildNes(QString prg)
     data = data.remove(0,2);
 
     data.insert(0,header);
-    int dc = data.count();
-//    int dCount = m_projectIniFile->getdouble("nes_16k_blocks");
+    int dc = data.length();
+    //    int dCount = m_projectIniFile->getdouble("nes_16k_blocks");
     //if (dc<pow(2,14))
     int j=pow(2,14)*2-dc+16;
-//    qDebug() << "j";
+    //    qDebug() << "j";
     for (int i=0;i<j;i++)
         data.append((char)0);
 
@@ -514,7 +420,7 @@ void FormRasEditor::BuildNes(QString prg)
 
     QFile out(prg+ ".nes");
     out.open(QFile::WriteOnly);
-//    out.write(header);
+    //    out.write(header);
     out.write(data);
     out.close();
 
@@ -566,7 +472,7 @@ void FormRasEditor::LookupSymbolUnderCursor()
 void FormRasEditor::LookupAssemblerUnderCursor()
 {
     emit emitGotoAssemblerLine(m_currentFileShort, ui->txtEditor->textCursor().blockNumber());
-//    void emitGotoAssemblerLine(QString rasSrc, int lineNuber);
+    //    void emitGotoAssemblerLine(QString rasSrc, int lineNuber);
 
 }
 
@@ -585,15 +491,15 @@ void FormRasEditor::Setup()
 void FormRasEditor::VerifyCommodoreStartChange()
 {
     if (!(Syntax::s.m_currentSystem->m_system == AbstractSystem::C64 ||
-            Syntax::s.m_currentSystem->m_system == AbstractSystem::VIC20 ||
-            Syntax::s.m_currentSystem->m_system == AbstractSystem::PLUS4 ||
-            Syntax::s.m_currentSystem->m_system == AbstractSystem::C128 ||
-            Syntax::s.m_currentSystem->m_system == AbstractSystem::PET)) return;
+          Syntax::s.m_currentSystem->m_system == AbstractSystem::VIC20 ||
+          Syntax::s.m_currentSystem->m_system == AbstractSystem::PLUS4 ||
+          Syntax::s.m_currentSystem->m_system == AbstractSystem::C128 ||
+          Syntax::s.m_currentSystem->m_system == AbstractSystem::PET)) return;
 
     QString iniField = "ignoremessage_commodore_start_change";
     if (m_projectIniFile->getdouble("override_target_settings")==1) {
         if (!(m_projectIniFile->contains(iniField) && m_projectIniFile->getdouble(iniField)==1)) {
-          //  qDebug() << "HERE" << m_projectIniFile->getdouble("override_target_settings");
+            //  qDebug() << "HERE" << m_projectIniFile->getdouble("override_target_settings");
             DialogCustomWarning* d = new DialogCustomWarning();
             d->Init("Project Warning","A BASIC SYS start address has been specified in the project settings that is invalid."
 " Please use [default] instead.",iniField,m_projectIniFile.get());
@@ -601,6 +507,17 @@ void FormRasEditor::VerifyCommodoreStartChange()
             delete d;
         }
     }
+}
+
+void FormRasEditor::ApplySymbolList(SourceBuilder* c) {
+    if (c==nullptr)
+        return;
+    if (c->compiler==nullptr)
+        return;
+
+    highlighter->AppendSymboltable(c->compiler->m_parser.m_procedures.keys());
+    highlighter->rehighlight();
+
 }
 
 void FormRasEditor::Focus() {
@@ -611,6 +528,14 @@ bool FormRasEditor::isBuilding()
 {
 
     return m_builderThread.m_isRunning;
+}
+
+QString FormRasEditor::getBuildText()
+{
+    if (m_builderThread.m_builder==nullptr)
+        return "";
+//    qDebug() << m_builderThread.m_builder->m_buildString;
+    return m_builderThread.m_builder->m_buildString;
 }
 
 
@@ -624,21 +549,21 @@ void FormRasEditor::Run()
         }
 
     }
-//    if (!m_run)
-  //      return;
+    //    if (!m_run)
+    //      return;
     if (m_builderThread.m_builder->m_system==nullptr)
         return;
 
 
 
     if (m_builderThread.m_builder->m_system->m_system == AbstractSystem::AMIGA) {
-//        Messages::messages.DisplayMessage(Messages::messages.NO_AMIGA_EMULATOR);
-//        qDebug() << "No amiga emulator installed";
+        //        Messages::messages.DisplayMessage(Messages::messages.NO_AMIGA_EMULATOR);
+        //        qDebug() << "No amiga emulator installed";
         return;
     }
     if (m_builderThread.m_builder->m_system->m_system == AbstractSystem::ATARI520ST) {
-//        Messages::messages.DisplayMessage(Messages::messages.NO_AMIGA_EMULATOR);
-//        qDebug() << "No amiga emulator installed";
+        //        Messages::messages.DisplayMessage(Messages::messages.NO_AMIGA_EMULATOR);
+        //        qDebug() << "No amiga emulator installed";
         return;
     }
 
@@ -648,37 +573,35 @@ void FormRasEditor::Run()
     if (!m_builderThread.m_builder->m_system->m_buildSuccess)
         return;
 
+    if (m_currentSourceFile.toLower().endsWith(".tru")) {
+        ui->txtOutput->setHtml("<font color=\"red\">Cannot execute Turbo Rascal Unit (.tru) files. </font>");
+    }
+
     if (!m_projectIniFile->contains("output_type"))
         m_projectIniFile->setString("output_type","prg");
 
     QString ft = ".ras";
     if (m_currentSourceFile.toLower().endsWith(".tru"))
         ft =".tru";
-    QString filename = m_currentSourceFile.split(ft)[0] + "."+ m_projectIniFile->getString("output_type");
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::NES)
-        filename = m_currentSourceFile.split(ft)[0] + ".nes";
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::GAMEBOY)
-        filename = m_currentSourceFile.split(ft)[0] + ".gb";
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::SPECTRUM)
-        filename = m_currentSourceFile.split(ft)[0] + ".bin";
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::X86)
-        filename = m_currentSourceFile.split(ft)[0] + ".exe";
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::AMSTRADCPC)
-        filename = m_currentSourceFile.split(ft)[0] + ".bin";
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::MSX)
-        filename = m_currentSourceFile.split(ft)[0] + ".rom";
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::COLECO)
-        filename = m_currentSourceFile.split(ft)[0] + ".bin";
-    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::TIKI100)
-        filename = m_currentDir+ "disk.dsk";
 
-
-//    exit(1);
-    if (m_currentSourceFile.toLower().endsWith(".tru")) {
-        ui->txtOutput->setHtml("<font color=\"red\">Cannot execute Turbo Rascal Unit (.tru) files. </font>");
+    QString base = m_currentSourceFile.split(ft)[0];
+    QString orgFile = base;
+    bool renameFile = false;
+    if (m_builderThread.m_builder->compiler->m_parser.m_overrideOutputTarget!="") {
+        renameFile = true;
+//        base = m_builderThread.m_builder->compiler->m_parser.m_overrideOutputTarget;
     }
-    else
-        ExecutePrg(filename);
+    QString filename = base;
+
+    if (renameFile) {
+        QString newFilename = filename;
+        newFilename = newFilename.replace(orgFile, m_builderThread.m_builder->compiler->m_parser.m_overrideOutputTarget);
+        Util::CopyFile(filename,newFilename);
+        filename = newFilename;
+    }
+
+
+    ExecutePrg(filename);
 
     m_run = false;
 
@@ -744,7 +667,7 @@ void FormRasEditor::SetupHighlighter()
 
 
     highlighter->ApplyCustomKeywordList();
-//    qDebug() << "UPDATE " << m_iniFile->getString("theme");
+    //    qDebug() << "UPDATE " << m_iniFile->getString("theme");
 
 }
 
@@ -756,8 +679,10 @@ void FormRasEditor::wheelEvent(QWheelEvent *event)
 
 void FormRasEditor::keyPressEvent(QKeyEvent *e)
 {
+//    qDebug() << "before" << m_documentIsChanged;
+    bool keep = ui->txtEditor->m_textChanged;
     TRSEDocument::keyPressEvent(e);
-    m_documentIsChanged  = ui->txtEditor->m_textChanged;
+  //  qDebug() << "after" << m_documentIsChanged;
     if (e->key() == Qt::Key_Escape && ui->leSearch2->hasFocus()) {
         ui->txtEditor->setFocus();
     }
@@ -766,16 +691,19 @@ void FormRasEditor::keyPressEvent(QKeyEvent *e)
         ui->txtEditor->setOverwriteMode(!ui->txtEditor->overwriteMode());
     }
 
-/*    if (e->key()==Qt::Key_W && (QApplication::keyboardModifiers() & Qt::ControlModifier))
+    /*    if (e->key()==Qt::Key_W && (QApplication::keyboardModifiers() & Qt::ControlModifier))
         emit requestCloseWindow();
         m_documentIsChanged  = ui->txtEditor->m_textChanged;
     //    Data::data.requestCloseWindow = true;
 */
-//    if (ui->txtEditor->m_textChanged)
+    //    if (ui->txtEditor->m_textChanged)
 
-//   if ((e->modifiers() & Qt::ControlModifier) && (e->modifiers() & Qt::ShiftModifier) && e->key()==Qt::Key_C)
-   if ((e->modifiers() & Qt::ControlModifier) && e->key()==Qt::Key_E)
+    //   if ((e->modifiers() & Qt::ControlModifier) && (e->modifiers() & Qt::ShiftModifier) && e->key()==Qt::Key_C)
+    if ((e->modifiers() & Qt::ControlModifier) && e->key()==Qt::Key_E) {
         ToggleComment();
+        ui->txtEditor->m_textChanged = keep;
+
+    }
 
 
     if (e->key()==Qt::Key_J && (QApplication::keyboardModifiers() & Qt::ControlModifier)) AutoFormat();
@@ -783,28 +711,50 @@ void FormRasEditor::keyPressEvent(QKeyEvent *e)
         ui->leSearch2->setText("");
         m_searchFromPos = ui->txtEditor->textCursor().position();
         ui->leSearch2->setFocus();
+        ui->txtEditor->m_textChanged = keep;
+
     }
     if (e->key()==Qt::Key_G && (QApplication::keyboardModifiers() & Qt::ControlModifier)) {
         emit emitSearchSymbols();
+        ui->txtEditor->m_textChanged = keep;
     }
 
 
     if (e->key()==Qt::Key_F1) {
+        if ((m_help && m_help->isVisible()) || ui->chkAlwaysUseHelpWindow->isChecked()) {
+            QTextCursor tc = ui->txtEditor->textCursor();
+            tc.select(QTextCursor::WordUnderCursor);
+            QString word = tc.selectedText();
+            tc.select(QTextCursor::LineUnderCursor);
+            QString line = tc.selectedText();
+            int pos = line.indexOf(word);
+            // Match for stuff like Memory::Clear
+            QRegularExpression regexp("\\b(\\S+?)::(\\S+?)\\b");
+            if (line.contains(regexp)) {
+                QString w = regexp.match(line).captured();
+                if (w.contains(word))
+                    word = w; // Match! change "MemCpy" to "Memory::MemCpy"
+            }
+            Help(word);
+            return;
+        }
+
         QTextCursor tc = ui->txtEditor->textCursor();
         tc.select(QTextCursor::WordUnderCursor);
         QString word = tc.selectedText();
 
-//        Help(word);
-   /*     QTextCursor tc = ui->txtEditor->textCursor();
+        //        Help(word);
+        /*     QTextCursor tc = ui->txtEditor->textCursor();
         tc.select(QTextCursor::WordUnderCursor);
         QString word = tc.selectedText();
 */
         ui->widgetHelp->BuildTRU(m_truList);
-        ui->tabOutputs->setCurrentIndex(1);
+        //ui->tabOutputs->setCurrentIndex(1);
 
         ui->widgetHelp->SetFontSize(m_iniFile->getdouble("font_size"));
-//        ui->tabHelp->setFocus();
+        //        ui->tabHelp->setFocus();
         ui->widgetHelp->Search(word);
+        ui->txtEditor->m_textChanged = keep;
     }
 
     if (e->key()==Qt::Key_Escape)
@@ -812,22 +762,30 @@ void FormRasEditor::keyPressEvent(QKeyEvent *e)
 
     if (e->key()==Qt::Key_F2) {
         LookupSymbolUnderCursor();
+        ui->txtEditor->m_textChanged = keep;
     }
 
     if (e->key()==Qt::Key_F3) {
         LookupAssemblerUnderCursor();
+        ui->txtEditor->m_textChanged = keep;
     }
 
     if (e->key() == Qt::Key_U &&  (QApplication::keyboardModifiers() & Qt::ControlModifier)) {
-        MemoryAnalyze(false);
+        emit emitMemoryAnalyse();
+        ui->txtEditor->m_textChanged = keep;
+    }
+    if (e->key() == Qt::Key_Y &&  (QApplication::keyboardModifiers() & Qt::ControlModifier)) {
+        emit emitSizeAnalyse();
     }
     if (e->key() == Qt::Key_F5 || (e->key() == Qt::Key_R &&  (QApplication::keyboardModifiers() & Qt::ControlModifier))) {
         m_run=true;
         Build();
-//        Run();
+        ui->txtEditor->m_textChanged = keep;
+        //        Run();
     }
 
 
+    m_documentIsChanged  = ui->txtEditor->m_textChanged;
 
 
 }
@@ -838,13 +796,13 @@ bool FormRasEditor::isRasFile()
 }
 
 void FormRasEditor::Destroy() {
-      m_builderThread.quit();
+    m_builderThread.quit();
 }
 
 void FormRasEditor::TestForCodeOverwrite(int codeEnd, QString& output)
 {
     for (MemoryBlock& mb: m_builderThread.m_builder->compiler->m_assembler->m_userWrittenBlocks) {
-//        qDebug() << Util::numToHex(mb.m_start) << " vs " << Util::numToHex(codeEnd) ;
+        //        qDebug() << Util::numToHex(mb.m_start) << " vs " << Util::numToHex(codeEnd) ;
         if (mb.m_start<codeEnd && mb.m_start>=Syntax::s.m_currentSystem->m_startAddress) {
             output +="\n<font color=\"#FF8080\">WARNING:</font>Possible code block overwrite on line <b>" +QString::number(mb.m_lineNumber) + "</b>.&nbsp;";
             output += "<font color=\"#FF8080\">Proceed with caution </font>(writing to <font color=\"#FF8080\">"+Util::numToHex(mb.m_start)+"</font>, code ends at <font color=\"#FF8080\">"+Util::numToHex(codeEnd) +")</font>. <br>";
@@ -854,16 +812,16 @@ void FormRasEditor::TestForCodeOverwrite(int codeEnd, QString& output)
 
 void FormRasEditor::GotoLine(int ln)
 {
-//    QTextCursor cursor(ui->txtEditor->document()->findBlockByLineNumber(ln-1));
-//    int scrollPos =  ui->txtEditor->verticalScrollBar()->value();
-//    ui->txtEditor->setTextCursor(cursor);
+    //    QTextCursor cursor(ui->txtEditor->document()->findBlockByLineNumber(ln-1));
+    //    int scrollPos =  ui->txtEditor->verticalScrollBar()->value();
+    //    ui->txtEditor->setTextCursor(cursor);
     ui->txtEditor->moveCursor(QTextCursor::End);
     QTextCursor cursor(ui->txtEditor->document()->findBlockByLineNumber(ln-1));
     ui->txtEditor->setTextCursor(cursor);
     ui->txtEditor->verticalScrollBar()->setValue(ui->txtEditor->verticalScrollBar()->value()-4);
 
     // reset the cursor position (and scroll back again)
-  //  setTextCursor(prevCursor);
+    //  setTextCursor(prevCursor);
     // scroll again to the remembered position
 }
 
@@ -876,10 +834,12 @@ void FormRasEditor::on_leSearch2_textChanged()
 
 void FormRasEditor::AcceptBuildString()
 {
-    ui->txtOutput->setHtml(m_builderThread.m_builder->m_buildString);
-//    float t = 0.02;
-  //  m_curCol = m_endCol;//(m_curCol)*(1-t) + m_endCol*t;
+    //ui->txtOutput->setHtml(m_builderThread.m_builder->m_buildString);
+    setOutputText(m_builderThread.m_builder->m_buildString);
+    //    float t = 0.02;
+    //  m_curCol = m_endCol;//(m_curCol)*(1-t) + m_endCol*t;
     ui->lblLight->setStyleSheet("QLabel { background-color : \""+ Util::toColor(m_curCol).name() + "\"; color : blue; }");
+    emit emitOutputTextChanged();
 
 }
 
@@ -889,7 +849,7 @@ void FormRasEditor::SearchInSource(QString text)
     QTextCursor cursor(ui->txtEditor->document()->findBlock(m_currentFromPos));
     ui->txtEditor->moveCursor(QTextCursor::End);
     ui->txtEditor->setTextCursor(cursor);
-//    ui->txtEditor->scroll(0,200);
+    //    ui->txtEditor->scroll(0,200);
 }
 
 void FormRasEditor::UpdateColors()
@@ -916,7 +876,7 @@ void FormRasEditor::UpdateFromIni()
 
 void FormRasEditor::AutoFormat()
 {
-/*    if (!BuildStep())
+    /*    if (!BuildStep())
         return;
 
     int pos = ui->txtEditor->textCursor().position();
@@ -1031,17 +991,21 @@ bool FormRasEditor::BuildStep()
 void FormRasEditor::FillFromIni()
 {
     ui->chkPostOpt->setChecked(m_iniFile->getdouble("post_optimize")==1);
-//    ui->chkExomize->setChecked(m_iniFile->getdouble("perform_crunch")==1);
+    //    ui->chkExomize->setChecked(m_iniFile->getdouble("perform_crunch")==1);
     ui->chkExomize->setChecked(m_projectIniFile->getdouble("exomizer_toggle")==1);
     ui->chkRemoveUnusedSymbols->setChecked(m_projectIniFile->getdouble("remove_unused_symbols")==1);
     ui->chkWarnings->setChecked(m_iniFile->getdouble("display_warnings")==1);
-//    qDebug() << "FillFromIni" << m_iniFile->getdouble("perform_crunch");
+    ui->chkWarnings->setVisible(false);
+    ui->chkDisplayAddresses->setVisible(Syntax::s.m_currentSystem->HasAddressCounter());
+    ui->chkDisplayCycles->setVisible(Syntax::s.m_currentSystem->HasCycleCounter());
+    //    qDebug() << "FillFromIni" << m_iniFile->getdouble("perform_crunch");
 
 
     ui->chkDisplayAddresses->setChecked(m_iniFile->getdouble("display_addresses")==1);
     ui->chkDisplayCycles->setChecked(m_iniFile->getdouble("display_cycles")==1);
+    ui->chkAlwaysUseHelpWindow->setChecked(m_iniFile->getdouble("always_use_help_window")==1.0);
 
-//    qDebug() << "PARSER "<<m_iniFile->getdouble("display_cycles");
+    //    qDebug() << "PARSER "<<m_iniFile->getdouble("display_cycles");
     isInitialized=true;
 }
 
@@ -1053,13 +1017,21 @@ void FormRasEditor::FillToIni()
     m_iniFile->setFloat("post_optimize",ui->chkPostOpt->isChecked()?1:0);
     m_projectIniFile->setFloat("exomizer_toggle",ui->chkExomize->isChecked()?1:0);
     m_projectIniFile->setFloat("remove_unused_symbols",ui->chkRemoveUnusedSymbols->isChecked()?1:0);
-    m_iniFile->setFloat("display_warnings",ui->chkWarnings->isChecked()?1:0);
+    m_iniFile->setFloat("display_warnings",1);
 
     m_iniFile->setFloat("display_addresses",ui->chkDisplayAddresses->isChecked()?1:0);
+    if (!Syntax::s.m_currentSystem->HasAddressCounter())
+        m_iniFile->setFloat("display_addresses",0);
+    if (!Syntax::s.m_currentSystem->HasCycleCounter())
+        m_iniFile->setFloat("display_cycles",0);
     m_iniFile->setFloat("display_cycles",ui->chkDisplayCycles->isChecked()?1:0);
 
     ui->txtEditor->m_displayCycles = ui->chkDisplayCycles->isChecked();
     ui->txtEditor->m_displayAddresses = ui->chkDisplayAddresses->isChecked();
+
+    m_iniFile->setFloat("always_use_help_window",ui->chkAlwaysUseHelpWindow->isChecked()?1:0);
+
+
     ui->txtEditor->update();
     m_iniFile->Save();
 }
@@ -1074,7 +1046,7 @@ void FormRasEditor::MemoryAnalyze(bool isHidden)
         ErrorHandler::e.m_warnings.clear();
         ErrorHandler::e.m_teOut = "";
         ErrorHandler::e.Warning("Memory analyzer only works for .ras source files");
-        SetOutputText(ErrorHandler::e.m_teOut);
+        setOutputText(ErrorHandler::e.m_teOut);
         return;
     }
     int i= m_projectIniFile->getdouble("exomizer_toggle");
@@ -1084,34 +1056,37 @@ void FormRasEditor::MemoryAnalyze(bool isHidden)
         ErrorHandler::e.m_warnings.clear();
         ErrorHandler::e.m_teOut = "";
         ErrorHandler::e.Warning("Source file must be built before memory analyzer can run.");
-        SetOutputText(ErrorHandler::e.m_teOut);
+        setOutputText(ErrorHandler::e.m_teOut);
         return;
     }
     if (!m_builderThread.m_builder->m_buildSuccess) {
         ErrorHandler::e.m_warnings.clear();
         ErrorHandler::e.m_teOut = "";
         ErrorHandler::e.Warning("Source file must be built before memory analyzer can run.");
-        SetOutputText(ErrorHandler::e.m_teOut);
+        setOutputText(ErrorHandler::e.m_teOut);
         return;
     }
 
-/*    if (!m_builderThread.m_builder->Build(ui->txtEditor->toPlainText())) {
+    /*    if (!m_builderThread.m_builder->Build(ui->txtEditor->toPlainText())) {
         return;
     }
 */
+
+
     m_projectIniFile->setFloat("exomizer_toggle",i);
     m_builderThread.m_builder->compiler->SaveBuild(filename + ".asm");
 
     filename = m_currentSourceFile;
     filename = filename.remove(".ras");
-//    qDebug() << "Filename; "<< m_currentSourceFile;
-//    m_builderThread.m_builder->
-//    bool success = m_builderThread.m_builder->compiler->SetupMemoryAnalyzer(filename);
+    //    qDebug() << "Filename; "<< m_currentSourceFile;
+    //    m_builderThread.m_builder->
+    //    bool success = m_builderThread.m_builder->compiler->SetupMemoryAnalyzer(filename);
     if (isHidden)
         return;
+
     m_mca.ClassifyZP(m_builderThread.m_builder->compiler->m_assembler->blocks);
 
-    DialogMemoryAnalyze* dma = new DialogMemoryAnalyze(m_iniFile,m_builderThread.m_builder->m_system.get());
+    DialogMemoryAnalyze* dma = new DialogMemoryAnalyze(m_iniFile,m_projectIniFile, m_builderThread.m_builder->m_system.get());
     dma->m_success = m_builderThread.m_builder->m_buildSuccess;
     dma->Initialize(m_builderThread.m_builder->compiler->m_assembler->blocks, m_iniFile->getInt("memory_analyzer_font_size"));
     dma->resize(m_iniFile->getdouble("memory_analyzer_window_width"),m_iniFile->getdouble("memory_analyzer_window_height"));
@@ -1135,7 +1110,7 @@ void FormRasEditor::Reload()
 
 void FormRasEditor::Save(QString filename)
 {
-  //  if (QFile::exists(filename))
+    //  if (QFile::exists(filename))
     //    QFile::remove(filename);
     QString txt = ui->txtEditor->document()->toPlainText();
     QFile file(filename);
@@ -1151,6 +1126,9 @@ void FormRasEditor::Save(QString filename)
 
 bool FormRasEditor::Load(QString filename)
 {
+    if (!QFile::exists(filename))
+        return false;
+
     QFile file(filename);
     if (file.open(QFile::ReadOnly | QFile::Text)) {
         SetText(file.readAll());
@@ -1160,7 +1138,8 @@ bool FormRasEditor::Load(QString filename)
     m_isTRU = filename.toLower().endsWith(".tru");
     if (m_isTRU)
         ui->txtEditor->m_fileType = CodeEditor::TRU;
-    if (filename.toLower().endsWith(".asm"))
+
+    if (filename.toLower().endsWith(".asm") || filename.toLower().endsWith(".ll"))
         ui->txtEditor->m_fileType = CodeEditor::ASM;
     if (filename.toLower().endsWith(".inc"))
         ui->txtEditor->m_fileType = CodeEditor::INC;
@@ -1213,7 +1192,7 @@ void FormRasEditor::on_chkPostOpt_stateChanged(int arg1)
 void FormRasEditor::HandleBuildError()
 {
     m_run = false;
-    SetOutputText(ErrorHandler::e.m_teOut);
+    setOutputText(ErrorHandler::e.m_teOut);
     m_outputText = ErrorHandler::e.m_teOut;
     int ln = Pmm::Data::d.lineNumber;
 
@@ -1223,7 +1202,7 @@ void FormRasEditor::HandleBuildError()
         return;
 
     HandleErrorDialogs(ErrorHandler::e.m_teOut);
-//    qDebug() << "FormRasEditor "<<ln;
+    //    qDebug() << "FormRasEditor "<<ln;
     if (m_builderThread.m_builder!=nullptr)
         emit OpenOtherFile(m_builderThread.m_builder->compiler->recentError.file, ln);
     if (ln>1)
@@ -1257,18 +1236,12 @@ void FormRasEditor::HandleErrorDialogs(QString& output)
 
 
     if (!output.toLower().contains("complete.")) {
-        if (output=="") {
-        Messages::messages.DisplayMessage(Messages::messages.NO_DASM);
-
-            output = output + "\nCould not find Dasm.exe. Did you set the correct environment variables?";
-        }
-
     }
 
 }
 void FormRasEditor::HandleUpdateBuildText()
 {
-    ui->txtOutput->setHtml(m_builderThread.m_builder->getOutput());
+    setOutputText(m_builderThread.m_builder->getOutput());
 
 }
 
@@ -1298,28 +1271,46 @@ void FormRasEditor::HandleBuildComplete()
 
     highlighter->AppendSymboltable(m_builderThread.m_builder->compiler->m_parser.m_procedures.keys());
     highlighter->rehighlight();
-//    ui->txtEditor->viewport()->update();
+    //    ui->txtEditor->viewport()->update();
     ui->txtEditor->m_textChanged = keepTextChanged;
 
     m_globalOutput =m_builderThread.m_builder->getOutput();
     emit emitSuccess();
-//    qDebug() << "EXECUTING RUN" <<m_run <<m_currentFileShort;
-//    qDebug() << "WOOT"  <<m_builderThread.m_builder->m_system->m_buildSuccess ;
+    //    qDebug() << "EXECUTING RUN" <<m_run <<m_currentFileShort;
+    //    qDebug() << "WOOT"  <<m_builderThread.m_builder->m_system->m_buildSuccess ;
     if (m_run) {
         m_builderThread.m_builder->AddMessage("<br>Running program...");
         HandleUpdateBuildText();
         Run();
     }
-
+    m_builderThread.m_builder->m_buildString= m_builderThread.m_builder->getOutput();
+    emit emitOutputTextChanged();
+//    if (ui->txtWarnings->toPlainText().simplified=="")
+  //      ui->tabWidget->setTabText(1,"Warnings");
+    //else
+    int cnt = ui->txtWarnings->toPlainText().split("\n").count()-1;
+        ui->tabWidget->setTabText(1,"Warnings ("+QString::number(cnt)+")");
     m_run = false;
 }
 
 void FormRasEditor::Help(QString word) {
-    m_help = QSharedPointer<DialogHelp>(new DialogHelp(nullptr, word, m_defaultPalette,m_truList));
+    if (!(m_help && m_help->isVisible()))
+        m_help = QSharedPointer<DialogHelp>(new DialogHelp(nullptr, word, m_defaultPalette,m_truList));
+    else {
+        m_help->Search(word);
+        m_help->setFocus();
+    }
+
     m_help->SetFontSize(m_iniFile->getdouble("font_size"));
     m_help->show();
-//    delete dh;
+    //    delete dh;
 
+}
+
+void FormRasEditor::AcceptRequestSystemChange(QString val)
+{
+    emit emitRequestSystemChange(val);
+    Build();
 }
 
 void FormRasEditor::ShadowBuild()
@@ -1329,7 +1320,7 @@ void FormRasEditor::ShadowBuild()
     if (!m_hasFocus)
         return;
 
-    Build(true);
+//    Build(true);
 
 
 }
@@ -1349,14 +1340,15 @@ void BuilderThread::run()
             //    }
             //        qDebug() << m_builder->m_filename;
 
-            m_builder->AddMessage("Assembling & compressing... ");
+//            m_builder->AddMessage("Assembling & compressing... ");
 
             //emit emitText();
 
 
             m_builder->Assemble();
             if (m_builder->m_buildSuccess) {
-                m_builder->compiler->SetupMemoryAnalyzer(Util::getFileWithoutEnding(m_filename), m_builder->m_system->m_orgAsm);
+                //qDebug() << "FORMRASEDITOR "<<m_builder->m_currentSourceFile;
+                m_builder->compiler->SetupMemoryAnalyzer(Util::getFileWithoutEnding(m_filename), m_builder->m_system->m_orgAsm.get());
                 //            qDebug() << m_builder->getOutput();
 
             }
@@ -1413,3 +1405,10 @@ void FormRasEditor::on_btnViewHelp_clicked()
     Help(ui->widgetHelp->m_currentWord);
 
 }
+
+void FormRasEditor::on_btnAsm_clicked()
+{
+    LookupAssemblerUnderCursor();
+
+}
+

@@ -1,0 +1,95 @@
+/*
+	X16 Balls
+	
+*/
+program VeraBalls;
+@use "system/screen"
+@use "system/memory"
+
+var 
+	// defines a constant to specify how many balls we want 
+	
+	const num_balls : byte = 200;
+	
+	// create arrays for the ball data
+	ball = record
+		xp,yp,dx,dy : byte;		
+	end;
+	
+   	balls : array[num_balls] of ball; // x and y position, delta X and Y moveement
+
+	i, j,rnd : byte;
+
+	rand : array[256] of byte = buildtable("Math.random()*256");
+
+	const ball_value : byte = $A0;
+
+	
+procedure getRand();
+begin
+	inc(rnd);
+	returnValue(rand[rnd]);
+end;
+
+procedure InitialiseBalls();
+begin
+	
+	// loop through all items in the array to set their position
+	for i := 0 to @NUM_BALLS do
+	begin
+		balls[i].xp := getRand()/4;	// set x position for each ball
+		balls[i].yp := getRand()/4;	// set y position for each ball
+		j := getRand() & 1;			// set starting direction on the x-axis for each ball
+		case j of
+			0 : balls[i].dx := 1;
+			1 : balls[i].dx := -1;
+		end;
+		j := getRand() & 1;			// set starting direction on the y-axis for each ball
+		case j of
+			0 : balls[i].dy := 1;
+			1 : balls[i].dy := -1;
+		end;
+	end;
+end;
+
+procedure MoveBalls();
+begin
+	Memory::SetBank(Memory::screen_bank);
+	Memory::VeraPoint(#Memory::screen);	
+	setveraincrement(1);
+	for i := 0 to num_balls do
+	begin
+		Screen::MoveTo(balls[i].xp*2,balls[i].yp);
+		vera_data1:=ball_value;		
+		vera_data1:=6;
+				
+		if (balls[i].xp = 0 ) then balls[i].dx := 1;
+		if (balls[i].xp = Screen::screen_width -1 ) then balls[i].dx := -1;
+		if (balls[i].yp = 0 ) then balls[i].dy := 1;
+		if (balls[i].yp = Screen::screen_height -1 ) then balls[i].dy := -1;
+		// update x and y position of ball using the delta
+		balls[i].xp := balls[i].xp + balls[i].dx;
+		balls[i].yp := balls[i].yp + balls[i].dy;
+		
+		
+		Screen::MoveTo(balls[i].xp*2,balls[i].yp);
+		
+		vera_data1:=ball_value;		
+		vera_data1:=3;		
+
+	end;
+end;
+
+begin
+	
+	InitialiseBalls(); 	 // initialise the balls
+
+	// infinite loop
+	while(true) do
+	begin
+		// move the balls
+		MoveBalls();
+		for i:=0 to 255 do wait(80);
+	end;
+	
+end.

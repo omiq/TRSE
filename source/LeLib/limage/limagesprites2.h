@@ -28,27 +28,12 @@ public:
 
 
 
-    void Clear() override {
+    void Clear(int val=0) override {
         for (PixelChar &pc : m_data)
             pc.Clear(pc.c[0]);
     }
 
-    LSprite(QByteArray& a, int index, int mask) {
-        int c = index;
-        Init(1,1);
-        for (int y=0;y<3;y++) {
-            for (int x=0;x<3;x++) {
-                for (int j=0;j<8;j++) {
-                    int d = c+3*j;
-                    m_data[y*3+x].p[j] = PixelChar::reverse(a[d]);
-                    m_data[y*3+x].p[j] = m_data[y*3+x].flipSpriteBit(j, mask);
-                }
-                c++;
-            }
-            c+=7*3;
-        }
-
-    }
+    LSprite(QByteArray& a, int index, int mask);
 
     void FillColor(int color, int idx) {
         for (int i=0;i<m_data.count();i++) {
@@ -62,10 +47,10 @@ public:
         m_data.resize(m_height*m_width*m_pcWidth*m_pcHeight);
         m_header.resize(HEADER_SIZE);
     }
-    PixelChar* GetSetData(float x, float y, float& ix, float& iy, uchar bitMask);
+    PixelChar* GetSetData(double x, double y, double& ix, double& iy, uchar bitMask);
 
-    void setPixel(float x, float y, uchar color, uchar bitMask);
-    uchar getPixel(float x, float y, uchar bitMask);
+    void setPixel(double x, double y, uchar color, uchar bitMask);
+    uchar getPixel(double x, double y, uchar bitMask);
 
 
 };
@@ -121,8 +106,9 @@ public:
    }
 
 
-    void InitPens() override;
-   void ToQImage(LColorList& lst, QImage& img, float zoom, QPointF center) override;
+
+   void InitPens() override;
+   void ToQImage(LColorList& lst, QImage& img, double zoom, QPointF center) override;
 
 
    void ToggleSpriteMulticolor();
@@ -135,9 +121,12 @@ public:
    virtual void Transform(int x, int y) override;
    virtual int getContainerCount() override {return m_items.count();}
 
+   virtual int getGridWidth() override;
+   virtual int getGridHeight()  override;
 
 
    virtual void OrdererdDither(QImage &img, LColorList &colors, QVector3D strength, QPoint size, float gamma = 1.0) override;
+   void ImportSpritepad(QString filename) override;
 
 
 };

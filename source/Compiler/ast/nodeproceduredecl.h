@@ -29,21 +29,46 @@
 #include "source/Compiler/ast/node.h"
 #include "source/Compiler/ast/nodeblock.h"
 #include "source/Compiler/ast/nodevardecl.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
+
+
+/*
+   Represents a procedure declaration, for example
+   procedure SomeProcedure(param1 : byte);
+   begin
+       val:=param1*2;
+   end;
+
+    m_left: undefined
+    m_right: undefined
+    m_op: undefined
+
+    m_paramDecl: list of parameter delcarations, for example "param1:byte"
+    m_flags : procedure flags such as "forward"
+    m_block : the actual code/variable definitions of the procedure
+*/
 
 class NodeProcedureDecl : public Node {
 public:
     QString m_procName, m_fileName;
     bool m_isStatic = true;
     QString m_class;
+
+    QStringList m_flags;
     QVector<QSharedPointer<Node>> m_paramDecl;
     QSharedPointer<Node> m_returnValue;
     QSharedPointer<Node> m_returnType;
     bool m_isFunction = false;
+    bool m_isRecursive = false;
     int m_type;
     bool m_isInline = false;
+    bool m_isForward = false;
+    bool m_isAssembler = false;
+
     QSharedPointer<Node> m_block = nullptr;
 
+
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override;
 
     NodeProcedureDecl(Token t, QString m);
     void parseConstants(QSharedPointer<SymbolTable>  symTab) override {
@@ -62,10 +87,12 @@ public:
 
     void SetParametersValue(QVector<PVar>& lst);
 
+    void ResetInlineAssembler() override;
+
 
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeProcedureDecl>(sharedFromThis()));
     }
 

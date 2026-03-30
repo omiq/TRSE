@@ -45,8 +45,9 @@ public:
     }
 
     Ray Rotate(QMatrix4x4& rotmat, QVector3D pos) {
-        Ray r(rotmat*(m_currentPos+pos)-pos,rotmat*m_direction);
+        Ray r(rotmat.map(m_currentPos+pos)-pos,rotmat.map(m_direction));
         r.m_currentPos = r.m_origin;
+        r.m_currentPosUnrotated = m_currentPos;
         return r;
     }
 
@@ -89,6 +90,9 @@ public:
     static const int output_type_AMSTRAD = 6;
     static const int output_type_CHARSET = 7;
     static const int output_type_CGA = 8;
+    static const int output_type_AMIGA = 9;
+    static const int output_type_SPECTRUM = 10;
+    static const int output_type_c64_qimage = 11;
 
     enum CameraType {regular, fisheye};
     CameraType m_type = regular;

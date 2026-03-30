@@ -3,13 +3,14 @@
 
 #include <QImage>
 #include <QThread>
-#include <QMap>
+#include <QHash>
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QDebug>
 #include "source/LeLib/limage/charsetimage.h"
 #include <QElapsedTimer>
+#include <QMap>
 
 class DemoEffectParam {
 public:
@@ -65,7 +66,7 @@ public:
 
     void UpdateScreenDataFrame(QVector<int>& screen, int xp, int yp, int w, int h, int frame);
 
-
+    void SaveImageBin(QString fname);
     void ExportDiffAsUnrolledBitmap6502ColorOut(QString file, QString background, QString name, QString waitFunc, int base, int xp, int yp, int w, int h, int speed, int startCol);
     void ExportDiffAsUnrolledBitmap6502ColorIn(QString file, QString background, QString name, QString waitFunc, int base, int xp, int yp, int w, int h, int speed, int startCol);
     void ExportDiffAsUnrolledBitmap6502ColorInAddress(QString file, int background, QString name, QString waitFunc, int base, int xp, int yp, int w, int h, int speed);
@@ -88,11 +89,11 @@ public:
         m_mc->m_colorList.EnableColors(m_cols);
 //        qDebug() <<"COLS IN USE " <<m_cols;
         if (dither==1)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true,ditherStrength.x());
         if (dither==2)
             m_mc->OrdererdDither(m_img, m_mc->m_colorList, ditherStrength,QPoint(1,size),1);
         if (dither==0)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false,ditherStrength.x());
 
         m_mc->ToQImage(m_mc->m_colorList,m_img,1,QPointF(160,100));
 
@@ -114,11 +115,11 @@ public:
         m_mc->m_colorList.EnableColors(m_cols);
 //        qDebug() <<"COLS IN USE " <<m_cols;
         if (dither==1)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true,ditherStrength.x());
         if (dither==2)
             m_mc->OrdererdDither(m_img, m_mc->m_colorList, ditherStrength,QPoint(1,size),1);
         if (dither==0)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false,ditherStrength.x());
 
         m_mc->ToQImage(m_mc->m_colorList,m_img,1,QPointF(160,100));
 
@@ -133,11 +134,11 @@ public:
 
         m_mc->m_colorList.EnableColors(m_cols);
         if (dither==1)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true,ditherStrength.x());
         if (dither==2)
             m_mc->OrdererdDither(m_img, m_mc->m_colorList, ditherStrength,QPoint(size,1),1.0);
         if (dither==0)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false,ditherStrength.x());
 
         m_mc->ToQImage(m_mc->m_colorList,m_img,1,QPointF(160,100));
 
@@ -149,11 +150,11 @@ public:
             return;*/
 //        m_mc->m_colorList.EnableColors(m_cols);
         if (dither==1)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true,ditherStrength.x());
         if (dither==2)
             m_mc->OrdererdDither(m_img, m_mc->m_colorList, ditherStrength,QPoint(1,2),1);
         if (dither==0)
-            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false);
+            m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false,ditherStrength.x());
 
         m_mc->ToQImage(m_mc->m_colorList,m_img,1,QPointF(160,100));
 

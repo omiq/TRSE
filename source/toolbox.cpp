@@ -42,7 +42,9 @@ void Toolbox::Initialize(QGridLayout* ly, int windowWidth)
     m_items.append(new Line("",":/resources/images/brush_line.png","Line"));
     m_items.append(new Circle("",":/resources/images/brush_drawcircle.png","Circle"));
     m_items.append(new Box("",":/resources/images/brush_rect.png","Box"));
-    m_items.append(new CopyStamp("",":/resources/images/brush_copy.png","Copy/Paste"));
+    m_items.append(new CopyStamp("",":/resources/images/brush_copy.png","Copy/Paste",0));
+    m_items.append(new CopyStamp("",":/resources/images/brush_copy.png","Cut/Paste",1));
+    m_items.append(new CopyStamp("",":/resources/images/brush_copy.png","Paste",2));
     m_items.append(new RotateAround("",":/resources/images/brush_rotate.png","Rotate"));
     m_items.append(new ShapeBoxFilter("",":/resources/images/brush_circle_background.png", "Background brush"));
 
@@ -92,7 +94,7 @@ void Toolbox::BuildToolOptions()
 void Toolbox::BuildGUI(QGridLayout *ly, int windowWidth)
 {
     int size = 64;
-    size = 80*(windowWidth/1920.0);
+    size = 80*(windowWidth/1920.0)*0.7;
     int row=0;
     int col=0;
     m_windowWidth = windowWidth;
@@ -110,14 +112,15 @@ void Toolbox::BuildGUI(QGridLayout *ly, int windowWidth)
    //     b->setMinimumWidth(20);
         b->setAutoFillBackground( true );
         b->setText(m_items[i]->m_name);
-        b->setFixedSize(QSize(size, size));
+ //       b->setFixedSize(QSize(size, size));
         b->setToolTip(m_items[i]->m_tooltip);
         QObject::connect( b, &QPushButton::clicked,  [=](){ handleButton(i);  } );
 
         ly->addWidget(b,row,col);
 
         b->setIcon(m_items[i]->m_icon);
-        b->setIconSize(QSize(b->width(), b->height())*0.9);
+//        b->setIconSize(QSize(b->width(), b->height())*0.9);
+        b->setIconSize(QSize(size,size));
 
         m_buttons.append(b);
         col++;

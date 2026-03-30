@@ -8,15 +8,17 @@ class LImageGamboy : public LImageNES
 {
 public:
     LImageGamboy(LColorList::Type t);
+    bool m_isInitalised = false;
+    void ExportBin(QFile &file) override;
 
-    void ExportBin(QFile &file);
-
-    void SpritePacker(LImage* in, QByteArray& sprData, int x, int y, int w, int h, int c) override;
+    void SpritePacker(LImage* in, QByteArray& rawDataOut, QByteArray& sprData, int x, int y, int w, int h, int c,int& noChars) override;
     int SearchForIdenticalPixelChar(PixelChar o1, PixelChar o2, int compare);
 
 
     void ImportBin(QFile &file) override;
     void Initialize(int width, int height) override;
+
+    void InitPens() override;
 
 };
 

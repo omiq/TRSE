@@ -4,7 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
-#include <QMap>
+#include <QHash>
 #include <QVector>
 
 
@@ -17,7 +17,7 @@ public:
     bool m_potentialOptimise = false;
     bool m_forceOptimise = false;
 
-    QMap<QString, QString> m_changeRegs;
+    QHash<QString, QString> m_changeRegs;
     SourceLine() = default;
     SourceLine(int lnr, QString line) {
         m_lineNumber = lnr;
@@ -33,11 +33,12 @@ public:
     PostOptimiser();
     int m_noPasses = 2;
     int m_linesOptimized = 0;
-    QMap<QString, QString> m_regs;
+    QHash<QString, QString> m_regs;
     QStringList m_registers;
     QStringList m_branches;
     QStringList m_registerChangingCommands;
     QStringList m_bops;
+    int m_currentPass = 0;
 
     QStringList PostOptimize(QStringList& src);
     void CreateLines(QStringList& src);

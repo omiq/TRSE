@@ -66,10 +66,10 @@ class Util {
 public:
 
     static QElapsedTimer globalTimer;
-    static QMap<QString, long> sm_fileSizes;
+    static QHash<QString, long> sm_fileSizes;
 
 
-
+    static char** StringListToChar(QStringList lst);
 
     static QString toString(QStringList lst);
     static unsigned long int Endian_DWord_Conversion(unsigned long int dword);
@@ -77,10 +77,14 @@ public:
     static bool CancelSignal;
     static int VerifyHexAddress(QString s);
     static QString numToHex(long v);
+    static QString numToOct(long v);
+    static QString numToHex0(long v);
     static QString path;
 
 
     static int hexType;
+
+    static uchar CountBits(uchar c);
 
     static QByteArray toQByteArray(QVector<int>& data);
 
@@ -90,6 +94,7 @@ public:
 
     static void WriteInt32(QByteArray& ba, int val);
     static void WriteInt16(QByteArray& ba, int val);
+    static void WriteInt16LH(QByteArray& ba, int val);
 
     static QStringList fixStringListSplitWithCommaThatContainsStrings(QStringList lst);
 
@@ -99,6 +104,7 @@ public:
     static uchar flipBit(uchar val, int bit);
 
     static QString findFileInDirectories(QString fileName, QStringList dirs);
+    static QStringList splitStringSafely(QString str);
 
 
 
@@ -112,18 +118,24 @@ public:
     static QByteArray loadBinaryFile(QString filename);
 
     static void CopyFile(QString i, QString o);
+    static void CopyFileMSVCBug(QString i, QString o);
     static void CopyFileBytes(QString i, QString o);
+
+    static void CopyFilesInDirectory(QString fileType, QString src, QString dst);
 
     static bool CopyRecursively(QString sourceFolder, QString destFolder);
 
-
+    static uchar MultiCharMask(uchar val);
 
     static QVector3D abss(QVector3D a);
+    static QVector3D fromQString(QString val);
+    static QString fromVec(QVector3D val);
     static QVector3D maxx(QVector3D a, QVector3D b);
 
     static int C64StringToInt(QString f);
 
     static bool SameSide(const QVector3D& p1,const QVector3D& p2, const QVector3D& a,const QVector3D& b);
+    static bool PointInTriangle(const QVector3D &p, const QVector3D &a, const QVector3D &b, const QVector3D &c);
 
     static QString fixFolder(QString folderName);
 
@@ -136,10 +148,13 @@ public:
     static QString listFiles(QDir directory, QString searchFile);
     static float floatRandom(const float & min, const float & max);
     static wchar_t* QStringToWchar(QString t);
+    static QStringList QStringToDataList(QStringList& t);
 
     static void SaveByteArray(QByteArray& data, QString file);
 
     static QString fromStringList(QStringList lst);
+
+    static long NumberFromStringHex(QString s, bool& isOk);
 
     static long NumberFromStringHex(QString s);
 
@@ -178,7 +193,9 @@ public:
 
     static QColor Gamma(QColor c, float exp, float shift);
     static float ColorLength(QColor& c);
-
+    static float lerp(float amnt, float start, float end) {
+        return start + amnt * (end - start);
+    }
     static bool isNumber(QString s);
 
     static void drawBox(QImage* backImage, QImage* img, int i, int j, int size, QRgb color);
@@ -222,19 +239,25 @@ public:
 
     static int getInt16(QByteArray& ba, int pos);
     static void setInt16(QByteArray& ba, int pos, int val);
+    static void setInt16Rev(QByteArray& ba, int pos, int val);
+    static void appendInt16(QByteArray& ba, int val, bool isRev);
     static void appendInt16(QByteArray& ba, int val);
+    static void appendInt16Rev(QByteArray& ba, int val);
 
     static QStringList ByteArrayToHexQStringList(QByteArray& ba);
     static QByteArray HexQStringListToByteArray(QStringList& lst);
 
     static QPoint mapToWindow(QWidget *from, QPoint pt);
 
-    static QPixmap CreateColorIcon(QColor col, int s);
+    static QPixmap CreateColorIcon(QColor col, int s, int index);
 
 
     static bool fileChanged(QString filename);
 
     static int CountFilesInAllDirectories(QString dir, QStringList fileTypes);
+
+
+    static QString IntToHexString(int val);
 
 };
 

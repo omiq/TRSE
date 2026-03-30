@@ -9,7 +9,7 @@ public:
     LImageOK64();
     LImageOK64(LColorList::Type t);
     QByteArray m_data;
-    void Initialize(int width, int height);
+    void Initialize(int width, int height) override;
 
     void setPixel(int x, int y, unsigned int color) override;
     unsigned int getPixel(int x, int y) override;
@@ -19,7 +19,7 @@ public:
 
     void LoadQImage(QString filename);
 
-    virtual void ToQImage(LColorList& lst, QImage& img, float zoom, QPointF center) override;
+    virtual void ToQImage(LColorList& lst, QImage& img, double zoom, QPointF center) override;
     void fromQImage(QImage* img, LColorList& lst) override;
 
 
@@ -28,9 +28,9 @@ public:
     void ApplyToLabel(QLabel* l) override {
 
     }
-    void Clear() override {
+/*    void Clear(int val=0) override {
     }
-
+*/
     void ExportBin(QFile &file) override;
     void ImportBin(QFile &file) override;
 

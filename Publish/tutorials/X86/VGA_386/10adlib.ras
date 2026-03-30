@@ -1,0 +1,47 @@
+program Adlib;
+@use "system/screen"
+@use "music/adlibplayer"
+@use "system/memory"
+var  
+	song: incbin("music/song1.trt");
+	
+/*
+
+In order for dosbox to be able to execute this program, you need to add sound blaster/adlib support
+to your dosbox.conf file:
+
+sbtype=sb16
+sbbase=220
+irq=7
+dma=1
+hdma=5
+sbmixer=true
+oplmode=auto
+oplemu=default
+oplrate=44100
+
+*/
+	
+	
+interrupt Raster();
+begin
+	startirq();
+	AdlibPlayer::Play();
+	closeirq();
+end;
+
+var
+	zp:pointer;
+
+begin
+	AdlibPlayer::Initialize(#song);
+	// Set timer raster interrupt to point to Raster()
+	SetInterrupt($8,Raster());	
+	//Set the timer to 1 VSync
+	Memory::SetTimer(Memory::Default_Timer);
+	while (true) do
+	begin
+		waitforverticalblank();
+	end;
+	
+end.

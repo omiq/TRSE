@@ -30,14 +30,17 @@
 #include <QMessageBox>
 #include <QProcess>
 
+
+class SourceBuilder;
+
 class TRSEDocument : public QWidget
 {
     Q_OBJECT
 public:
     TRSEDocument(QWidget* parent);
-    enum Type {FJONG, RAS, PAW };
+    enum Type {FJONG, RAS, PAW, NONE };
 
-    Type m_type;
+    Type m_type = NONE;
     bool m_run = false;
 
     bool m_hasFocus = true;
@@ -66,6 +69,14 @@ public:
 
     virtual void UpdateHelpText(QStringList& files) {};
 
+    virtual void LoseFocus() {
+
+    }
+
+    virtual void SetFocus() {
+
+    }
+    virtual QString getBuildText() { return ""; }
     bool SaveChanges();
     void SaveCurrent() {
         if (m_currentSourceFile=="") {
@@ -82,7 +93,6 @@ public:
     virtual void Build(bool isShadow = false) {}
     virtual void Run() {}
     virtual void PrepareClose() {}
-
 
 
 
@@ -104,6 +114,7 @@ public:
 
     virtual void Focus() {}
     virtual void keyPressEvent(QKeyEvent *e);
+    virtual void ApplySymbolList(SourceBuilder* c) {};
 
 
     void UserDefined();
@@ -129,6 +140,14 @@ signals:
     void emitSuccess();
     void emitGotoSymbol(QString sym);
     void emitGotoAssemblerLine(QString rasSrc, int lineNuber);
+    void emitSearchSymbols();
+    void emitMemoryAnalyse();
+    void emitSizeAnalyse();
+    void OpenOtherFile(QString filename, int ln);
+    void NotifyOtherSourceFiles(QSharedPointer<SourceBuilder> builder);
+    void emitFailure();
+    void emitRequestSystemChange(QString val);
+    void emitOutputTextChanged();
 
 };
 

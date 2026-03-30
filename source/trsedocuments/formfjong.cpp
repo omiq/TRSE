@@ -90,6 +90,7 @@ void FormFjong::InitDocument(WorkerThread *t, QSharedPointer<CIniFile> ini, QSha
     m_font.setPointSize(m_iniFile->getdouble("font_size"));
 
 
+
 }
 
 
@@ -119,6 +120,7 @@ void FormFjong::SetupHighlighter()
 {
     if (highlighter != nullptr)
         delete highlighter;
+
     CIniFile colors;
 
     colors.Load(Util::GetSystemPrefix() + "themes/" + m_iniFile->getString("theme_fjong"));
@@ -130,12 +132,13 @@ void FormFjong::SetupHighlighter()
     ui->txtEditor->setPalette(p);
     highlighter = new FjongHighlighter(colors, 0, ui->txtEditor->document());
 
+    ui->txtEditor->setEnabled(true);
     //    qDebug() << "UPDATE " << m_iniFile->getString("theme");
 
 }
 
 
-void FormFjong::SearchInSource()
+void FormFjong::SearchInSource(QString text)
 {
     m_currentFromPos = ui->txtEditor->document()->toPlainText().toLower().indexOf(ui->leSearch->text().toLower(), m_searchFromPos);
     QTextCursor cursor(ui->txtEditor->document()->findBlock(m_currentFromPos));
@@ -204,12 +207,12 @@ void FormFjong::keyPressEvent(QKeyEvent *e)
 
 void FormFjong::on_leSearch_textChanged(const QString &arg1)
 {
-    SearchInSource();
+    SearchInSource("");
 
 }
 void FormFjong::on_leSearch_returnPressed()
 {
     m_searchFromPos=m_currentFromPos+1;
-    SearchInSource();
+    SearchInSource("");
 
 }

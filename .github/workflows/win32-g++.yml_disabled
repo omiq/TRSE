@@ -1,0 +1,53 @@
+name: win32-g++
+
+on:
+  push:
+    tags:
+      - 'nightly'
+
+jobs:
+  build:
+    runs-on: windows-2019
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v2
+      # Increment version. Ideally we would like to do it once for all builds,
+      # but this is complicated as we want to allow to trigger a nightly by
+      # pushing the tag, so this can't be in nightly.yml. One option would be to
+      # have another intermediate workflow, but we take the quik & dirty
+      # solution: increment it in each workflow and push it in one (linux.yml).
+      - name: Increment version
+        id: version
+        shell: bash
+        run: |
+          version=$(grep "define NIGHTLY" source/LeLib/data.cpp | awk '{ print $3 }')
+          let version=${version}+1
+          sed -i "s/define NIGHTLY .*/define NIGHTLY $version/" source/LeLib/data.cpp
+          version=$(grep "define \(MAJOR\|FEATURE\|NIGHTLY\)" source/LeLib/data.cpp | awk '{ print $3 }' | xargs | sed 's/ /\./g')
+          echo "::set-output name=TRSE_VERSION::${version}"
+
+      - uses: jurplel/install-qt-action@v2
+        with:
+          arch: win64_mingw81
+
+      # Build lua, the checked-in version doesn't seem to work
+      - name: Build lua
+        run: |
+          curl -R -O http://www.lua.org/ftp/lua-5.4.3.tar.gz
+          tar zxf lua-5.4.3.tar.gz
+          cd lua-5.4.3 && make UNAME="echo mingw" all test && cp src/liblua.a ../libs/lua/
+
+      # Build TRSE
+      - name: Build TRSE
+        run: |
+          qmake TRSE.pro
+          make -j 2
+
+      - name: Build notification
+        if: failure()
+        uses: adamkdean/simple-slack-notify@master
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          channel: #bugs
+          text: "[GitHub Actions Notification] MinGW build failed: ${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}"

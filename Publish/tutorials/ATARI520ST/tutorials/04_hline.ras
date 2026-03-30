@@ -1,0 +1,71 @@
+program Tutorial4_Horizontal_lines;
+var 
+
+@use "graphics"
+
+
+/* 
+	This example renders horizontal lines
+
+*/
+
+	done : integer = 0;
+ 	j,i,time,x1,t,col : integer = 0;
+	sin : array[256] of integer = buildsinetable(256);
+	test : pointer of long;
+
+	const yStart : integer = 25;
+	const yEnd : integer = 175;
+
+procedure RenderLines();
+begin
+	t:=time;
+	for i:=yStart to yEnd do
+	begin
+		x1:=sin[t&255]>>1 + 64;	
+		// hlinesingle sets a single bitplane, while hline fills a specific color (slower)
+		t:=t+1;
+		Graphics::LHLine(x1,i,48,t);
+		x1:=sin[(t*2)&255]>>1 + 64;	
+		Graphics::LHLineSingle(320-x1,i,48,4);
+	end;
+end;
+
+
+interrupt VBLank();
+begin
+	time:=time+1;
+	done:=keypressed(sc_key_space_pressed);
+end;
+
+begin
+	SetLoRes();
+	Graphics::Init();
+	InitGraphics();
+	Graphics::InitHTabs();
+
+	j:=2;
+	for i:=0 to 16 do
+	begin
+		// Set some random palette
+		poke16(#palette_start,i*2, j);
+		j:=j+111;
+	end;	
+	
+	setirq(VBLank(), irq_verticalblank);
+
+	Graphics::FlipBuffers();
+	while (done = false) do
+	begin
+		// Clear back buffer. Do this smarter. 
+		fill(Graphics::curBuf,0,40*200);
+		// Render the lines
+		RenderLines();
+		// Flip buffers
+		Graphics::FlipBuffers();
+	end;	
+end.
+
+
+
+

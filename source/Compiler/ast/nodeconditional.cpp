@@ -20,7 +20,7 @@
 */
 
 #include "nodeconditional.h"
-#include "source/Compiler/assembler/mos6502/mos6502.h"
+#include "source/Compiler/assembler/asm6502.h"
 
 
 NodeConditional::NodeConditional(Token op, int forcePage, QSharedPointer<Node> clause, QSharedPointer<Node> block, bool isWhile, QSharedPointer<Node> elseBlock) :Node(){
@@ -30,6 +30,25 @@ NodeConditional::NodeConditional(Token op, int forcePage, QSharedPointer<Node> c
     m_binaryClause = clause;
     m_op = op;
     m_forcePage = forcePage;
+}
+
+void NodeConditional::ReplaceVariable(Assembler *as, QString name, QSharedPointer<Node> node)
+{
+    Node::ReplaceVariable(as,name,node);
+    if (m_block!=nullptr)
+        m_block->ReplaceVariable(as,name,node);
+    if (m_elseBlock!=nullptr)
+        m_elseBlock->ReplaceVariable(as,name,node);
+    if (m_binaryClause!=nullptr)
+        m_binaryClause->ReplaceVariable(as,name,node);
+}
+
+bool NodeConditional::Optimize() {
+    if (m_block!=nullptr)
+        m_block->Optimize();
+    if (m_elseBlock!=nullptr)
+        m_elseBlock->Optimize();
+    return false;
 }
 
 

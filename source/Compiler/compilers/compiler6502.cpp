@@ -1,10 +1,20 @@
 #include "compiler6502.h"
+#include "../codegen/codegen_tripe.h"
+#include "../assembler/asmTripe.h"
 
 void Compiler6502::InitAssemblerAnddispatcher(QSharedPointer<AbstractSystem> system)
 {
-    m_assembler = QSharedPointer<AsmMOS6502>(new AsmMOS6502());
+    if (m_projectIni->getdouble("use_tripe")==1.0) {
+        m_codeGen = QSharedPointer<CodeGenTRIPE>(new CodeGenTRIPE());
+        m_assembler = QSharedPointer<AsmTripe>(new AsmTripe());
+    }
+    else {
+        m_codeGen = QSharedPointer<CodeGen6502>(new CodeGen6502());
+        m_assembler = QSharedPointer<Asm6502>(new Asm6502());
+        m_assembler->m_isOrgasm = m_ini->getString("assembler").toLower()=="orgasm";
+    }
     m_assembler->m_zbyte = 0x10;
-    m_dispatcher = QSharedPointer<ASTDispatcher6502>(new ASTDispatcher6502());
+
     Init6502Assembler();
     LabelStack::m_labelCount = 0;
 }
@@ -44,10 +54,10 @@ void Compiler6502::Connect()
     */
 }
 
-void Compiler6502::CleanupCycleLinenumbers(QString currentFile, QMap<int, int> &ocycles, QMap<int, int> &retcycles, bool isCycles)
+void Compiler6502::CleanupCycleLinenumbers(QString currentFile, QHash<int, int> &ocycles, QHash<int, int> &retcycles, bool isCycles)
 {
 
-    QMap<int, int> cycles;
+    QHash<int, int> cycles;
 //    int acc = 0;
     if (currentFile=="")
         for (int i: ocycles.keys()) {
@@ -55,7 +65,7 @@ void Compiler6502::CleanupCycleLinenumbers(QString currentFile, QMap<int, int> &
             int count = ocycles[i];
             int nl = i;
   //          acc = 0;
-            for (FilePart& fp : m_parser.m_lexer->m_includeFiles) {
+            for (FilePart& fp : m_parser.m_lexer->getIncludeFiles()) {
                 // Modify bi filepart
                 if (nl>fp.m_startLine && nl<fp.m_endLine) {
                     if (isCycles)
@@ -81,7 +91,7 @@ void Compiler6502::CleanupCycleLinenumbers(QString currentFile, QMap<int, int> &
             int count = ocycles[i];
             int nl = i;
 
-            for (FilePart& fp : m_parser.m_lexer->m_includeFiles) {
+            for (FilePart& fp : m_parser.m_lexer->getIncludeFiles()) {
                 {
                     if (fp.m_name == currentFile)
                         if (nl>fp.m_startLineAcc && nl<fp.m_endLineAcc) {
@@ -104,6 +114,7 @@ void Compiler6502::CleanupCycleLinenumbers(QString currentFile, QMap<int, int> &
 void Compiler6502::Init6502Assembler()
 {
     m_assembler->m_startInsertAssembler << m_parser.m_initAssembler;
+    m_assembler->m_endInsertAssembler << m_parser.m_endAssembler;
     //    qDebug() << m_parser.m_initAssembler;
     m_assembler->m_defines = m_parser.m_preprocessorDefines;
 
@@ -191,111 +202,6 @@ void Compiler6502::Init6502Assembler()
         Syntax::s.m_currentSystem->m_startAddress = Syntax::s.m_currentSystem->getDefaultBasicAddress();
 
 
-}
-
-bool Compiler6502::SetupMemoryAnalyzer(QString filename, Orgasm* orgAsm)
-{
-    if (orgAsm == nullptr)
-        return false;
- //   Orgasm orgAsm;
-    orgAsm->SetupConstants(m_parser.m_symTab);
-    //orgAsm.Codes();
-    orgAsm->Assemble(filename+".asm", filename+".prg");
-
-    if (m_assembler==nullptr)
-        return false;
-  /*  if (!orgAsm.m_success) {
-        return;
-    }
-*/
-    int i = 1;
-/*
-    // Reset
-    QVector<QSharedPointer<MemoryBlock>> nb;
-    for (auto b:m_assembler->blocks)
-        if (b->m_type!=MemoryBlock::CODE) {
-            b->m_shift = 0;
-            b->m_isOverlapping = false;
-            nb.append(b);
-        }
-
-    m_assembler->blocks = nb;
-*/
-    // Loop through all symbols for a startblock
-    for (QString s : orgAsm->m_symbolsList){
-        if (s.toLower().startsWith("startblock")) {
-            int start = orgAsm->m_symbols[s];
-            QString search = s.toLower().replace("startblock","endblock");
-            int end = start;
-            for (QString s2 : orgAsm->m_symbolsList){
-                if (s2.toLower() == search) {
-                    end = orgAsm->m_symbols[s2];
-                    break;
-                }
-            }
-            if (start!=end) {
-                if (m_assembler!=nullptr) {
-                QString name = "Code block "+QString::number(i++);
-                for (auto bl : m_assembler->userBlocks)
-                    if (bl->m_start == start)
-                        if (bl->m_name!="")
-                            name = bl->m_name;
-//                qDebug() << "Adding cod eblock with name : "<<name;
-
-                m_assembler->blocks.append(QSharedPointer<MemoryBlock>(new MemoryBlock(start, end, MemoryBlock::CODE, name)));
-            }
-            }
-        }
-    }
-
-    for (QSharedPointer<MemoryBlock> mb : m_assembler->blocks) {
-        if (mb->m_type==MemoryBlock::USER)
-            continue;
-        if (mb->m_type==MemoryBlock::MUSIC)
-            continue;
-        if (mb->m_type==MemoryBlock::CODE) // Already taken care of
-            continue;
-
-        QString str = Util::numToHex(mb->m_start);
-        str = str.toLower().remove("$");
-        int end = mb->m_start;
-        QString curEnd = ("endblock"+str);
-        for (QString s : orgAsm->m_symbols.keys())  {
-//            qDebug() << s.toLower() << curEnd << Util::numToHex(orgAsm->m_symbols[s]);
-            QString chk = s;
-//            chk = chk.remove("_extra"); // Ignore the extra label
-            if (chk.toLower()==curEnd) {
-                end = orgAsm->m_symbols[s];
-                mb->m_end = end;
-                break;
-            }
-        }
-
-
-    }
-
-    std::sort(m_assembler->blocks.begin(), m_assembler->blocks.end(),
-           [](const auto& a, const auto& b) { return a->m_start < b->m_start; });
-
-
-    // Check for overlaps:
-    for (int i=0;i<m_assembler->blocks.count();i++) {
-        auto x = m_assembler->blocks[i];
-        for (int j=i+1;j<m_assembler->blocks.count();j++) {
-            auto y = m_assembler->blocks[j];
-//            x1 <= y2 && y1 <= x2
-            if (x->m_start<y->m_end && y->m_start<x->m_end) {
-             //   qDebug() << "OVERLAP " << Util::numToHex(x->m_start)<<Util::numToHex(x->m_end) << " vs " << Util::numToHex(y->m_start)<<Util::numToHex(y->m_end);
-                x->m_isOverlapping = true;
-                y->m_isOverlapping = true;
-                y->m_shift = x->m_shift+1;
-                ErrorHandler::e.Warning("Overlapping memory regions: '"+x->m_name + "' and '"+y->m_name+"' at "+Util::numToHex(y->m_start)+" to " +Util::numToHex(x->m_end)+". See the memory analyzer for details.");
-
-            }
-        }
-    }
-
-    return orgAsm->m_success;
 }
 
 

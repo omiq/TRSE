@@ -25,14 +25,20 @@
 #include <QFileDialog>
 #include "source/Compiler/syntax.h"
 
+
 DialogImport::DialogImport(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogImport)
 {
     ui->setupUi(this);
+#if QT_VERSION <= 0x060000
     QFontDatabase d;
     ui->cmbFonts->addItems(d.families());
+#else
+    ui->cmbFonts->addItems(QFontDatabase::families());
     ui->cmbFonts->setCurrentText("Courier 10 Pitch");
+
+#endif
     ui->cmbDitherY->setCurrentIndex(1);
     ui->cmbDitherX->setCurrentIndex(0);
     UpdateText();
@@ -51,6 +57,12 @@ void DialogImport::Initialize(LImage::Type imageType, LColorList::Type colorType
 //    qDebug() << "Currenttype: " <<QString::number(LImage::TypeToChar(m_imageType)) <<m_image->m_width<<img->m_width;
 
     m_image = LImageFactory::Create(m_imageType, colorType);
+    m_image->setMultiColor(img->isMultiColor());
+    m_work.Initialize(m_image->m_width, m_image->m_height);
+    m_work.m_colorList.CopyFrom(&img->m_colorList);
+//    qDebug() << "Dialog Import : "<<m_image->m_width << img->m_width;
+
+    //qDebug() << "COUNT : " << m_work.m_colorList.m_list.count();
 //    qDebug() << m_image->m_width << m_imageType;
 
     if (!Syntax::s.m_currentSystem->m_hasVariableColorPalette)
@@ -71,7 +83,6 @@ void DialogImport::Initialize(LImage::Type imageType, LColorList::Type colorType
        m_image->m_colorList.m_selectClosestFromPen = false;
 
 
-
     LImageVIC20* vic = dynamic_cast<LImageVIC20*>(img);
     if (vic!=nullptr) {
         LImageVIC20* i = dynamic_cast<LImageVIC20*>(m_image);
@@ -80,7 +91,6 @@ void DialogImport::Initialize(LImage::Type imageType, LColorList::Type colorType
 
     }
     LImageSprites2* sprite = dynamic_cast<LImageSprites2*>(img);
-
 
 
 
@@ -102,16 +112,16 @@ void DialogImport::Initialize(LImage::Type imageType, LColorList::Type colorType
 
     if (m_image->m_colorList.m_type==LColorList::C64 || m_image->m_colorList.m_type==LColorList::VIC20) {
 
-    m_image->m_colorList.CreateUI(ui->layoutColors,0);
-/*    m_image->m_colorList.FillComboBox(ui->cmbForeground);
+        m_image->m_colorList.CreateUI(ui->layoutColors,0);
+        /*    m_image->m_colorList.FillComboBox(ui->cmbForeground);
     m_image->m_colorList.FillComboBox(ui->cmbBackground);
     m_image->m_colorList.FillComboBox(ui->cmbMC1);
     m_image->m_colorList.FillComboBox(ui->cmbMC2);
 */
-//    qDebug() << "EXTRACOL 3 " <<QString::number(m_image->m_extraCols[3]);
- //   qDebug() << "EXTRACOL 0 " <<QString::number(m_image->m_extraCols[0]);
+        //    qDebug() << "EXTRACOL 3 " <<QString::number(m_image->m_extraCols[3]);
+        //   qDebug() << "EXTRACOL 0 " <<QString::number(m_image->m_extraCols[0]);
 
-/*    if (dynamic_cast<MultiColorImage*>(m_image)!=nullptr) {
+        /*    if (dynamic_cast<MultiColorImage*>(m_image)!=nullptr) {
         ui->cmbForeground->setCurrentIndex(m_image->m_colorList.getPen(3));
         ui->cmbBackground->setCurrentIndex(m_image->m_colorList.getPen(0));
         ui->cmbMC1->setCurrentIndex(m_image->m_colorList.getPen(1));
@@ -122,10 +132,12 @@ void DialogImport::Initialize(LImage::Type imageType, LColorList::Type colorType
         ui->cmbMC1->setCurrentIndex(6);
 */
 
-    //QObject::connect(this, LColorList::colorValueChanged, UpdateOutput);
-    connect(&m_image->m_colorList, SIGNAL(colorValueChanged()), this, SLOT(UpdateOutput()));
-}
+        //QObject::connect(this, LColorList::colorValueChanged, UpdateOutput);
+        connect(&m_image->m_colorList, SIGNAL(colorValueChanged()), this, SLOT(UpdateOutput()));
+    }
     connect(ui->buttonBox, SIGNAL(accepted()), this, SLOT(slotOk()));
+  //  qDebug() << "INIT1" <<img->m_colorList.m_list.count() << m_imageType << colorType <<m_image->m_type;
+  //  qDebug() << "INIT2" <<m_image->m_colorList.m_list.count();
 }
 
 
@@ -134,13 +146,19 @@ void DialogImport::Convert()
 {
 //    qDebug()<< "Type" << m_imageType;
     m_output.Release();
-    bool useDither = ui->chkDither->isChecked();
+    bool useDither = ui->cmbDither->currentIndex()!=0;
     if (m_work.m_qImage==nullptr)
         return;
     if (m_image == nullptr)
         return;
 
+
+    m_image->m_forceD800Color = ui->leForceD800->text().toInt();
+
     LImageQImage* img = &m_work;
+//    qDebug() << "A0" << img->m_colorList.m_list.count();
+//    if (img->m_colorList.m_list.count()==0)
+  //      return;
 
     if (ui->chkTreatCharset->isChecked()) {
         img = &m_intermediate;
@@ -156,6 +174,9 @@ void DialogImport::Convert()
                                     );
     }
 
+    double scaleX = 1+(ui->hsScaleX->value()/100.0 - 0.5)*4;
+    double scaleY = 1+(ui->hsScaleY->value()/100.0 - 0.5)*4;
+
 
 
     m_output.m_qImage = img->Resize(m_work.m_qImage->width(),
@@ -168,8 +189,11 @@ void DialogImport::Convert()
 //    qDebug() << m_image->m_width << m_output.m_qImage->width() << m_work.m_qImage->width();
     //exit(1);
 //    m_image->Clear();
-    m_image->m_importScaleX = 1+ (ui->hsScaleX->value()/100.0 - 0.5)*4;
-    m_image->m_importScaleY = 1+ (ui->hsScaleY->value()/100.0 - 0.5)*4;
+//    m_image->m_importScaleX = scaleX;//+ (ui->hsScaleX->value()/100.0 - 0.5)*4;
+//    m_image->m_importScaleY = scaleY;//+ (ui->hsScaleY->value()/100.0 - 0.5)*4;
+    m_image->m_importScaleX = scaleX;//+ (ui->hsScaleX->value()/100.0 - 0.5)*4;
+    m_image->m_importScaleY = scaleY;//+ (ui->hsScaleY->value()/100.0 - 0.5)*4;
+
 //    m_image->setPixel(10,10,1);
 //    qDebug() << m_image->m_importScaleX;
     SetColors();
@@ -206,26 +230,66 @@ void DialogImport::Convert()
         m_image->m_colorList.m_selectClosestFromPen = false;
         m_image->m_colorList.CopyFrom(&org->m_colorList);
         orgCols.CopyFrom(&org->m_colorList);
+        m_image->m_colorList.EnableColors(org->m_colorList.m_enabledColors);
         m_image->m_importScaleX = 1+ (ui->hsScaleX->value()/100.0 - 0.5)*4.0;
         m_image->m_importScaleY = 1+ (ui->hsScaleY->value()/100.0 - 0.5)*4.0;
+   //     qDebug() << "AA" << m_work.m_colorList.m_list.count();
+        m_image->CopyFrom(img);
+     //   qDebug() << m_image->m_colorList.m_list.count();
+
+//        m_image->m_colorList.CopyFrom(&org->m_colorList);
     }
 
-
-    m_image->Clear();
+    m_image->Clear(img->getBackground());
+//    m_image->setBackground(img->getBackground());
+/*    MultiColorImage* mc = dynamic_cast<MultiColorImage*>(img);
+    if (img!=nullptr){
+        m_image->m_colorList.m_multicolors = img->m_colorList.m_multicolors;
+    }*/
 /*    if (!useDither)
        m_image->fromQImage(m_output.m_qImage, m_image->m_colorList);
     else
 //        m_image->FloydSteinbergDither(*m_output.m_qImage,m_image->m_colorList, true);
 */
-
     if (!useDither)
         strength.setX(0);
 
-
 //    qDebug() << "IMG WIDTH " <<m_output.m_qImage->width();
+    if (org!=nullptr)
+        m_image->m_colorList.CopyFrom(&org->m_colorList);
+    if (ui->chkCustom->isChecked()) {
+        auto lst = ui->leCustomPalette->text().split("," );
+        m_image->m_colorList.m_customPalette = Util::HexQStringListToByteArray(lst);
 
-    m_image->OrdererdDither(*m_output.m_qImage,m_image->m_colorList, strength,QPoint(matrixSizeX,matrixSizeY),1);
+//        org->m_colorList.m_customPalette = Util::HexQStringListToByteArray(lst);;
+    }
+   // m_image->m_importScale = 2;
+//        qDebug() << scaleX;
+  //  m_output.OrdererdDither(*m_output.m_qImage,m_image->m_colorList, QVector3D(0,0,0),QPoint(matrixSizeX,matrixSizeY),1);
+    //*m_output.m_qImage = QImage(m_output.m_qImage->scaled(m_image->GetWidth(),m_image->GetHeight(),Qt::IgnoreAspectRatio));
+    if (ui->cmbDither->currentIndex()==1) {
+        //    QPixmap p = m_pixMapImage.scaled(QSize(grid.width(),grid.height()),  Qt::IgnoreAspectRatio, Qt::FastTransformation);
+  //      LImageQImage* copy = (LImageQImage*)LImageFactory::Create(LImage::QImageBitmap,LColorList::C64);
+      //  m_output.CopyFrom(&m_input);
+      //  copy->CopyFrom(&m_input);
+     //   copy->m_importScaleX = scaleX;//+ (ui->hsScaleX->value()/100.0 - 0.5)*4;
+      //  copy->m_importScaleY = scaleY;//+ (ui->hsScaleY->value()/100.0 - 0.5)*4;
+       // qDebug() << "GERE" <<copy->GetWidth();
+//        m_output.m_importScaleX = scaleX;//+ (ui->hsScaleX->value()/100.0 - 0.5)*4;
+  //      m_output.m_importScaleY = scaleY;//+ (ui->hsScaleY->value()/100.0 - 0.5)*4;
+    //    m_output.CopyFrom(&m_work);
+      //  m_output.OrdererdDither(*m_input.m_qImage,m_image->m_colorList, QVector3D(1,1,1),QPoint(matrixSizeX,matrixSizeY),1);
+        *m_output.m_qImage = QImage(m_output.m_qImage->scaled(m_image->GetWidth(),m_image->GetHeight(),Qt::IgnoreAspectRatio));
+        m_image->FloydSteinbergDither(*m_output.m_qImage,m_image->m_colorList, true,strength.x());
+//        delete copy;
+    }
+    else
+        m_image->OrdererdDither(*m_output.m_qImage,m_image->m_colorList, strength,QPoint(matrixSizeX,matrixSizeY),1);
 
+
+    if (ui->chkCustom->isChecked()) {
+        m_image->m_colorList.m_customPalette = QByteArray();
+    }
 
 
     if (m_output.m_qImage!=nullptr)  {
@@ -244,8 +308,8 @@ void DialogImport::Convert()
     if (chr!=nullptr && chr->m_colorList.m_type!=LColorList::NES) {
         //chr->m_currentMode=CharsetImage::Mode::FULL_IMAGE;
         chr->m_footer.set(LImageFooter::POS_DISPLAY_CHAR,0);
-        chr->SetColor(0,0);
-        chr->SetColor(1,1);
+//        chr->SetColor(0,0);
+  //      chr->SetColor(1,1);
 //        chr->set
 
     }
@@ -258,6 +322,7 @@ void DialogImport::Convert()
     if (inter!=nullptr) {
         // Need to convert back to c64 cells
         m_image = org;
+//        qDebug() << m_image->m_width << m_image->m_height << inter->m_width << inter->m_height;
         m_image->FromLImageQImage(inter);
         m_image->m_colorList.CopyFrom(&orgCols);
 
@@ -265,9 +330,10 @@ void DialogImport::Convert()
         inter = nullptr;
 
     }
-
+//    if (dynamic_cast<MultiColorImage*>(m_image)!=nullptr)
+  //      dynamic_cast<MultiColorImage*>(m_image)->Reorganize();
+//    m_image->FixHires();
     m_image->ToQImage(m_image->m_colorList,*m_output.m_qImage,1, QPoint(0.0,0.0));
-
 }
 
 void DialogImport::Blur()
@@ -364,7 +430,7 @@ void DialogImport::on_cmbForeground_activated(int index)
 
 void DialogImport::on_cmbBackground_activated(int index)
 {
-    m_image->setBackground(index);
+//    m_image->setBackground(index);
  //   m_image->setC
     UpdateOutput();
 }
@@ -395,6 +461,17 @@ void DialogImport::on_btnImport_clicked()
         tr("Open Image"), "", tr("Image Files (*.png *.jpg *.bmp *.jpeg *.gif)"));
 
     m_input.LoadQImage(fileName);
+    m_input.m_qImage->save("test.png");
+
+    if (m_input.m_width<m_work.m_width || m_input.m_height<m_work.m_height) {
+        QMessageBox msgBox;
+        QString resIn = QString::number(m_input.m_width) + "x"+QString::number(m_input.m_height);
+        QString resOut = QString::number(m_work.m_width) + "x"+QString::number(m_work.m_height);
+        msgBox.setText("Your input image has a lower resolution ("+resIn+") than the output image ("+resOut+"). The input image should be the same resolution (or larger) than the target resolution, so this conversion might produce incorrect results.");
+        msgBox.exec();
+    }
+
+
     if (ui->chkGenPal->isChecked()) {
         m_image->m_colorList.GeneratePaletteFromQImage(*m_input.m_qImage);
         m_image->m_colorList.CreateUI(ui->layoutColors,0);
@@ -469,13 +546,13 @@ void DialogImport::on_cmbMC2_activated(int index)
     UpdateOutput();
 }
 
-void DialogImport::on_chkDither_stateChanged(int arg1)
+/*void DialogImport::on_chkDither_stateChanged(int arg1)
 {
     SetColors();
     UpdateOutput();
 
 }
-
+*/
 void DialogImport::on_btnFromFont_clicked()
 {
 
@@ -526,7 +603,7 @@ void DialogImport::on_hsScaleY_sliderMoved(int position)
 
 void DialogImport::on_cmbDither_currentIndexChanged(int index)
 {
-    //UpdateOutput();
+    UpdateOutput();
 
 }
 
@@ -633,3 +710,42 @@ void DialogImport::on_leScaleY_textChanged(const QString &arg1)
     //UpdateOutput();
 
 }
+
+void DialogImport::on_chkCustom_stateChanged(int arg1)
+{
+    UpdateSliders();
+}
+
+void DialogImport::on_leCustomPalette_textChanged(const QString &arg1)
+{
+    UpdateSliders();
+
+}
+
+
+void DialogImport::on_comboBox_currentIndexChanged(int index)
+{
+    ui->leCustomPalette->setText(m_customPalettes[index]);
+
+}
+
+void DialogImport::on_leForceD800_editingFinished()
+{
+    UpdateSliders();
+    UpdateOutput();
+}
+
+
+void DialogImport::on_leForceD800_textChanged(const QString &arg1)
+{
+    UpdateSliders();
+    UpdateOutput();
+}
+
+
+void DialogImport::on_comboBox_2_currentIndexChanged(const QString &arg1)
+{
+    SetColors();
+    UpdateOutput();
+}
+

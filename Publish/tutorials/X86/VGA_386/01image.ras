@@ -1,0 +1,60 @@
+program Tut3;
+
+/*
+
+	This example demonstrates how to 
+	a) load a compressed file
+	b) decompress the data to a location
+
+
+*/
+
+@use "system/screen"
+@use "system/memory"
+@use "system/compression"
+@use "system/file"
+
+
+/*
+
+ This example exports a VGA image to disk before compressing it (which happens compile-time).
+ The program itself loads these files and decompresses the image data to VGA memory
+ 
+
+*/
+
+// Automatically export image	 to image1.bin (and image1.pal)
+@export "images/image1.flf" "images/image1.bin" 256
+// Lz4-compress the image to a new file
+@compress "images/image1.bin" "images/image1_c.bin"
+
+var
+	
+	filename1 : string="IMAGES/IMAGE1_C.BIN";
+	// Palette file is automatically exported as well
+	palette1 : string="IMAGES/IMAGE1.PAL";
+	
+	f1 : File::File;
+	
+	
+
+
+begin
+	Memory::Init();
+	Screen::SetMode($13);
+	// Initialises 3 64kb VGA buffers
+	Screen::InitVGABuffers(3);
+	// Load palette from file
+	File::SetPaletteFromFile(#palette1);		
+
+	// Open compressed file and read all to a buffer
+	File::ReadAllLarge(#filename1, Screen::buffer1);
+	// Decomress data from buffer to screen	
+	Compression::Decompress(Screen::buffer1,ptr(screen_vga,0));
+
+	// Loop infinitely
+	while (true) do
+	begin
+		waitforverticalblank();
+	end;
+end.

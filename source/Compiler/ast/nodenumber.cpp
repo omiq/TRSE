@@ -30,6 +30,9 @@ NodeNumber::NodeNumber(Token op, long val) :Node() {
     if (m_op.m_type!=TokenType::ADDRESS)
         m_op.m_type = TokenType::INTEGER_CONST;
 
+//    if (op.m_isReference)
+  //          ErrorHandler::e.Error("Constant numbers cannot be referenced with #.",op.m_lineNumber);
+
 }
 
 
@@ -40,12 +43,23 @@ bool NodeNumber::isAddress() {
 
 
 bool NodeNumber::isPureNumeric() {
+   //return true;
+
+    if (isReference())
+        return true;
+    if (isAddress()) return false;
+
+    return true;
+}
+
+bool NodeNumber::isPureNumericOrAddress()
+{
     return true;
 }
 
 bool NodeNumber::isWord(Assembler *as) {
 //    return (m_val>=256 && m_op.m_type == TokenType::INTEGER_CONST);
-    if (m_forceType == TokenType::INTEGER)
+    if (m_loadType == TokenType::INTEGER)
         return true;
     if (isReference())
         return true;
@@ -57,34 +71,41 @@ QString NodeNumber::getValue(Assembler* as) {
         QString hash = "";
         if (as!=nullptr)
             hash = as->m_hash;
+//        qDebug() << "NodeNumber "<< HexValue() <<m_val;
         if (isAddress()) return HexValue(); else return hash + HexValue();
-    }
+}
 
-QString NodeNumber::getValue8bit(Assembler *as, bool isHi) {
+bool NodeNumber::isReference() {
+    return m_op.m_isReference;// || isAddress();
+}
+
+QString NodeNumber::getValue8bit(Assembler *as, int isHi) {
     QString hash = "";
     if (as!=nullptr)
         hash = as->m_hash;
 
     if (isAddress()) hash="";
     if (isReference()) hash="#";
-    if (isHi)
-        return hash + Util::numToHex((int)m_val>>8);
-    else
+    if (isHi==1)
+        return hash + Util::numToHex(((int)m_val>>8)&0xFF);
+    if (isHi==0)
         return hash + Util::numToHex(((int)m_val)&0xFF);
+    if (isHi==2)
+        return hash + Util::numToHex(((int)m_val>>16)&0xFF);
+
+    return 0;
 }
-
-
 
 
 
 bool NodeNumber::is8bitValue(Assembler* as)
 {
-    //  if (m_forceType==TokenType::INTEGER)
+    //  if (m_loadType==TokenType::INTEGER)
     //        return false;
     return m_val<256 && m_op.m_type == TokenType::INTEGER_CONST;
 }
 
-/*void NodeNumber::LoadVariable(AbstractASTDispatcher* dispatcher) {
+/*void NodeNumber::LoadVariable(AbstractCodeGen* dispatcher) {
     dispatcher->as->ClearTerm();
     dispatcher->as->Term("lda ");
     Accept(dispatcher);
@@ -94,11 +115,20 @@ bool NodeNumber::is8bitValue(Assembler* as)
 */
 QString NodeNumber::HexValue() {
 
-    if (m_val>=0)
+//    qDebug() << QString::number((ulong)m_val,16) <<m_val << isAddress();
 
+    if (Syntax::s.m_currentSystem->m_useOctals) {
+        if (m_val>=0 || isAddress()) {
+            return "" + QString::number((ulong)m_val,8);
+        }
+        else
+            return "-" + QString::number((long)abs(m_val),8);
 
+    }
 
-    return "$" + QString::number((long)m_val,16);
+    if (m_val>=0 || isAddress()) {
+        return "$" + QString::number((ulong)m_val,16);
+    }
     else
         return "-$" + QString::number((long)abs(m_val),16);
 

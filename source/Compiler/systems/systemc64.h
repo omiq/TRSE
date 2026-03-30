@@ -14,25 +14,16 @@ public:
     };
     bool isCommodoreSystem() override  {return true;}
 
-
-};
-
-
-class SystemX16 : public SystemMOS6502
-{
-public:
-    SystemX16(QSharedPointer<CIniFile> settings, QSharedPointer<CIniFile> proj) : SystemMOS6502(settings, proj) {
-        m_processor = MOS6502;
-        m_system = X16;
-        m_systemColor = QColor(100,60,40);
+    virtual QString getEmulatorName() override {
+        return m_settingsIni->getString("emulator");
+    }
+    void applyEmulatorParameters(QStringList& params, QString debugFile, QString filename, CIniFile* pini) override {
+        applyEmulatorParametersVICE(params,debugFile,filename);
 
     }
+
 };
 
-class SystemMEGA65 : public SystemMOS6502
-{
-public:
-    SystemMEGA65(QSharedPointer<CIniFile> settings, QSharedPointer<CIniFile> proj);
-};
+
 
 #endif // SYSTEMC64_H

@@ -32,8 +32,24 @@
 #include "source/Compiler/ast/nodevartype.h"
 #include "source/Compiler/misc/sidfile.h"
 #include "source/LeLib/util/util.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
+
+
+/* 
+    Variable declaration node, for instance
+    var
+        b : byte = 10;
+
+    or in procedure declarations:
+    procedure myProc( p : integer );
+
+    m_left: unused
+    m_right: unused
+    m_op: unused
+    n_varNode : NodeVar, the variable ( ex: "p" )
+    m_typeNode : NodeVarType, the type (ex : "integer");
+*/
 class NodeVarDecl : public Node {
 public:
     QSharedPointer<Node> m_varNode = nullptr;
@@ -41,6 +57,9 @@ public:
     int m_fileSize=0;
     int m_dataSize=0;
     bool m_chipMem = false;
+    bool m_isInline = false;
+
+    static QHash<QString, int> s_mProcStackPos;
 
     SidFile sid;
 
@@ -63,7 +82,7 @@ public:
     }
 
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeVarDecl>(sharedFromThis()));
     }
 

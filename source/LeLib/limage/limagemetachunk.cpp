@@ -1,6 +1,6 @@
 #include "limagemetachunk.h"
 #include "source/LeLib/limage/limageio.h"
-
+#include "source/Compiler/syntax.h"
 
 LImageMetaChunk::LImageMetaChunk(LColorList::Type t) : CharsetImage(t)
 {
@@ -9,10 +9,17 @@ LImageMetaChunk::LImageMetaChunk(LColorList::Type t) : CharsetImage(t)
     m_width = 256;
     m_height = 256;
     m_supports.displayColors = false;
+    m_GUIParams[btnFlipH] = "Paint mirror X";
+    m_GUIParams[btnFlipV] = "Paint mirror Y";
+
+
 
     Initialize(m_width,m_height);
     if (t==LColorList::NES) {
         m_img = new LImageNES(t);
+    }
+    if (t==LColorList::SNES) {
+        m_img = new LImageSNES(t);
     }
     m_type = LImage::Type::LMetaChunk;
     if (m_img!=nullptr) {
@@ -24,8 +31,9 @@ LImageMetaChunk::LImageMetaChunk(LColorList::Type t) : CharsetImage(t)
 
     m_supports.displayBank = true;
 
-    if (isNes())
+    if (isNes() || isSnes())
         m_charWidthDisplay = 16;
+
     else m_charWidthDisplay = 40;
 
     m_gridWidthDisplay = m_charWidthDisplay;
@@ -62,7 +70,7 @@ LImageMetaChunk::LImageMetaChunk(LColorList::Type t) : CharsetImage(t)
     m_GUIParams[tabSprites] ="Metachunks";
 
     m_updateCharsetPosition = false;
-    m_supports.displayCharOperations = false;
+    m_supports.displayCharOperations = true;
 
 
 }
@@ -92,12 +100,12 @@ void LImageMetaChunk::CopyFrom(LImage *mc)
         getCur()->m_data = img->getCur()->m_data;*/
 
         DeleteAll();
-        for (LImageContainerItem* li: img->m_items) {
-            LMetaChunkItem* s= (LMetaChunkItem*)li;
+        for (auto li: img->m_items) {
+            LMetaChunkItem* s= (LMetaChunkItem*)li.get();
             LMetaChunkItem* s2= new LMetaChunkItem();
             *s2 = *s;
 
-            m_items.append(s2);
+            m_items.append(QSharedPointer<LMetaChunkItem>(s2));
         }
 
 
@@ -119,7 +127,7 @@ void LImageMetaChunk::CopyFrom(LImage *mc)
 //        m_current = img->m_current;
 //        m_current = 0;
         m_currentAttribute = img->m_currentAttribute;
-        m_writeType = img->m_writeType;
+        m_classvariableType = img->m_classvariableType;
         //m_currentBank = img->m_currentBank;
         m_footer = img->m_footer;
         m_charWidthDisplay = img->m_charWidthDisplay;
@@ -158,7 +166,7 @@ void LImageMetaChunk::LoadCharset(QString file, int skipBytes)
         nes->m_double = false;
 
     m_charsetFilename = file;
-    if (isNes())
+    if (isNes() || isSnes())
         m_charWidthDisplay = 16;
     else m_charWidthDisplay = 40;
 
@@ -174,13 +182,29 @@ void LImageMetaChunk::InitPens()
 
 void LImageMetaChunk::SetPalette(int pal)
 {
+    if (m_charset==nullptr)
+        return;
     m_charset->SetPalette(pal);
+//    m_colorList.CopyFrom(&m_charset->m_colorList);
+}
+
+QStringList LImageMetaChunk::getPaletteNames() {
+    if (m_charset==nullptr)
+        return LImage::getPaletteNames();
+
+    return m_charset->getPaletteNames();
 }
 
 void LImageMetaChunk::setPixel(int x, int y, unsigned int color)
 {
     QPoint p = getPos(x,y);
-    ((LMetaChunkItem*)m_items[m_current])->setPixel(p.x(),p.y(),m_currentChar,m_img->m_bitMask);
+    int bm = 1;
+    if (m_img!=nullptr)
+        bm = m_img->m_bitMask;
+
+    ((LMetaChunkItem*)m_items[m_current].get())->setPixel(p.x(),p.y(),m_currentChar,bm);
+    if (isSnes())
+        ((LMetaChunkItem*)m_items[m_current].get())->setPixelAttrib(p.x(),p.y(),m_currentAttribute,bm);
 
 }
 
@@ -190,29 +214,53 @@ unsigned int LImageMetaChunk::getPixel(int x, int y)
     if (m_charset==nullptr)
         return 0;
 
+
     QPoint p = getPos(x,y);
 //    qDebug() << p;
     if (m_current>=m_items.count())
         return 0;
 
-
-    uchar val = ((LMetaChunkItem*)m_items[m_current])->getPixel(p.x(),p.y(),m_img->m_bitMask);
+    int bm=1;
+    if (m_img!=nullptr)
+        bm = m_img->m_bitMask;
+    uchar val = ((LMetaChunkItem*)m_items[m_current].get())->getPixel(p.x(),p.y(),bm);
+    uchar attrib = ((LMetaChunkItem*)m_items[m_current].get())->getPixelAttrib(p.x(),p.y(),bm);
 
     int xp = x/(float)m_width*m_pixelWidth*getCur()->m_width;
     int yp = y/(float)m_height*m_pixelHeight*getCur()->m_height;
+
+
+
+    if  ((attrib&0b01000000) == 0b01000000) {
+        xp = m_pixelWidth-1-xp%m_pixelWidth; // Flip
+    }
+    if  ((attrib&0b10000000) == 0b10000000) {
+        yp = m_pixelHeight-1-yp%m_pixelHeight; // Flip
+    }
+
+
 
     int xx = ((val%m_charWidthDisplay)*m_pixelWidth) + xp%m_pixelWidth;
     int yy = ((val/(int)m_charWidthDisplay)*m_pixelHeight)  +yp%m_pixelHeight;
 
     if (isNes())
         yy=yy+ 16*8*m_footer.get(LImageFooter::POS_CURRENT_BANK);
+    if (isSnes())
+        yy=yy+ 16*16*m_footer.get(LImageFooter::POS_CURRENT_BANK);
 
     m_charset->m_footer.set(LImageFooter::POS_DISPLAY_CHAR,0);
 //    qDebug() << xx << yy
-    if (m_charset==nullptr) {
-        return 0;
+
+    unsigned int col = 0;
+    col = m_charset->getPixel(xx,yy);
+//    if (isNes())
+    if (isSnes() && m_returnActualColor)
+    {
+        unsigned int pen = m_charset->getPixel(xx,yy);// % 16;
+        col = m_charset->m_colorList.getPen(pen);
+
     }
-    else return m_charset->getPixel(xx,yy);
+    return col;
 
 }
 
@@ -220,13 +268,20 @@ void LImageMetaChunk::SaveBin(QFile &file)
 {
     uchar no = m_items.count();
     file.write( ( char * )( &no ),  1 );
-    for (LImageContainerItem* li : m_items) {
-        LMetaChunkItem *m = dynamic_cast<LMetaChunkItem*>(li);
+    for (auto li : m_items) {
+        LMetaChunkItem *m = dynamic_cast<LMetaChunkItem*>(li.get());
         uchar w = m->m_width;
         uchar h = m->m_height;
         file.write( ( char * )( &w ),  1 );
         file.write( ( char * )( &h ),  1 );
         file.write(m->m_data);
+  //      qDebug() << "Writing: "<<isSnes();
+        if (Syntax::s.m_currentSystem->m_system==AbstractSystem::SNES)
+        {
+//        if (isSnes()) {
+//            qDebug() << "Writing attributes;";
+            file.write(m->m_attributes);
+        }
     }
     AppendSaveBinCharsetFilename(file);
 }
@@ -244,6 +299,8 @@ void LImageMetaChunk::LoadBin(QFile &file)
   //      qDebug() << "W read : " << QString::number(w);
         AddNew(w,h);
         getCur()->m_data = file.read(w*h);
+        if (Syntax::s.m_currentSystem->m_system==AbstractSystem::SNES)
+            getCur()->m_attributes = file.read(w*h);
     }
     LoadBinCharsetFilename(file);
 }
@@ -264,7 +321,7 @@ LMetaChunkItem *LImageMetaChunk::getCur()
 {
     if (m_current>=m_items.count())
         return nullptr;
-    return (LMetaChunkItem*)m_items[m_current];
+    return (LMetaChunkItem*)m_items[m_current].get();
 
 }
 
@@ -294,7 +351,7 @@ void LImageMetaChunk::PasteChar()
     *getCur() = m_copy;
 }
 
-/*void LImageMetaChunk::ToQImage(LColorList &lst, QImage &img, float zoom, QPointF center)
+/*void LImageMetaChunk::ToQImage(LColorList &lst, QImage &img, double zoom, QPointF center)
 {
 
 }
@@ -303,7 +360,7 @@ void LImageMetaChunk::AddNew(int w, int h)
 {
     LMetaChunkItem* s = new LMetaChunkItem();
     s->Init(w,h);
-    m_items.append(s);
+    m_items.append(QSharedPointer<LMetaChunkItem>(s));
     m_current = m_items.count()-1;
 
 
@@ -311,11 +368,14 @@ void LImageMetaChunk::AddNew(int w, int h)
 
 void LImageMetaChunk::FlipHorizontal()
 {
-
+    if (isSnes())
+        m_currentAttribute = Util::flipBit(m_currentAttribute,6);
 }
 
 void LImageMetaChunk::FlipVertical()
 {
+    if (isSnes())
+        m_currentAttribute = Util::flipBit(m_currentAttribute,7);
 
 }
 
@@ -333,30 +393,41 @@ void LMetaChunkItem::setPixel(float x, float y, uchar color, uchar bitMask)
 {
     if (x<0 || x>=m_width || y<0 || y>=m_height)
         return;
-    m_data[(int)(y*m_width+x)] = color;
+    int idx = (int)(y*m_width+x);
+    if (idx<m_data.size())
+        m_data[idx] = color;
+
 }
 
 void LMetaChunkItem::setPixelAttrib(float x, float y, uchar color, uchar bitMask)
 {
     if (x<0 || x>=m_width || y<0 || y>=m_height)
         return;
-    m_attributes[(int)(y*m_width+x)] = color;
+    int idx = (int)(y*m_width+x);
+    if (idx<m_data.size())
+        m_attributes[idx] = color;
+
 }
 
 uchar LMetaChunkItem::getPixel(float x, float y, uchar bitMask)
 {
     if (x<0 || x>=m_width || y<0 || y>=m_height)
         return 0;
-    return m_data[(int)(y*m_width+x)];
+    int idx = (int)(y*m_width+x);
+    if (idx<m_data.size())
+        return m_data[idx];
 
-
+    return 0;
 }
 
 uchar LMetaChunkItem::getPixelAttrib(float x, float y, uchar bitMask)
 {
     if (x<0 || x>=m_width || y<0 || y>=m_height)
         return 0;
-    return m_attributes[(int)(y*m_width+x)];
+    int idx = (int)(y*m_width+x);
+    if (idx<m_data.size())
+        return m_attributes[idx];
+   return 0;
 
 
 }
@@ -401,9 +472,11 @@ QPixmap LImageMetaChunk::ToQPixMap(int chr)
 
 void LImageMetaChunk::ExportBin(QFile &file)
 {
-    for (LImageContainerItem* li : m_items) {
-        LMetaChunkItem *m = dynamic_cast<LMetaChunkItem*>(li);
+    for (auto li : m_items) {
+        LMetaChunkItem *m = dynamic_cast<LMetaChunkItem*>(li.get());
         file.write(m->m_data);
+        if (Syntax::s.m_currentSystem->m_system==AbstractSystem::SNES)
+            file.write(m->m_attributes);
     }
 }
 

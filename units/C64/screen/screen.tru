@@ -1,4 +1,5 @@
 Unit Screen;
+@use "system/str"
 var
 /*
 
@@ -6,10 +7,53 @@ var
 
 */
 
-//var
-   	p1, sp, cp : pointer;
+   	p1, sp, cp, p2 : pointer;
 	i, j, x, y, c : byte;
-	i2 : integer;
+	@donotremove i2
+	@donotremove p1
+	@donotremove p2
+	@donotremove i
+	i2,i1 : integer;
+	
+	const screen0 : address = $0400;
+	const screen1 : address = $4400;
+	const screen2 : address = $8400;
+	const screen3 : address = $C400;
+	const vic_data : address = $D018;
+	
+	const border : address = $d020;
+	const background : address = $d021;
+	const color : address = $d800;
+	const width : byte = 40;
+	const height : byte = 25;
+	
+	const ROMCharset_uppercase : address = $D000;
+	const ROMCharset_lowercase : address = $D800;
+	
+	tab40 : array[25] of integer = buildtable("i*SCREEN_WIDTH");
+	
+	numStr : array[16] of byte;
+/**
+
+	Toggles raster interrupts on lines above than 256
+
+**/
+
+procedure EnableRasterLinesGreaterThan256() inline ;
+begin
+	screen_ctrl:=screen_ctrl|%10000000;
+end;
+
+/**
+
+	Toggles raster interrupts on lines below 256
+
+**/
+
+procedure DisableRasterLinesGreaterThan256() inline;
+begin
+	screen_ctrl:=screen_ctrl&%01111111;
+end;
 
 /**
 	Prints a single character to the screen
@@ -55,6 +99,39 @@ begin
 	end;
 end;
 
+/**
+	Prints a string text to the screen at position [p1 + y*40 + c] with color [c]
+**/
+procedure PrintString(p1 : global pointer; x, y : global byte; p2: global ^byte);
+begin
+	sp := p2 +tab40[y] + x;
+
+
+	asm("
+		ldy #0
+printstring_loop1:
+		lda (Screen_p1),y
+		beq printstring_endd
+		
+		sta (Screen_sp),y
+		iny
+		jmp printstring_loop1
+printstring_endd:
+
+		
+	
+	");
+	
+	while (p1^<>0) do
+	begin
+		j := p1^;
+		if (j>64 and j<64+32) then j:=j-64;
+		sp^:=j;
+		sp+=1;
+		p1+=1;
+	end;
+end;
+
 
 procedure WaitForRaster( i2 : global integer); 
 begin
@@ -79,6 +156,320 @@ wait_for_raster:
 	bne wait_for_raster
 	");
 
+end;
+/**
+
+	Clears 40*25 = 1000 bytes at position i2 with value i
+
+**/
+procedure Clear( i2 : global integer pure_number, i: global byte pure_number) inline;
+begin
+	asm("
+	lda #[Screen_i]
+	ldx #$fa
+{label0}
+	dex
+	sta [Screen_i2] + $0000,x
+	sta [Screen_i2] + $00fa,x
+	sta [Screen_i2] + $01f4,x
+	sta [Screen_i2] + $02ee,x
+	bne {label0}
+	");
+end;
+
+procedure Clear( i2 : global integer pure_number, i: global byte pure_variable) inline;
+begin
+	asm("
+	lda [Screen_i]
+	ldx #$fa
+{label0}
+	dex
+	sta [Screen_i2] + $0000,x
+	sta [Screen_i2] + $00fa,x
+	sta [Screen_i2] + $01f4,x
+	sta [Screen_i2] + $02ee,x
+	bne {label0}
+	");
+end;
+
+procedure Clear( p1 : global pointer, i: global byte);
+begin
+	fill(p1,i,250);
+	p1+=250;
+	fill(p1,i,250);
+	p1+=250;
+	fill(p1,i,250);
+	p1+=250;
+	fill(p1,i,250);
+end;
+
+
+/**
+
+	Waits for a vertical blank (when the raster is reset to the top of the screen)
+
+**/
+procedure WaitForVerticalBlank() inline;
+begin
+	asm("
+	nop	
+{label0}
+	bit $D011
+	bpl {label0}
+{label1}
+	bit $D011
+	bmi {label1}
+	
+	");
+end;
+
+
+/*
+
+	Scrolls i pixels horizontally (between 0-7)
+
+*/
+procedure Scrollx(i: global byte);
+begin
+	asm("
+	lda Screen_i
+	sta $58
+	lda $d016  
+	and #$F8
+	ora $58
+	sta $d016
+	
+	");	
+end;
+
+procedure RasterIRQ(i2 : global integer, i: global byte pure) inline;
+begin
+	asm("
+	lda #[Screen_i]
+	sta $d012
+	lda #<[Screen_i2]
+	sta $0314
+	lda #>[Screen_i2]
+	sta $0315
+	
+	");
+end;
+/**
+	Hides column 0 and 39
+
+**/
+procedure HideBorders() inline;
+begin
+	asm("
+	lda $D016
+	and #%11110111
+	sta $D016
+	");
+end;
+
+/**
+	Shows column 0 and 39
+
+**/
+procedure ShowBorders() inline;
+begin
+	asm("
+	lda $D016
+	ora #%1000
+	sta $D016
+	");
+end;
+
+
+procedure CopyFull(i1, i2 : global integer pure_number) inline;
+begin
+	asm("
+	ldx #0
+{label0}
+	lda [Screen_i1],x
+	sta [Screen_i2],x
+	lda [Screen_i1]+250,x
+	sta [Screen_i2]+250,x
+	lda [Screen_i1]+500,x
+	sta [Screen_i2]+500,x
+	lda [Screen_i1]+750,x
+	sta [Screen_i2]+750,x
+	inx
+	cpx #250
+	bne {label0}
+	");	
+end;
+/**
+	Copies a full screen (1000 bytes) from parameter 1 to parameter 2
+
+**/
+procedure CopyFull(p1, p2 : global pointer);
+begin
+	for i:=0 to 4 do
+	begin
+		memcpy(p1,0,p2,250);
+		p1+=250;
+		p2+=250;
+	end;
+end;
+
+
+/**
+
+	Sets multicolor mode
+
+**/
+
+procedure SetMulticolorMode() inline;
+begin
+	asm("
+	lda #16
+	ora $d016
+	sta $d016
+	");
+end;
+
+/**
+
+	Sets hires mode
+
+**/
+
+procedure SetHiresMode() inline;
+begin
+	asm("
+	lda $d016
+	and #%11101111
+	sta $d016
+	");
+end;
+
+/**
+
+	Sets bitmap mode
+
+**/
+
+procedure SetBitmapMode() inline;
+begin
+	asm("
+	lda #$3b
+	sta $d011
+	");
+end;
+
+
+/**
+	Sets vic bank 0-4
+	<code>
+Screen::SetBank(vic_bank1);
+	</code>
+
+**/
+procedure SetBank(i: global byte) inline;
+begin
+	asm("
+		lda #[Screen_i]
+		sta $dd00
+	");		
+end;
+/**
+
+	Sets the location of the screen data (text mode) or color data (bitmap mode). Must be an offset
+	of $400, ie $0, $400, $800, $c00, $1000, $1400 etc
+<code>
+Screen::SetScreenLocation($4000);
+</code>
+
+**/
+procedure SetScreenLocation(i1: global integer);
+begin
+	i:=((hi(i1)/4)&%00001111)<<4;
+	vic_data_loc:=((vic_data_loc)&%00001111)|i;
+end;
+
+/**
+
+	Sets the location of the character set (text mode) or bitmap data (bitmap mode). Must be an offset
+	of $800, ie $0, $800, $1000, $1800, $2000, $2800 etc. Bitmap data can only be stored at $0 and $2000 on each bank.
+	
+<code>
+Screen::SetCharsetLocation($1000); // point to ROM
+</code>
+
+**/
+procedure SetCharsetLocation(i1: global integer);
+begin
+	i:=((hi(i1)/8)&%00001111)<<1;
+	vic_data_loc:=((vic_data_loc)&%11110000)|i;
+end;
+
+/**
+
+	Copies image data from p1 to bank i
+
+**/
+procedure CopyImageColorData(sp : global pointer, i: global byte);
+begin
+	cp := $0400;
+	i:=i<<6;
+	asm("
+		clc
+		lda Screen_cp+1
+		adc	Screen_i
+		sta Screen_cp+1
+	");
+	border := sp[0];
+	background := sp[1];
+	Screen::CopyFull(sp+2, cp);
+	Screen::CopyFull(sp+1002, $D800);
+	
+end;
+
+procedure PrintNumber(i1 : global integer; x,y,c : global byte; cp:global ^byte);
+begin
+	str::itoa(i1, #numStr, c);
+	PrintString(#numStr, x,y, cp);
+end;	
+/**
+	Copes charset from ROM at p1 to p2 (2000 bytes)
+
+**/
+procedure CopyCharsetFromRom(p1, p2 : global ^byte);
+begin
+	asm(" sei");
+	i:=peek(^01,0);
+	poke(^01,0,$33);
+	CopyFull(p1,p2);
+	CopyFull(p1+1000,p2+1000);
+	poke(^01,0,i);
+end;
+
+/**
+
+	Waits p1 raster lines
+
+**/
+procedure WaitNoLines(i : global byte pure_number) inline;
+begin
+	asm("
+	lda #[Screen_i]
+	clc 
+	adc $d012
+	cmp $d012
+	bne *-3
+	");
+end;
+
+procedure WaitNoLines(i : global byte);
+begin
+	asm("
+	lda Screen_i
+	clc 
+	adc $d012
+	cmp $d012
+	bne *-3
+	");
 end;
 
 end.

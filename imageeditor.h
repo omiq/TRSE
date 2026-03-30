@@ -40,7 +40,7 @@ public:
     ImageType(QString n,QString cat,LImage::Type t, LColorList::Type colType) {
         type = t;
         name = n;
-        category = cat;
+        category = cat.toUpper();
         colorType = colType;
     }
 };
@@ -67,7 +67,7 @@ public:
     void Undo();
     void AddUndo();
     void setName();
-    const int m_undoMax = 10;
+    const int m_undoMax = 30;
 
 
 };

@@ -12,20 +12,16 @@ void SystemTiki100::Assemble(QString &text, QString filename, QString currentDir
     int codeEnd = 0;
 
 
-    output+="<br>";
-    QString assembler = m_settingsIni->getString("pasmo");
-    if (!QFile::exists(assembler)) {
-        text  += "<br><font color=\"#FF6040\">Please set up a link to the PASMO assembler directory in the TRSE settings panel.</font>";
-        m_buildSuccess = false;
+    PerformAssembling(filename,text,currentDir,symTab);
+    if (!m_buildSuccess)
         return;
-    }
 
-    if (QFile::exists(filename+".com"))
-        QFile::remove(filename+".com");
+    if (m_projectIni->getdouble("exomizer_toggle")==1)
+        PackProgram(filename,0x300, 0x300, text, currentDir, symTab,":resources/code/tiki100/unpack.asm");
 
-    QProcess process;
-    QStringList params;
-    StartProcess(assembler, QStringList() << "-1" << filename+".asm" <<filename+".com", output);
+
+
+    Util::CopyFile(filename+".bin",filename+".com");
 
     if (!QFile::exists(filename+".com")) {
         text  += "<br><font color=\"#FFFF00\">Error during assembly : please check source assembly for errors.</font>";

@@ -10,8 +10,8 @@ program real3d;
 @define objPos $8800
 @define max3dobjects 1
 
+@define linemethod "Gfx::Line"
 @use "gfx/lib3d"
-
 
 var
 	bb,x1,x2,y1,y2,l,i,j,k,f,x3,y3,time,time2,t: byte;

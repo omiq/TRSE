@@ -29,10 +29,13 @@
 #include <QPainter>
 #include <QMatrix4x4>
 #include "source/Compiler/syntax.h"
+#include <QDebug>
 //#include <omp.h>
 uchar LImage::m_copy[1024*1024];
 bool LImage::m_hasCopy = false;
 QPoint LImage::m_copySize = QPoint(512,512);
+int LImage::m_canvasStart = -1;
+
 LImage::LImage(LColorList::Type t)
 {
     m_colorList.Initialize(t);
@@ -98,6 +101,44 @@ unsigned char LImage::TypeToChar(LImage::Type t)
         return 27;
     if (t==Spectrum)
         return 28;
+    if (t==SNES)
+        return 29;
+    if (t==LevelEditorSNES)
+        return 30;
+    if (t==VZ200)
+        return 31;
+    if (t==CustomC64)
+        return 32;
+    if (t==JDH8)
+        return 33;
+    if (t==LImageGeneric)
+        return 34;
+    if (t==GenericSprites)
+        return 35;
+    if (t==CGA160x100)
+        return 36;
+    if (t==AmstradSprites)
+        return 37;
+    if (t==SNESGeneric)
+        return 38;
+    if (t==TIM)
+        return 39;
+    if (t==TVC)
+        return 40;
+    if (t==COCO3)
+        return 41;
+    if (t==THOMSON)
+        return 42;
+    if (t==TIMG)
+        return 43;
+    if (t==LevelEditorGeneric)
+        return 44;
+    if (t==AGON)
+        return 45;
+    if (t==PRIMO)
+        return 46;
+    if (t==CGA_HIRES)
+        return 47;
 
 
     return 255;
@@ -163,6 +204,44 @@ QString LImage::TypeToString(LImage::Type t)
         return "VGA";
     if (t==Spectrum)
         return "Spectrum";
+    if (t==SNES)
+        return "SNES";
+    if (t==LevelEditorSNES)
+        return "SNES Level editor";
+    if (t==VZ200)
+        return "VZ200 4-color 128x64";
+    if (t==CustomC64)
+        return "Custom C64";
+    if (t==JDH8)
+        return "JDH8";
+    if (t==LImageGeneric)
+        return "Generic indexed image";
+    if (t==GenericSprites)
+        return "Generic Sprites";
+    if (t==CGA160x100)
+        return "CGA 160x100 16 colour";
+    if (t==AmstradSprites)
+        return "Amstrad sprites";
+    if (t==SNESGeneric)
+        return "Generic SNES image";
+    if (t==TIM)
+        return "Generic TIM image";
+    if (t==TVC)
+        return "Generic TVC image";
+    if (t==COCO3)
+        return "Generic TRS80 CoCo3 image";
+    if (t==THOMSON)
+        return "Generic Thomson mo5 image";
+    if (t==TIMG)
+        return "Generic TIM image";
+    if (t==LevelEditorGeneric)
+        return "Generic Level Editor";
+    if (t==AGON)
+        return "Generic AGON image";
+    if (t==PRIMO)
+        return "Generic PRIMO image";
+    if (t==CGA_HIRES)
+        return "Hires CGA";
 
 
     return "Unknown image type";
@@ -230,9 +309,57 @@ LImage::Type LImage::CharToType(unsigned char c)
         return VGA;
     if (c==28)
         return Spectrum;
+    if (c==29)
+        return SNES;
+    if (c==30)
+        return LevelEditorSNES;
+    if (c==31)
+        return VZ200;
+    if (c==32)
+        return CustomC64;
+    if (c==33)
+        return JDH8;
+    if (c==34)
+        return LImageGeneric;
+    if (c==35)
+        return GenericSprites;
+    if (c==36)
+        return CGA160x100;
+    if (c==37)
+        return AmstradSprites;
+    if (c==38)
+        return SNESGeneric;
+    if (c==39)
+        return TIM;
+    if (c==40)
+        return TVC;
+    if (c==41)
+        return COCO3;
+    if (c==42)
+        return THOMSON;
+    if (c==43)
+        return TIMG;
+    if (c==44)
+        return LevelEditorGeneric;
+    if (c==45)
+        return AGON;
+    if (c==46)
+        return PRIMO;
+    if (c==47)
+        return CGA_HIRES;
 
     return NotSupported;
 
+}
+
+int LImage::getCanvasColor(int x, int y)
+{
+    return 0;
+/*    if (((x+y)&7)==0)
+        return 1;
+    else
+        return 0;*/
+//    return (x+y)&7;
 }
 
 MetaParameter *LImage::getMetaParameter(QString name)
@@ -242,6 +369,28 @@ MetaParameter *LImage::getMetaParameter(QString name)
             return mp;
 
     return nullptr;
+}
+
+void LImage::ToQImageUsingPens(LColorList &lst, QImage &img, double zoom, QPointF center)
+{
+    m_canvasStart = -1;
+    int height  =img.height();
+    if (m_footer.get(LImageFooter::POS_DISPLAY_CHAR)==1)
+        height = m_height;
+    for (int i=0;i<m_width;i++)
+        for (int j=0;j<height;j++) {
+
+            float xp = ((i-center.x())*zoom)+ center.x();
+            float yp = ((j-center.y())*zoom) + center.y();
+
+            unsigned int pen = getPixel(xp,yp);// % 16;
+            unsigned int col = m_colorList.getPen(pen);
+
+            //            img->setPixel(i,j,QRgb(col));
+            img.setPixel(i,j,lst.get(col).color.rgb());
+        }
+    //return img;
+
 }
 
 void LImage::CopyImageData(LImage *img) {
@@ -258,9 +407,22 @@ int LImage::getCharHeightDisplay()
     return m_charHeightDisplay;
 }
 
+QPointF LImage::getZoomedCoordinates(int i, int j, const QPointF& center, double zoom) {
+    double xp = ((i-center.x())*zoom)+ center.x();
+    double yp = (((j-center.y())*zoom) + center.y());//*m_aspect;
+    if (yp>=m_height && m_canvasStart == -1)
+        m_canvasStart = j;
+    return QPointF(xp,yp);
+}
+
+QStringList LImage::getBankNames() {
+    return QStringList()<<"Bank 0";
+}
+
 void LImage::CtrlLeftShift(int x, int y) {
     Data::data.currentColor = getPixel(x,y);
 }
+
 
 QString LImage::GetCurrentModeString() {
     /*    if (m_currentMode==CHARSET1x1) return "1x1 charset mode";
@@ -270,18 +432,40 @@ QString LImage::GetCurrentModeString() {
     return "";
 }
 
-void LImage::FloydSteinbergDither(QImage &img, LColorList &colors, bool dither)
+void LImage::ToQPixMaps(QVector<QPixmap> &map)
 {
+    map.clear();
+    for (int i=0;i<m_charWidth*m_charHeight;i++) {
+        map.append(ToQPixMap(i));
+    }
+}
+
+void LImage::FloydSteinbergDither(QImage &oimg, LColorList &colors, bool dither, double strength)
+{
+
+    /*    int xx = (dx-img.width()/2.0)*m_importScaleX + img.width()/2.0;
+    int yy = (dy-img.height()/2.0)*m_importScaleY + img.height()/2.0;
+
+    if (m_importScaleX==1.0 && m_importScaleY==1.0) { // prevent rounding errors on windows.. damn
+       xx = dx;
+       yy = dy;
+    }
+
+  */
+    QImage img = oimg.scaled(oimg.width()*m_importScaleX,oimg.height()*m_importScaleY,Qt::IgnoreAspectRatio,Qt::SmoothTransformation);
     int height  =std::min(img.height(), m_height);
     int width  =std::min(img.width(), m_width);
     for (int y=0;y<height;y++) {
         for (int x=0;x<width;x++) {
+
+
             QColor oldPixel = QColor(img.pixel(x,y));
             int winner = 0;
             QColor newPixel = colors.getClosestColor(oldPixel, winner);
             //int c = m_colorList.getIndex(newPixel);
             setPixel(x,y,winner);
             QVector3D qErr(oldPixel.red()-newPixel.red(),oldPixel.green()-newPixel.green(),oldPixel.blue()-newPixel.blue());
+            qErr*=strength/100.0;
             if (dither) {
                 if (x!=width-1)
                     img.setPixel(x+1,y,Util::toColor(Util::fromColor(img.pixel(x+1,y))+qErr*7/16.0).rgba());
@@ -304,10 +488,10 @@ void LImage::OrdererdDither(QImage &img, LColorList &colors, QVector3D strength,
     int width  =std::min(img.width(), m_width);
     QMatrix4x4 bayer4x4 = QMatrix4x4(0,8,2,10,  12,4,14,6, 3,11,1,9, 15,7,13,5);
     bayer4x4 = bayer4x4*1/16.0*strength.x();
-
 //    qDebug() << img.width();
+    qDebug() << m_importScaleX << img.width() << width;
     for (int y=0;y<height;y++) {
-#pragma omp parallel for
+//#pragma omp parallel for
         for (int x=0;x<width;x++) {
 
 //            color.R = color.R + bayer8x8[x % 8, y % 8] * GAP / 65;
@@ -315,6 +499,11 @@ void LImage::OrdererdDither(QImage &img, LColorList &colors, QVector3D strength,
             double dy = y/(double)height*img.height();
             int xx = (dx-img.width()/2.0)*m_importScaleX + img.width()/2.0;
             int yy = (dy-img.height()/2.0)*m_importScaleY + img.height()/2.0;
+
+            if (m_importScaleX==1.0 && m_importScaleY==1.0) { // prevent rounding errors on windows.. damn
+               xx = dx;
+               yy = dy;
+            }
 
 
             QColor color = QColor(img.pixel(xx,yy));
@@ -327,6 +516,7 @@ void LImage::OrdererdDither(QImage &img, LColorList &colors, QVector3D strength,
             int winner = 0;
             QColor newPixel = colors.getClosestColor(color, winner);
             //int c = m_colorList.getIndex(newPixel);
+
             setPixel(x,y,winner);
 
         }
@@ -360,12 +550,33 @@ void LImage::CopyChar()
                        m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_Y)*32);
 
 //   m_copySize = QPoint(256,256);
+/*
+   m_isHybridTemp = false;
+   bool multi = m_bitMask==0b11;
+   if (m_footer.get(LImageFooter::POS_DISPLAY_HYBRID)==1)
+   {
+       m_footer.set(LImageFooter::POS_DISPLAY_HYBRID,0);
+       setMultiColor(false);
+       m_isHybridTemp = true;
+   }
+*/
     for (int y=0;y<m_copySize.y();y++)
         for (int x=0;x<m_copySize.x();x++) {
             m_copy[x+y*m_copySize.x()] = getPixel((float)x/(float)m_copySize.x()*(float)m_width,
                                                   (float)y/(float)m_copySize.y()*(float)m_height);
+//            if (m_copy[x+y*m_copySize.x()]>8)
+  //          qDebug() << QString::number(m_copy[x+y*m_copySize.x()]);
         }
     m_hasCopy = true;
+
+  /*  if (m_isHybridTemp) {
+       m_footer.set(LImageFooter::POS_DISPLAY_MULTICOLOR,0);
+       setMultiColor(false);
+       m_footer.set(LImageFooter::POS_DISPLAY_HYBRID,1);
+   }
+   m_isHybridTemp = false;
+*/
+
 
 }
 
@@ -394,6 +605,7 @@ void LImage::PasteChar()
 }
 
 void LImage::FlipHorizontal() {
+    PushHybrid();
     CopyChar();
     for (int y=0;y<m_copySize.y();y++)
         for (int x=m_copySize.x()-1;x>=0;x--) {
@@ -402,9 +614,11 @@ void LImage::FlipHorizontal() {
                      m_copy[m_copySize.x()-1-x+y*m_copySize.x()]);
         }
 
+    PopHybrid();
 }
 
 void LImage::FlipVertical() {
+    PushHybrid();
     CopyChar();
     for (int y=0;y<m_copySize.y();y++)
         for (int x=0;x<m_copySize.x();x++) {
@@ -414,10 +628,11 @@ void LImage::FlipVertical() {
         }
 
 
-
+    PopHybrid();
 }
 
 void LImage::Transform(int tx, int ty) {
+    PushHybrid();
 
     CopyChar();
     for (int y=0;y<m_copySize.y();y++)
@@ -427,25 +642,54 @@ void LImage::Transform(int tx, int ty) {
                      m_copy[(x+tx)%m_width+((y+ty)%m_height)*m_copySize.x()]);
         }
 
+    PopHybrid();
+}
+
+void LImage::Clear(int val) {
+    for (int y=0;y<m_height;y++)
+        for (int x=0;x<m_width;x++) {
+            setPixel(x,y,val);
+        }
+
+}
+void LImage::PushHybrid()
+{
+
+    m_isHybridTemp = false;
+    if (m_footer.get(LImageFooter::POS_DISPLAY_HYBRID)==1) {
+        m_footer.set(LImageFooter::POS_DISPLAY_HYBRID,0);
+        setMultiColor(false);
+        m_isHybridTemp = true;
+    }
 
 }
 
-void LImage::Clear() {
-    for (int y=0;y<m_height;y++)
-        for (int x=0;x<m_width;x++) {
-            setPixel(x,y,0);
-        }
+void LImage::PopHybrid()
+{
+    if (m_isHybridTemp) {
+        setMultiColor(false);
+        m_footer.set(LImageFooter::POS_DISPLAY_HYBRID,1);
+    }
+    m_isHybridTemp = false;
 
 }
 
 
 void LImage::ShiftXY(int dx, int dy)
 {
-    CopyChar();
    // qDebug() <<m_copySize;
+    PushHybrid();
+    CopyChar();
+
+/*    if (m_footer.get(LImageFooter::POS_DISPLAY_HYBRID)==1) {
+        dx*=2;
+    }*/
 
     dx*=m_bitMask==0b11?2:1;
-
+/*    if (m_isHybridTemp && m_bitMask==0b11) {
+        dx*=1;
+    }
+*/
     if (!m_footer.isFullscreen()) {
         int sx = m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_X)*8;
         int sy = m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_Y)*8;
@@ -465,6 +709,7 @@ void LImage::ShiftXY(int dx, int dy)
 
                      m_copy[x+y*m_copySize.x()]);
         }
+    PopHybrid();
 
 }
 
@@ -483,9 +728,40 @@ void LImage::Rotate(QPoint center, float angle, float scale, LImage* img)
         }
 }
 
+unsigned int LImage::getPixel(QPointF p) {
+    return getPixel(p.x(), p.y());
+}
+
+void LImage::ExportSubregion(QString outfile, int x, int y, int w, int h, int type) {
+
+    QByteArray data;
+//    qDebug() << x<<type;
+    m_footer.set(LImageFooter::POS_DISPLAY_CHAR,0);
+    if (type==0)
+        for (int j=0;j<h;j++)
+            for (int i=0;i<w;i++)
+            {
+                data.append(getPixel(x+i,y+j));
+    //            data.append(getPixel(x+i,y+j));
+            }
+
+    if (type == 1)
+    for (int i=0;i<w;i++)
+        for (int j=0;j<h;j++)
+        {
+            data.append(getPixel(x+i,y+j));
+        }
+
+    Util::SaveByteArray(data,outfile);
+
+
+
+}
+
 void LImage::ExportRGB8Palette(QString filename) {
 
-    QByteArray b = m_colorList.toArray();
+    QByteArray b;
+    m_colorList.toArray(b);
     b.remove(0,1);
     Util::SaveByteArray(b,filename);
 
@@ -525,9 +801,13 @@ void LImage::drawCircle(float x0, float y0, float r, float r0, unsigned int col)
 
 void LImage::Box(int x, int y, unsigned char col, int size)
 {
+
+    int sx = fmax(m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+    int sy = fmax(m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+    int w = fmax(m_footer.get(LImageFooter::LImageFooter::POS_CHARSET_WIDTH),1);
     for (int i=0;i<size;i++)
         for (int j=0;j<size;j++) {
-            setPixel(x+i-size/2, y+j-size/2, col);
+            setPixel(x+i-size/2, y+j-size/2, col+i%sx + (j%sy)*w);
         }
 }
 
@@ -535,13 +815,19 @@ void LImage::RBox(int x0, int y0, int x1, int y1, unsigned char col, int size)
 {
     if (x0>x1) std::swap(x0,x1);
     if (y0>y1) std::swap(y0,y1);
+
+    int sx = fmax(m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+    int sy = fmax(m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+    int w = fmax(m_footer.get(LImageFooter::LImageFooter::POS_CHARSET_WIDTH),1);
+
     for (int i=0;i<x1-x0;i++)
         for (int j=0;j<y1-y0;j++) {
+            char c = col+i%sx + (j%sy)*w;
             if (size==0)
-                setPixel(x0+i, y0+j, col);
+                setPixel(x0+i, y0+j, c);
             else {
                 if (i<size || i>=x1-x0-size || j<size || j>=y1-y0-size)
-                    setPixel(x0+i, y0+j, col);
+                    setPixel(x0+i, y0+j, c);
             }
         }
 }
@@ -554,14 +840,28 @@ void LImage::CopyFrom(LImage *img) {
         m_height = img->m_height;
 
     }
+    m_aspect = img->m_aspect;
     m_colorList.CopyFrom(&img->m_colorList);
     m_footer = img->m_footer;
     m_scaleX = img->m_scaleX;
-#pragma omp parallel for
+//#pragma omp parallel for
 
     for (int i=0;i<m_width;i++)
         for (int j=0;j<m_height;j++)
             setPixel(i,j,img->getPixel(i,j));
+
+}
+
+void LImage::SaveCurrentPaletteToPPU()
+{
+    int pal = m_footer.get(LImageFooter::POS_CURRENT_PALETTE);
+//    qDebug() << "LImage::SaveCurrentPaletteToPPU  CURRENT PALETTE "<< pal;
+    int noCol = pow(2,m_colorList.m_bpp.x());
+    for (int i=0;i<noCol;i++) {
+        m_colorList.m_nesPPU[pal*noCol +i] = (uchar)m_colorList.getPen(i);
+  //      if (i==0)
+    //        qDebug() << "COLOR 0 is "<<Util::numToHex(m_colorList.getPen(i));
+    }
 
 }
 

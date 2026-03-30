@@ -10,8 +10,11 @@ public:
     LImageAmiga(LColorList::Type t, int type);
     void InitPens() override;
     void ExportBin(QFile &file) override;
-    void SaveBin(QFile& file) override;
-    void LoadBin(QFile& file) override;
+    virtual void SaveBin(QFile& file) override;
+    virtual void LoadBin(QFile& file) override;
+
+    void ExportSubregion(QString outfile, int x, int y, int w, int h, int type) override;
+
 };
 
 #endif // LIMAGEAMIGA4_H

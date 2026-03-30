@@ -1,0 +1,11 @@
+<p>BuildTable2D can be used with arrays to create a 2D table of data that is calculated at build time.</p>
+
+<p>JavaScript is used with an indexer variable called 'i' and j.  Thus, any JavaScript functions can be used.</p>
+
+<h3>Example</h3>
+<code>
+data1 : array[256] of byte =BuildTable2D(16,16,"i+j" );
+
+screen_circle : array[1000] of byte = BuildTable(40,25,"Math.sqrt( (i-20)*(i-20) + (j-12)*(j-12))  ;   // circles
+
+</code>

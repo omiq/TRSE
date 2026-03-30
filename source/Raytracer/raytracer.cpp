@@ -1,7 +1,12 @@
 #include "raytracer.h"
 
+
+#ifdef USE_OMP
 #include <omp.h>
+#endif
 #include <algorithm>
+
+#include "source/LeLib/limage/multicolorimage.h"
 
 RayTracer::RayTracer()
 {
@@ -132,9 +137,11 @@ void RayTracer::Raymarch(QImage &img, int w, int h)
 
 
 #pragma omp parallel for
+
        for (int j=0;j<h;j++)
            for (int i=0;i<w;i++)
         {
+//               qDebug() << "Thread number: " << omp_get_thread_num();
 
             float x = (i-w/2)*m_globals.m_aspect +w/2;//*aspect;
             float y = j;//*aspect;
@@ -144,9 +151,10 @@ void RayTracer::Raymarch(QImage &img, int w, int h)
 
             QVector3D dir;
             if (m_globals.m_type==RayTracerGlobals::regular)
-                dir = m_camera.coord2ray(x,y,w,h);;
+//                dir = m_camera.coord2ray(x+0.5,y+0.5,w,h);;
+                dir = m_camera.coord2ray(x+0.5,y+0.5,w,h);;
             if (m_globals.m_type==RayTracerGlobals::fisheye)
-                dir = m_camera.fisheye(x,y,w,h);;
+                dir = m_camera.fisheye(x+0.5,y+0.5,w,h);;
             Ray ray(m_camera.m_camera,dir);
             ray.m_reflect=3;
 #ifdef USE_OMP
@@ -201,10 +209,9 @@ void RayTracer::LoadMesh(QString fn, float scale, QVector3D orgPos, Material mat
                 rt->m_centerPos = (rt->m_pos[0]+ rt->m_pos[1]+rt->m_pos[2])/3;
                 rt->m_position = -rt->m_centerPos;//rt->m_centerPos;
                 rt->m_localPos = -rt->m_centerPos;//rt->m_centerPos;
-
                 for (int i=0;i<3;i++) {
                     rt->m_pos[i]-=rt->m_centerPos;
-                    rt->m_pos[i]*=1.04;
+                    //rt->m_pos[i]*=1.04;
                 }
                 rt->m_normal = QVector3D::crossProduct(rt->m_pos[1]-rt->m_pos[0],rt->m_pos[2]-rt->m_pos[0]).normalized();
                 if (invertN)
@@ -212,11 +219,13 @@ void RayTracer::LoadMesh(QString fn, float scale, QVector3D orgPos, Material mat
                 rt->m_bbRadius = std::max(std::max((rt->m_pos[0]).length(),
                                      (rt->m_pos[1]).length()),
                                      (rt->m_pos[2]).length());
-
                 rt->m_pos[0]+=rt->m_centerPos;
                 rt->m_pos[1]+=rt->m_centerPos;
                 rt->m_pos[2]+=rt->m_centerPos;
-
+ //               rt->m_centerPos = QVector3D(0,0,0);
+   //             rt->m_localPos = QVector3D(0,0,0);
+                rt->m_localPos = QVector3D(0,0,0);
+                rt->m_position = QVector3D(0,0,0);
   //          if (parent->m_children.count()<200)
                 parent->m_children.append(rt);
 
@@ -264,7 +273,7 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
 //        qDebug() << o->m_localPos;
 //        if (culled.size()>10)
   //          break;
-        if (o->m_hasNormal) {
+        if (o->m_hasNormal && dynamic_cast<RayObjectTriangle*>(o)==nullptr) {
             if (QVector3D::dotProduct(ray.m_direction, o->m_normal)>0)
                 continue;
         }
@@ -275,7 +284,7 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
         }
         else
 //        if (ray.IntersectSphere((o->m_localPos)*-1,QVector3D(1,1,1)*o->m_bbRadius,isp1, isp2, t0,t1))
-        if (ray.IntersectBox((o->m_localPos)*-1,QVector3D(1,1,1)*o->m_bbRadius,isp1, isp2, t0,t1))
+        if (ray.IntersectBox((o->getBBBox())*-1,QVector3D(1,1,1)*o->m_bbRadius,isp1, isp2, t0,t1))
         {
             //if (( t1>0) || dynamic_cast<RayObjectPlane*>(o)!=nullptr)
             if (pass==Pass::Shadow) {
@@ -322,8 +331,10 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
                 continue;
 
             ro->m_localRay[tid].setCurrent(t);
-
             float keep2 = ro->intersect(&ro->m_localRay[tid]);
+            if (!ro->doesIntersect)
+                continue;
+            if (keep2<-100) continue;
 //            float keep2 = ro->intersect(&ray);
             if (keep2<keep) {
                 keep = keep2;
@@ -332,6 +343,7 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
             }
 
             if (keep2<precis) {
+//                qDebug() << keep2;
                 winner = w;
                 i=cnt;
                 if (pass==Shadow)
@@ -342,9 +354,11 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
         }
             t=t+keep;
 
-    }
+//            if (rand()%1000>98 && keep!=1000 )
+  //          qDebug() << keep<<winner;
 
-    if (winner!=nullptr) {
+    }
+    if (winner!=nullptr && winner->doesIntersect) {
   //      m_objectsFlattened.removeAll(winner);
     //    m_objectsFlattened.insert(0,winner);
 
@@ -356,7 +370,7 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
         QVector3D normal;
          normal = winner->CalcMarchNormal(rotated.m_currentPos);
 
-        normal = winner->m_localRotmatInv*normal;
+        normal = winner->m_localRotmatInv.map(normal);
         QVector3D tt(1,2,-213.123);
         QVector3D tangent = QVector3D::crossProduct(tt,normal).normalized();
         QVector3D bi = QVector3D::crossProduct(tangent,normal).normalized();
@@ -374,7 +388,7 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
 
 
 
-        QVector<float> shadows;
+        QVector<double> shadows;
         for (int i=0;i<m_globals.m_lights.count();i++)
             shadows.append(1);
         //        if (pass==Image)
@@ -419,7 +433,7 @@ bool RayTracer::RayMarchSingle(Ray& ray, Pass pass, AbstractRayObject* ignore, i
     return false;
 }
 
-void RayTracer::Compile2DList(QString fileOutput, int base, int maxx, QVector<QPoint>& killList, QImage &img, QString unrollName)
+void RayTracer::Compile2DList(QString fileOutput, int base, int maxx, QVector<QPoint>& killList, QImage &img, QString unrollName, LImage* mask, int maskColor)
 {
     QByteArray data;
     data.append(m_objects.count());
@@ -433,10 +447,20 @@ void RayTracer::Compile2DList(QString fileOutput, int base, int maxx, QVector<QP
     QString unrollData = "procedure "+name+"_unroll();\n";
     unrollData+="begin asm(\" \n";
 
+    QHash<int, int> types;
+    MultiColorImage* mc = dynamic_cast<MultiColorImage*>(mask);
+
     for (AbstractRayObject* aro : m_objects) {
         id = aro->m_id;
+//        qDebug() <<aro->m_material.m_color;
         QVector<QVector3D> reduced;
-  //      qDebug() << aro->m_2Dpoints.count();
+
+        int type = 1; // Assume white
+        if ((aro->m_material.m_color.x()==0 &&aro->m_material.m_color.y()==0))
+            type = 2; // Blue - type 2
+
+        if ((aro->m_material.m_color.x()==0 &&aro->m_material.m_color.y()==0 &&aro->m_material.m_color.z()==0))
+            continue;
 
         // Combine all 2D points from instances
         QVector<QVector3D> all;
@@ -446,8 +470,8 @@ void RayTracer::Compile2DList(QString fileOutput, int base, int maxx, QVector<QP
 
         if (all.count()==0)
             continue;
+//        qDebug() << type<<all.cou;
 
-//        qDebug() << "Org size : " << all.count();
 //        if (id>5) continue;
         for (QVector3D p: all) {
             //            img.setPixelColor(p.x(),p.y(),Qt::red);
@@ -459,39 +483,58 @@ void RayTracer::Compile2DList(QString fileOutput, int base, int maxx, QVector<QP
 
 //            if (rand()%100>95) qDebug() << org;
             if (org.red()==0 && org.blue() == 0 && org.green()==0)
-            if (!reduced.contains(p)) {
-                reduced.append(p);
-            }
+                if (!reduced.contains(p)) {
+                    reduced.append(p);
+                }
         }
-
+//        qDebug() << "Org size : " << reduced.count();
 //        killList.append(perhapsKill);
   //      total.append(reduced);
+
+        int bb = base;
+        if (type==2) bb=0xD800;
 
         QVector<int> positions;
         for (QVector3D p: reduced) {
 
-            int i = base + p.x() + p.y()*40;
+            int i = bb + p.x() + p.y()*40;
+
+            if (p.x() + p.y()*40>=1000) {
+                continue;
+            }
+            if (mc) {
+                PixelChar& pc = mc->m_data[(int)(p.x() + p.y()*40)];
+                if (!pc.isEmpty())
+                    continue;
+            }
+
+            if (!types.contains(i))
+                types[i]=type;
 
             if (p.x()>=0 && p.x()<40 && p.y()>=0 && p.y()<25) {
                 if (!taken.contains(i)) {
                     positions.append(i);
                     taken.append(i);
                 }
-
-
             }
-  //          qDebug() << Util::numToHex(i);
+  //          qDebug() << Util::numToHex(i);'
 //            data.append((char)((i)&0xFF));
   //          data.append((char)((i>>8)&0xFF));
         }
 
 
 
-
         int cnt = positions.count();
         if (cnt!=0) {
             unrollData+=" ldx #"+Util::numToHex(id)+"\n";
-            unrollData+=" lda cols,x\n";
+//            if (ty==0)
+                unrollData+=" lda cols,x\n";
+  /*          if (type==1)
+                unrollData+=" lda cols2,x\n";
+            if (type==0b11) {
+                unrollData+=" lda cols,x\n";
+                unrollData+=" ora cols2,x\n";
+            }*/
             for (int i: positions) {
                 unrollData += " sta "+Util::numToHex(i) + "\n";
             }
@@ -510,7 +553,7 @@ void RayTracer::Compile2DList(QString fileOutput, int base, int maxx, QVector<QP
              while (cnt!=0)
              {
                 int size = std::min(cnt,255);
-                int sizePos = data.count();
+                int sizePos = data.length();
                 data.append((uchar)size);
 
                 data.append((uchar)id);

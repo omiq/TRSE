@@ -23,7 +23,7 @@
 #define SYMBOLTABLE_H
 
 #include <QString>
-#include <QMap>
+#include <QHash>
 #include <QDebug>
 #include <QStack>
 #include "errorhandler.h"
@@ -49,18 +49,28 @@ public:
     QString m_name;
     QString m_type;
     static QString s_currentProcedure;
-    TokenType::Type m_arrayType;
+    TokenType::Type m_arrayType = TokenType::BYTE;
     // For records
     QString m_arrayTypeText;
     QStringList m_flags;
     bool m_isClassVariable = false;
     bool m_doNotOptimize = false;
     bool m_constIsPrefixed = false;
+    bool m_isInline = false;
     QString m_pointsTo = "";
     int m_org = 0;
     int m_size = 0;
+    bool m_isBoolean = false;
     int m_lineNumber;
     int m_bank = 0;
+    // Stack stuff
+    bool m_isStackVariable = false;
+    int m_stackPos = 0;
+    bool isLPointer() {
+        return m_flags.contains("lpointer");
+    }
+
+
     QString m_fileName;
     bool isUsed = false;
     void setIsUsed();
@@ -102,25 +112,33 @@ class SymbolTable
 private:
     QString m_currentProcedure = "";
 public:
-    QMap<QString, QSharedPointer<Symbol>> m_symbols;
-    QMap<QString, QSharedPointer<SymbolTable> > m_records;
-    QMap<QString, QSharedPointer<Symbol>> m_constants;
-    QMap<QString, QString> m_extraAtSymbols;
+    QString m_currentProcedureClean = "";
+    QStringList m_forwardedVariables;
+    QHash<QString, QSharedPointer<Symbol>> m_forwardedSymbols;
+    QHash<QString, QSharedPointer<Symbol>> m_symbols;
+    QHash<QString, QSharedPointer<SymbolTable> > m_records;
+    QHash<QString, QSharedPointer<Symbol>> m_constants;
+    QStringList m_userConstants;
+    QHash<QString, QString> m_extraAtSymbols;
 //    QStack<QString> m_tempPointers;
     Stack m_tempPointers;
-    static QMap<QString,int> s_classSizes;
+    static QHash<QString,int> s_classSizes;
 
-
+    static int pass;
     QStringList m_orderedByDefinition;
 
     QString m_name="";
     QStringList m_globalList;
     QString m_gPrefix;
     bool m_ignorePrefixWhenMerging = false;
+    bool m_ignoreAllprefixes = false;
     QString m_currentUnit = "";
     QString m_currentFilename="";
     QStringList m_extraMonCommands;
+    QStringList m_units; // used for dispatcher only
     QStringList m_externalRecords; // used for keeping track of merging records from units
+    static QStringList s_ignoreUnusedSymbolWarning;
+    QString m_currentClass ="";
     bool m_addToGlobals = false;
     bool m_isClass = false;
     ~SymbolTable();
@@ -129,6 +147,7 @@ public:
         return m_gPrefix+m_currentProcedure;
     }
     void SetCurrentProcedure(QString pr) {
+        m_currentProcedureClean = pr;
         if (m_useLocals) {
             if (pr!="") {
                 m_currentProcedure= "localVariable_"+pr;
@@ -141,7 +160,7 @@ public:
 
     void ExitProcedureScope(bool removeSymbols);
 
-//    QMap<QString,QSharedPointer<SymbolTable> > m_locals;
+//    QHash<QString,QSharedPointer<SymbolTable> > m_locals;
 
     SymbolTable();
     static SymbolTable s;

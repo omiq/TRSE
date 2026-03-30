@@ -5,15 +5,14 @@
 #include <QTimer>
 #include "source/LeLib/util/util.h"
 #include "source/Compiler/syntax.h"
-#include "source/Compiler/Opcodes/opcodes6502.h"
+#include "source/Compiler/opcodes/opcodes6502.h"
 #include "source/Compiler/symboltable.h"
 #include <QSharedPointer>
+#include <QJSEngine>
 
 class OrgasmData {
 public:
     enum PassType { PASS_LABELS, PASS_SYMBOLS, PASS_COMPILE };
-
-
     static QString ReplaceWord(QString& line, QString& word, QString replacement);
     static QString BinopExpr(QString& expr, long& val, QString rep);
 
@@ -26,12 +25,10 @@ class OrgasmInstruction {
         enum Type {none, imm, zp, zpx, zpy, izx, izy,abs, abx,aby, ind, rel, izz, label, imp};
         Type m_type;
         int m_size = 0;
-//        enum Pass { passSymbol, passCompile };
         bool m_bracketsAroundVariables = false;
 
         void Init(QStringList lst) {
             m_opCode = lst[0];
-//            m_expr = lst[1];
             if (lst.count()>1)
                 m_type = getTypeFromParams(lst[1]);
             else m_type=none;
@@ -39,11 +36,12 @@ class OrgasmInstruction {
 
         Type getTypeFromParams(QString s) {
             s=s.toLower();
-            //        qDebug() << " Getting type from : " << s;
             if (s=="")
                 return none;
+
             if (s.startsWith("#"))
                 return imm;
+
             long i = 0;
             bool ok;
             if (s.contains(",")) {
@@ -91,19 +89,13 @@ class OrgasmInstruction {
 
         Type getTypeFromParamsZ80(QString s);
 
-/*        QByteArray Assemble(QString& expr, Opcodes6502 &m_opCodes,
-                            OrgasmData::PassType pass, QMap<QString, int>& symbols,
-                            int pCounter, QMap<QString, QString>& constants, QMap<QString, QRegExp*>& exp,
-                            QVector<QString>& symList, QVector<QString>& constList);
-
-*/
     };
 
 
 
 class OrgasmLine {
 public:
-    enum OLType {INSTRUCTION, ORG, INCBIN, CONSTANT, BYTE, WORD, LABELONLY, PADBYTE, ORGASMCOMMAND};
+    enum OLType {INSTRUCTION, ORG, INCBIN, CONSTANT, BYTE, WORD, LABELONLY, PADBYTE, ORGASMCOMMAND, LONG24, ALIGN};
 
     OLType m_type;
     int m_pos, m_lineNumber, m_rasLineNumber=0;
@@ -121,6 +113,8 @@ public:
             return "ORGASMCOMMAND";
         if (m_type==ORG)
             return "ORG";
+        if (m_type==ALIGN)
+            return "ALIGN";
         if (m_type==INCBIN)
             return "INCBIN";
         if (m_type==CONSTANT)
@@ -131,6 +125,7 @@ public:
             return "WORD";
         if (m_type==LABELONLY)
             return "LABELONLY";
+        return "";
     }
 
 };
@@ -167,23 +162,25 @@ public:
     QString m_currentChar;
     QVector<OrgasmLine> m_ol;
     QVector<QString> m_symbolsList, m_constList;
-    QMap<QString, QString> m_extraSymbols; // Variables declared AT
-    QMap<QString, int> m_symbols;
-    QMap<QString, QString> m_constants;
+    QHash<QString, QString> m_extraSymbols; // Variables declared AT
+    QHash<QString, int> m_symbols;
+    QHash<QString, QString> m_constants;
     Opcodes6502 m_opCodes;
     QVector<OrgasmLine> m_olines;
     bool m_success = false;
     int m_constantPassLines;
     int m_hasOverlappingError = false;
+    QJSEngine m_jsEngine;
+
     OrgasmData::PassType m_passType;
     QByteArray m_data;
-    QMap<QString, QRegularExpression*> m_regs;
-    QMap<int,int> m_lineAddress;
+    QHash<QString, QRegularExpression*> m_regs;
+    QHash<int,int> m_lineAddress;
     QString m_output;
     QString m_prevLabel = "";
 
-    QString processRepeatIndex(QString s, int current);
-    QStringList processRepeatIndex(QStringList s, int current);
+    QString processRepeatIndex(QString s, int currentX, int currentY);
+    QStringList processRepeatIndex(QStringList s, int currentX, int currentY);
 
     QString endl = "\n";
     OrgasmError error;
@@ -199,6 +196,7 @@ public:
 
 
     int m_pCounter = 0;
+    int m_startAddress = -1;
     bool m_done = false;
     void LoadFile(QString filename);
 
@@ -206,18 +204,26 @@ public:
     static const int CPUFLAVOR_6502_ILLEGAL = 1;
     static const int CPUFLAVOR_GS4510 = 2;
     static const int CPUFLAVOR_Z80 = 3;
+    static const int CPUFLAVOR_S1C88 = 4;
+
+    QString m_subCpu = "";
 
     int m_cpuFlavor = CPUFLAVOR_6502_STOCK;
 
     virtual void LoadCodes(int CPUflavor);
-    void ProcessSource();
+    virtual void ProcessSource();
     void ProcessUnrolling();
+    virtual void ApplyCPUType() {}
+    static const int HEADER_RAW = 0;
+    static const int HEADER_DECB = 1;
+    int m_header = 0;
 
-
+    bool isLittleEndian = true;
     OrgasmLine LexLine(int i);
 
     bool Assemble(QString filename, QString out);
 
+    void FindCPUtype();
     void PassFindConstants();
     void PassReplaceConstants();
     void PassLabels();
@@ -226,7 +232,9 @@ public:
     void ProcessByteData(OrgasmLine& ol,OrgasmData::PassType );
     void ProcessBytePad(OrgasmLine& ol);
     void ProcessWordData(OrgasmLine& ol);
+    void ProcessLong24Data(OrgasmLine& ol);
     void ProcessOrgData(OrgasmLine& ol);
+    void ProcessAlignData(OrgasmLine& ol);
     void ProcessIncBin(OrgasmLine& ol);
     virtual void ProcessInstructionData(OrgasmLine& ol, OrgasmData::PassType pd);
     void SaveSymbolsList(QString dupFile);

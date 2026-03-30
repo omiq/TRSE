@@ -82,7 +82,8 @@ void CIniFile::Load(QString fname) {
 //            qDebug() << it.name << it.lst;
             items.push_back(it);
         } else {
-            qDebug() << "Couldn't parse line '" << line << "' in " << fname;
+            if (line.trimmed()!="")
+                qDebug() << "Couldn't parse line '" << line << "' in " << fname;
         }
     }
     file.close();
@@ -352,6 +353,18 @@ double CIniFile::getdouble(QString name) {
     }
   //  qDebug() << "CIniFile: Could not find parameter " + name;
     return 0;
+}
+
+void CIniFile::remove(QString name)
+{
+    for (int i=0;i<items.size();i++) {
+        if (items[i].name==name.toLower().trimmed()) {
+            items.removeAt(i);
+            return;
+        }
+
+    }
+
 }
 
 

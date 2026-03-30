@@ -28,18 +28,24 @@ class TTRView: public QAbstractScrollArea
 
 
         QString validHex = "abcdef0123456789-";
-        QString validNotes1 = "cdefgab-s";
+        QString validNotes1 = "cdefgab-sq";
         QString notesOnly = "cdefgab";
         QString validNotes2 = "# -";
         QString validInput = validHex + validNotes1 + validNotes2;
         QVector<QColor> m_columnColors;
         float m_size = 1.5;
         int m_curLinePos;
-        int m_curOctave;
         int m_curCmd;
         int m_curEffect;
-        int m_curInstrument;
+        int m_curOctave = 1;
+        int m_curInstrument = 0;
         int m_curPlayerLine = -1;
+        bool m_pianoInput = true;
+        bool m_writeMode = true;
+
+        QStringList m_pianoData = QStringList() << "z"<<"s"<<"x"<<"d"<<"c"<<"v"<<"g"<<"b"<<"h"<<"n"<<"j"<<"m"<<"q"<<"2"<<"w"<<"3"<<"e"<<"r"<<"5"<<"t"<<"6"<<"y"<<"7"<<"u"<<"i"<<"9"<<"o"<<"0"<<"p";
+
+
 
         TTRView(QWidget *parent = 0);
         ~TTRView();
@@ -59,7 +65,7 @@ class TTRView: public QAbstractScrollArea
         void Calculate();
 
         bool m_isChanged = false;
-        QString m_lastLine="";
+        QString m_lastLine="C- 03 00 00 00 00"; // Default
         QString UnpackLine(QByteArray& d, int pos );
         void PackLine(QByteArray& d, int pos, QString line);
 

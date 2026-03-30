@@ -1,0 +1,73 @@
+unit System;
+var
+	stack : array[512] of byte;
+	
+	
+procedure SetFast() inline;
+begin
+	asm("
+ sta $FFD9
+	");
+end;
+
+procedure SetSlow() inline;
+begin
+	asm("
+ sta $FFD8	
+	");
+end;
+	
+procedure DisableInterrupts() inline;
+begin
+	asm("
+	orcc #%01010000	
+	");
+end;	
+	
+procedure DisableROM() inline;
+begin
+	asm("
+    sta $FFDF
+ 	");
+end;
+
+
+procedure Init() inline;
+begin
+	DisableInterrupts();
+//	DisableROM();
+
+/*	asm("
+	lda #0x7E
+	sta 0
+	sta 0x0071		
+	");
+*/
+	
+/*	asm("
+	clra
+	tfr a,dp
+	lds #System_stack+64
+	");
+*/	
+	
+//	SetFast();
+/*	asm("
+	
+	lda #0x7E
+	sta 0
+	sta 0x0071		; BASIC cold boot flag
+	rts	
+	
+	; Turn on PIA  CB1 (50Hz interrupt)
+	lda 0xFF03
+	ora #1
+	sta 0xFF03
+	
+	");
+*/	
+end;
+	
+	
+	
+end.

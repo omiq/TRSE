@@ -34,8 +34,8 @@ class CItem : public QVariant {
 public:
     QString name="", strval="";
     QStringList lst;
-    double dval;
-    QVector3D vec;
+    double dval = 0.0;
+    QVector3D vec = QVector3D(0,0,0);
 
 
 
@@ -95,6 +95,8 @@ public:
     int getInt(QString name);
 
     double getdouble(QString name);
+
+    void remove(QString name);
 
 /*    bool find(QString key, QString value) {
         QQString actualValue = QQString::fromStdQString(getQString(key.toLower().toStdQString()));

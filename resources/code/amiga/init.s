@@ -70,7 +70,10 @@ init:
 	move.w	INTREQR,d0
 	or.w #$8000,d0
 	move.w d0,oldintreq
-	move.w	ADKCONR,d0;
+
+;        move.w  #$7fff,INTENA
+
+        move.w	ADKCONR,d0;
 	or.w #$8000,d0
 	move.w d0,oldadkcon
 
@@ -91,3 +94,7 @@ init:
 	jsr -270(a6)	; WaitTOF
 	move.l	$4,a6
 	jsr -132(a6)	; Forbid
+
+        move.l #cop,a0
+        move.l a0,COP1LCH
+

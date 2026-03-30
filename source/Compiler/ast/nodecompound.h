@@ -27,9 +27,21 @@
 #include "source/Compiler/pvar.h"
 #include "source/Compiler/symboltable.h"
 #include "source/Compiler/errorhandler.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 #include "source/Compiler/ast/node.h"
+/* 
+    NodeCompound contains a list of statements, and corresponds to the begin/end part of a nodeblock
+    ex:
+    begin
+        i:=10*v;
+        Print(i);
+    end;
+    "i:=10*v" and "Print(i)" will be the two statements located in the "children" list
 
+    m_left: unused
+    m_right: unused
+    m_op: unused
+*/
 class NodeCompound : public Node {
 public:
     QVector<QSharedPointer<Node>> children;
@@ -37,8 +49,16 @@ public:
         m_op = t;
     }
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
+    void clearComment() override {
+        m_comment = "";
+        for (auto n : children)
+            n->clearComment();
+    }
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override;
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void ReplaceVariable(Assembler* as, QString name, QSharedPointer<Node> node) override;
+
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeCompound>(sharedFromThis()));
     }
     void parseConstants(QSharedPointer<SymbolTable>  symTab) override {
@@ -48,7 +68,12 @@ public:
 
 
 
-    void ReplaceInline(Assembler* as,QMap< QString,QSharedPointer<Node>>& inp) override;
+    void ReplaceInline(Assembler* as,QHash< QString,QSharedPointer<Node>>& inp) override;
+    void ReplaceInlineAssemblerVariables(Assembler* as, QString var, QString val) override;
+    void ResetInlineAssembler() override;
+
+
+    virtual bool Optimize() override;
 
 
 };

@@ -10,10 +10,18 @@ public:
         m_processor = M68000;
         m_system = AMIGA;
         m_hasVariableColorPalette = true;
+        m_allowedGlobalTypeFlags << "chipmem";
+
+
     }
     void Assemble(QString &text, QString filename, QString currentDir, QSharedPointer<SymbolTable>  symTab) override;
 
     void PostProcess(QString &text, QString file, QString currentDir) override;
+    virtual QString getEmulatorName() override {
+        return "";
+    }
+    void applyEmulatorParameters(QStringList& params, QString debugFile, QString filename, CIniFile* pini) override {
+    }
 
 };
 

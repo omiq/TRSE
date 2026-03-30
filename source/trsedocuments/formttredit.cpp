@@ -37,7 +37,7 @@ void FormTTREdit::SaveCurrentInstrument()
 //        ba.resize(11);
         QString txt = ui->leInstrument->text();
         int cur = 0;
-        while (ba.count()<16) {
+        while (ba.length()<16) {
             if (cur<txt.length())
                 ba.append(txt[cur].toLatin1());
             else
@@ -277,7 +277,7 @@ void FormTTREdit::on_cmbInstruments_currentIndexChanged(int index)
     if (index<0 || index>=m_ttr.m_instruments.count())
         return;
 //    qDebug() << (m_ttr.m_instruments[index].count());
-    for (int i=11;i<m_ttr.m_instruments[index].count();i++)
+    for (int i=11;i<m_ttr.m_instruments[index].length();i++)
         txt+=QChar(m_ttr.m_instruments[index][i]);
 
 /*    unsigned int d = ((uchar)m_ttr.m_instruments[index][0]) |
@@ -452,3 +452,19 @@ void FormTTREdit::on_btnTRSEInstruments_clicked()
     on_cmbInstruments_currentIndexChanged(ui->cmbTRSEInstrument->currentIndex());
     m_player.m_instruments.Save();
 }
+
+void FormTTREdit::on_checkBox_stateChanged(int arg1)
+{
+    for (auto w: m_curPatterns)
+        w->TogglePiano(arg1);
+}
+
+
+void FormTTREdit::on_comboBox_activated(int index)
+{
+    for (auto w: m_curPatterns)
+        w->SetOctave(index);
+
+}
+
+

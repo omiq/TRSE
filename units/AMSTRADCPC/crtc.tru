@@ -9,11 +9,15 @@ var
 	pa,sp,pb,p1 : pointer;
 	j,k: byte;
 
+	
+	
+
+	
 	@donotremove y_lookup
 	y_lookup : array[200] of integer = buildTable( "0xC000 + (Math.floor(i/8))*80 + (i&7)*2048");
 	// Lookup for mode 0 pixel 0
 	
-	hwConv : array[26] of byte = (
+	hwConv : array[] of byte = (
 	$14,$4,$15,$1c,$18,$1D,$0c,$05,$D,$16,$06,$17,$1E,$00,$1F,$0e,$07,$0f,$12,$02,$13,$1A,$19,$1b,$0a,$03,$0b);
 
 	ytab : array[200] of integer = BuildTable("i*80");
@@ -88,11 +92,11 @@ Waits until a horizontal sync has been performed
 procedure WaitForHSync();
 begin
 	asm("
-wf_Sync:
+hf_Sync:
     ld b,#f5
     in a,(c)
     rra
-    jr nc,wf_Sync + 2
+    jr nc,hf_Sync + 2
     ei
     nop
     halt
@@ -100,6 +104,7 @@ wf_Sync:
     di
     ");
 end;
+
 
 /**
 Sets the CPC resolution mode. 
@@ -264,20 +269,20 @@ set_Crtc_vals:
 
 Crtc_256widthList:
 
-	defb $3f	; R0  - horizontal total
-	defb 32		; R1  - horizontal displayed (32 chars wide)
-	defb 42		; R2  - Horizontal sync position (centralises screen)
-	defb $86	; R3  - Horizontal and Vertical sync widths
-	defb 38		; R4  - Vertical total
-	defb 0		; R5  - Vertical adjust
-	defb 24		; R6  - Vertical displayed (24 chars tall)
-	defb 31		; R7  - Vertical sync position (centralises screen)
-	defb 0		; R8  - Interlace
-	defb 7		; R9  - Max Raster
-	defb 0		; R10 - Cusror (not used)
-	defb 0		; R11 - Cursor (not used)
-	defb $30	; R12 - screen start (at &c000)
-	defb $00	; R13 - screen start
+	db $3f	; R0  - horizontal total
+	db 32		; R1  - horizontal displayed (32 chars wide)
+	db 42		; R2  - Horizontal sync position (centralises screen)
+	db $86	; R3  - Horizontal and Vertical sync widths
+	db 38		; R4  - Vertical total
+	db 0		; R5  - Vertical adjust
+	db 24		; R6  - Vertical displayed (24 chars tall)
+	db 31		; R7  - Vertical sync position (centralises screen)
+	db 0		; R8  - Interlace
+	db 7		; R9  - Max Raster
+	db 0		; R10 - Cusror (not used)
+	db 0		; R11 - Cursor (not used)
+	db $30	; R12 - screen start (at &c000)
+	db $00	; R13 - screen start
 
 	");
 
@@ -504,6 +509,19 @@ begin
 		memcpy(sp,pa,80);
 		pa:=pa+80;
 	end;
+end;
+
+procedure InitDefault(ga:global byte);
+begin
+	SetBorder(0); // black border
+	SetMode(ga); // 160x200 bitmap	
+	
+	Memory::DisableFirmware(); 
+	Memory::DisableLRom();
+
+	Crtc::Synchronize();
+	Memory::DisableInterrupts();
+	
 end;
 
 

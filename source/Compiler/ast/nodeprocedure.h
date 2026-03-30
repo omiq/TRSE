@@ -31,8 +31,16 @@
 #include "source/Compiler/ast/nodeproceduredecl.h"
 #include "source/Compiler/ast/nodevar.h"
 #include "source/Compiler/ast/nodeassign.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
+/* 
+   Represents a procedure call, ie "SomeProcedure(param1);"
+    m_left: undefined
+    m_right: undefined
+    m_op: undefined
 
+    m_parameters: list of parameter expressions, ie "param1"
+    m_procedureDecl : link to the definition of the procedure
+*/
 class NodeProcedure : public Node {
 public:
     QSharedPointer<NodeProcedureDecl> m_procedure;
@@ -42,8 +50,10 @@ public:
 
     virtual bool isReference() override { return m_op.m_isReference; }
 
-    bool isAddress() override;
+    void ReplaceVariable(Assembler *as, QString name, QSharedPointer<Node> node) override;
 
+    bool isAddress() override;
+    bool m_classTagged = false;
     void parseConstants(QSharedPointer<SymbolTable>  symTab) override {
         if (m_procedure!=nullptr)
             m_procedure->parseConstants(symTab);
@@ -54,14 +64,25 @@ public:
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
 
     QString getValue(Assembler* as) override;
-    QString getValue8bit(Assembler* as, bool isHi) override;
+    QString getValue8bit(Assembler* as, int isHi) override;
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    bool isBool(Assembler* as) override;
+    bool isWord(Assembler* as) override;
+    bool isLong(Assembler* as) override;
+    bool isByte(Assembler* as) override;
+
+
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeProcedure>(sharedFromThis()));
     }
 
 
-    virtual void ReplaceInline(Assembler* as,QMap< QString,QSharedPointer<Node>>& inp) override;
+    virtual void ReplaceInline(Assembler* as,QHash< QString,QSharedPointer<Node>>& inp) override;
+    virtual void ReplaceInlineAssemblerVariables(Assembler* as, QString var, QString val) {
+        m_procedure->ReplaceInlineAssemblerVariables(as,var,val);
+    }
+    virtual void ResetInlineAssembler();
+
     bool isPureNumeric() override;
 
 };

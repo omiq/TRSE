@@ -51,11 +51,11 @@ public:
 
     }
 
-    void Clear() override {
-        for (int i=0;i<m_rawData.count();i++)
-            m_rawData[i] = 0x20;
+    void Clear(int val=0) override {
+        for (int i=0;i<m_rawData.length();i++)
+            m_rawData[i] = val;
 
-        for (int i=0;i<m_rawData.count();i++)
+        for (int i=0;i<m_rawData.length();i++)
             m_rawColors[i] = 0x2;
     }
 
@@ -75,7 +75,7 @@ public:
 */
 
     PixelChar m_color;
-    C64Screen m_copy;
+    static C64Screen m_copy;
 
     unsigned int m_tempChar=0;
     C64FullScreenChar(LColorList::Type t);
@@ -88,15 +88,15 @@ public:
     void LoadBin(QFile &f) override;
 
     void SetColor(uchar col, uchar idx) override;
-    void Clear() override;
+    void Clear(int val) override;
     void ImportBin(QFile& f) override;
     void ExportBin(QFile& f) override;
 
     void fromQImage(QImage *img, LColorList &lst) override;
 
+    QByteArray getDirArt() override;
 
     void ReInitialize() override;
-
     void Initialize(int width, int height) override;
 
 //    void FromRaw(QByteArray& arr);
@@ -133,8 +133,8 @@ public:
 
 
     bool KeyPress(QKeyEvent *e) override;
-    void CopyChar();
-    void PasteChar();
+    void CopyChar() override;
+    void PasteChar() override;
 
     void AddNew(int w, int h) override;
 
@@ -161,17 +161,18 @@ public:
     void ImportC(QFile &file) override;
 
     void setExtraData(int idx, char val) override {
-        ((C64Screen*)m_items[m_current])->m_data[idx] = val;
+        ((C64Screen*)m_items[m_current].get())->m_data[idx] = val;
     }
     char getExtraData(int idx) override {
-        return ((C64Screen*)m_items[m_current])->m_data[idx];
+        return ((C64Screen*)m_items[m_current].get())->m_data[idx];
     }
 
     void Transform(int x, int y) override;
     void OrdererdDither(QImage &img, LColorList &colors, QVector3D strength, QPoint size, float gamma = 1.0) override;
 
 
-    QString getMetaInfo();
+    QString getMetaInfo() override;
+    void setMultiColor(bool doSet) override;
 
 
 };

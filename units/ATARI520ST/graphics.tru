@@ -9,7 +9,7 @@ var
 	//above2 : array[4096] of byte aligned; 
 	screen2Buf : array[180*200] of byte aligned; 
 	empty : array[512] of byte aligned;
-
+	vbl : integer;
 
 
 	rnd : array[256] of integer = buildtable("Math.random()*0xFFFF");
@@ -58,7 +58,7 @@ var
 	@donotremove shiftTab
 
 	// Tab for shl >8
-	shiftTab : array[32] of integer = (
+	shiftTab : array[] of integer = (
 	0,0, 
 	1,0, 
 	2,0, 
@@ -160,7 +160,7 @@ end;
 
 
 
-procedure Putpixel(addr, x,y,col:global integer);
+procedure Putpixel(addr:global ^integer; x,y,col:global integer);
 begin
 	asm("
 		move.l Graphics_addr,a0
@@ -589,7 +589,7 @@ begin
 end;
 
 
-procedure Blit(bsrc,bdst: global pointer of integer; bdx, bdy,bw,bh : global integer;badd:global long);
+procedure Blit(bsrc, bdst: global pointer of integer; bdx, bdy,bw,bh : global integer;badd:global long);
 begin
 	asm("
 		jsr Graphics_BlitSetup	
@@ -1260,6 +1260,16 @@ topp_flipp_eor:
 	");
 
 end;
+
+procedure WaitForVBL();
+begin
+	vbl:=0;
+	while (vbl=0) do
+	begin
+	end;
+
+end;
+
 
 
 end.

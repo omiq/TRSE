@@ -44,8 +44,6 @@ void DialogTRSESettings::FillFromIni()
     FillFont(ui->cbmFont, m_ini->getString("editor_font"));
     FillFont(ui->cmbFontSymbols, m_ini->getString("editor_font_symbols"));
 
-
-
     ui->leDosbox->setText(m_ini->getString("dosbox"));
     ui->leVasmm->setText(m_ini->getString("vasmm"));
     ui->leNasm->setText(m_ini->getString("nasm"));
@@ -54,6 +52,7 @@ void DialogTRSESettings::FillFromIni()
     ui->leDasm->setText(m_ini->getString("dasm"));
     ui->leEmulator->setText(m_ini->getString("emulator"));
     ui->leEmulatorC128->setText(m_ini->getString("c128_emulator"));
+    ui->leVZ200Emulator->setText(m_ini->getString("vz200_emulator"));
     ui->leVic20Emulator->setText(m_ini->getString("vic20_emulator"));
     ui->lePETEmulator->setText(m_ini->getString("pet_emulator"));
     ui->leNesEmulator->setText(m_ini->getString("nes_emulator"));
@@ -62,16 +61,41 @@ void DialogTRSESettings::FillFromIni()
     ui->leGameboyEmulator->setText(m_ini->getString("gameboy_emulator"));
     ui->leOK64Emulator->setText(m_ini->getString("ok64_emulator"));
     ui->leBBCEmulator->setText(m_ini->getString("bbc_emulator"));
+    ui->leWonderswanEmulator->setText(m_ini->getString("wonderswan_emulator"));
+    ui->leAcornEmulator->setText(m_ini->getString("acorn_emulator"));
     ui->leAtari800Emulator->setText(m_ini->getString("atari800_emulator"));
     ui->lePlus4Emulator->setText(m_ini->getString("plus4_emulator"));
     ui->leX16Emu->setText(m_ini->getString("x16_emulator"));
+    ui->leThomsonEmulator->setText(m_ini->getString("thomson_emulator"));
     ui->leMSXEmulator->setText(m_ini->getString("msx_emulator"));
     ui->leAppleIIEmulator->setText(m_ini->getString("appleii_emulator"));
+    ui->leOricEmulator->setText(m_ini->getString("oric_emulator"));
+    ui->leTimEmulator->setText(m_ini->getString("tim_emulator"));
+    ui->lePCWEmulator->setText(m_ini->getString("pcw_emulator"));
+    ui->leTVCEmulator->setText(m_ini->getString("TVC_emulator"));
+    ui->lePrimoEmulator->setText(m_ini->getString("primo_emulator"));
+    ui->leAgonEmulator->setText(m_ini->getString("agon_emulator"));
+    ui->leSparkle->setText(m_ini->getString("sparkle"));
+
+    ui->leTRS80->setText(m_ini->getString("trs80_emulator"));    ui->leSNES->setText(m_ini->getString("snes_emulator"));
     ui->leAmstradCPC->setText(m_ini->getString("amstradcpc_emulator"));
     ui->leColecoEmulator->setText(m_ini->getString("coleco_emulator"));
+    ui->leBK0010Emulator->setText(m_ini->getString("bk0010_emulator"));
+
+    ui->leDragonEmulator->setText(m_ini->getString("dragon_emulator"));
+    ui->leVectrexEmulator->setText(m_ini->getString("vectrex_emulator"));
+    //ui->lec8asm->setText(m_ini->getString("c8asm"));
+    ui->leQemuDir->setText(m_ini->getString("qemu_directory"));
+    ui->leJDH8Emulator->setText(m_ini->getString("jdh8_directory"));
+    ui->leCpmTools->setText(m_ini->getString("cpmtools_directory"));
+    ui->lePokemonMinEmulator->setText(m_ini->getString("pokemonmini_emulator"));
     //ui->leX16EmuParams->setText(m_ini->getString("x16_emulator_params"));
     ui->leC1541->setText(m_ini->getString("c1541"));
+    ui->leFoenixEmulator->setText(m_ini->getString("foenix_emulator"));
     ui->lePasmo->setText(m_ini->getString("pasmo"));
+    ui->leWasm->setText(m_ini->getString("lwasm"));
+    ui->lePMAS->setText(m_ini->getString("pmas"));
+    ui->leCL65->setText(m_ini->getString("cl65"));
     ui->leZXSpectrumEmulator->setText(m_ini->getString("spectrum_emulator"));
     ui->leTiki100->setText(m_ini->getString("tiki100_emulator"));
     ui->leExomizer->setText(m_ini->getString("exomizer"));
@@ -79,6 +103,10 @@ void DialogTRSESettings::FillFromIni()
     ui->leTinyCrunch->setText(m_ini->getString("tinycrunch"));
     ui->leCursorWidth->setText(QString::number((int)m_ini->getdouble("editor_cursor_width")));
     ui->chkAutoInject->setChecked(m_ini->getdouble("auto_inject")==1.0);
+    if (m_ini->contains("auto_load_recent_project_on_startup"))
+       ui->chkAutoLoadRecent->setChecked(m_ini->getdouble("auto_load_recent_project_on_startup")==1.0);
+    else
+        ui->chkAutoLoadRecent->setChecked(true);
     ui->leBackupFiles->setText(QString::number((int)m_ini->getdouble("backup_files_count")));
 
     ui->leLZ4->setText(m_ini->getString("lz4"));
@@ -87,11 +115,14 @@ void DialogTRSESettings::FillFromIni()
 
     ui->leSidplayer->setText(m_ini->getString("sidplayer"));
 
+    ui->chkPython->setChecked(m_ini->getdouble("use_python")==1.0);
     ui->chkBackup->setChecked(m_ini->getdouble("auto_backup")==1.0);
-    ui->chkAutoComplete->setChecked(m_ini->getdouble("editor_autocomplete")==1.0);
+    ui->chkAutoIndent->setChecked(m_ini->getdouble("editor_autocomplete")==1.0);
+    ui->chkAutoComplete->setChecked(m_ini->getdouble("editor_autocomplete_nobug")==1.0);
     ui->chkCompileThread->setChecked(m_ini->getdouble("compile_thread")==1.0);
 
     ui->leCPCDisk->setText(m_ini->getString("cpcdisk_location"));
+    ui->leGridColor->setText(Util::fromVec(m_ini->getVec("grid_colour")));
 
     ui->chkExomizer->setChecked(m_ini->getdouble("exomizer_version_3")==1.0);
 
@@ -105,10 +136,10 @@ void DialogTRSESettings::FillFromIni()
         ui->cmbPalette->setCurrentText("Light");
 
 
-    ui->leKeywords->setText( Util::toString(m_ini->getStringList("custom_keyword_list")));
-    ui->leColour->setText( Util::toString(m_ini->getStringList("custom_keyword_colour")));
-    ui->chkBold->setChecked(m_ini->getdouble("custom_keyword_bold")==1.0);
-    ui->chkItalic->setChecked(m_ini->getdouble("custom_keyword_italic")==1.0);
+    ui->leKeywords_2->setText( Util::toString(m_ini->getStringList("custom_keyword_list")));
+    ui->leColour_2->setText( Util::toString(m_ini->getStringList("custom_keyword_colour")));
+    ui->chkBold_2->setChecked(m_ini->getdouble("custom_keyword_bold")==1.0);
+    ui->chkItalic_2->setChecked(m_ini->getdouble("custom_keyword_italic")==1.0);
     QDir directory(Util::path+"themes/");
     QStringList  themes = directory.entryList(QStringList() << "*.ini");
     ui->cmbTheme->clear();
@@ -126,6 +157,8 @@ void DialogTRSESettings::FillFromIni()
     ui->cmbThemeFjong->setCurrentText(m_ini->getString("theme_fjong").split(".")[0]);
 
 
+    ui->leTripeLoc->setText(m_ini->getString("tripe_location"));
+
     ui->leFontSize->setText(QString::number((int)m_ini->getdouble("font_size")));
     ui->leFontScale->setText(QString::number(m_ini->getdouble("font_size_scale")));
     ui->leFontSizeSymbols->setText(QString::number((int)m_ini->getdouble("font_size_symbols")));
@@ -140,7 +173,9 @@ void DialogTRSESettings::FillFromIni()
 
     ui->cmbAssembler->setCurrentText(m_ini->getString("assembler"));
     ui->cmbAssemblerZ80->setCurrentText(m_ini->getString("assembler_z80"));
-    ui->cmbPainter->setCurrentIndex((int)m_ini->getdouble("image_painter"));
+    ui->cmb6809Assembler->setCurrentText(m_ini->getString("assembler_6809"));
+    ui->cmbAssemblerM68k->setCurrentText(m_ini->getString("assembler_m68k"));
+    ui->cmbPainter_2->setCurrentIndex((int)m_ini->getdouble("image_painter"));
 
 }
 
@@ -162,28 +197,55 @@ void DialogTRSESettings::FillToIni()
     m_ini->setString("vic20_emulator", ui->leVic20Emulator->text());
     m_ini->setString("pet_emulator", ui->lePETEmulator->text());
     m_ini->setString("c128_emulator", ui->leEmulatorC128->text());
+    m_ini->setString("vz200_emulator", ui->leVZ200Emulator->text());
     m_ini->setString("atari2600_emulator", ui->leAtari2600Emulator->text());
     m_ini->setString("ok64_emulator", ui->leOK64Emulator->text());
     m_ini->setString("bbc_emulator", ui->leBBCEmulator->text());
+    m_ini->setString("wonderswan_emulator", ui->leWonderswanEmulator->text());
+    m_ini->setString("acorn_emulator", ui->leAcornEmulator->text());
     m_ini->setString("atari800_emulator", ui->leAtari800Emulator->text());
+    m_ini->setString("sparkle", ui->leSparkle->text());
+    m_ini->setString("thomson_emulator", ui->leThomsonEmulator->text());
     m_ini->setString("msx_emulator", ui->leMSXEmulator->text());
     m_ini->setString("appleii_emulator", ui->leAppleIIEmulator->text());
+    m_ini->setString("oric_emulator", ui->leOricEmulator->text());
+    m_ini->setString("tim_emulator", ui->leTimEmulator->text());
+    m_ini->setString("pcw_emulator", ui->lePCWEmulator->text());
+    m_ini->setString("TVC_emulator", ui->leTVCEmulator->text());
+    m_ini->setString("primo_emulator", ui->lePrimoEmulator->text());
+    m_ini->setString("agon_emulator", ui->leAgonEmulator->text());
+    m_ini->setString("trs80_emulator", ui->leTRS80->text());
+    m_ini->setString("snes_emulator", ui->leSNES->text());
     m_ini->setString("plus4_emulator", ui->lePlus4Emulator->text());
     m_ini->setString("x16_emulator", ui->leX16Emu->text());
+    m_ini->setString("bk0010_emulator", ui->leBK0010Emulator->text());
+    m_ini->setString("dragon_emulator", ui->leDragonEmulator->text());
     m_ini->setString("amstradcpc_emulator", ui->leAmstradCPC->text());
+    m_ini->setString("vectrex_emulator", ui->leVectrexEmulator->text());
+    //m_ini->setString("c8asm", ui->lec8asm->text());
+    m_ini->setString("qemu_directory",ui->leQemuDir->text());
+    m_ini->setString("jdh8_directory",ui->leJDH8Emulator->text());
+    m_ini->setString("cmptools_directory",ui->leCpmTools->text());
     m_ini->setString("coleco_emulator", ui->leColecoEmulator->text());
+    m_ini->setString("pokemonmini_emulator", ui->lePokemonMinEmulator->text());
     m_ini->setString("lz4",ui->leLZ4->text());
     //m_ini->setString("x16_emulator_params", ui->leX16EmuParams->text());
     m_ini->setString("c1541", ui->leC1541->text());
 
     m_ini->setString("spectrum_emulator", ui->leZXSpectrumEmulator->text());
     m_ini->setString("tiki100_emulator", ui->leTiki100->text());
+    m_ini->setString("foenix_emulator", ui->leFoenixEmulator->text());
     m_ini->setString("pasmo", ui->lePasmo->text());
+    m_ini->setString("lwasm", ui->leWasm->text());
+    m_ini->setString("pmas", ui->lePMAS->text());
+    m_ini->setString("cl65", ui->leCL65->text());
 
+    m_ini->setString("cpmtools_directory", ui->leCpmTools->text());
 
     m_ini->setString("sidplayer",ui->leSidplayer->text());
 
     m_ini->setString("cpcdisk_location",ui->leCPCDisk->text());
+    m_ini->setVec("grid_colour",Util::fromQString(ui->leGridColor->text()));
 
     m_ini->setFloat("backup_files_count",ui->leBackupFiles->text().toInt());
 
@@ -191,6 +253,7 @@ void DialogTRSESettings::FillToIni()
 
 
     m_ini->setFloat("display_addresses", ui->chkDisplayAddresses->isChecked());
+    m_ini->setFloat("use_python", ui->chkPython->isChecked()?1:0);
     m_ini->setString("gameboy_rgbasm_dir", ui->leRGBAsmDir->text());
 
 
@@ -209,11 +272,14 @@ void DialogTRSESettings::FillToIni()
 
     m_ini->setFloat("hide_exomizer_footprint", ui->chkExomizerFootprint->isChecked()?1:0);
 
-    m_ini->setFloat("image_painter",ui->cmbPainter->currentIndex());
+    m_ini->setFloat("image_painter",ui->cmbPainter_2->currentIndex());
 
     m_ini->setFloat("auto_inject", ui->chkAutoInject->isChecked()?1:0);
+    m_ini->setFloat("auto_load_recent_project_on_startup", ui->chkAutoLoadRecent->isChecked()?1:0);
+
     m_ini->setFloat("auto_backup", ui->chkBackup->isChecked()?1:0);
-    m_ini->setFloat("editor_autocomplete", ui->chkAutoComplete->isChecked()?1:0);
+    m_ini->setFloat("editor_autocomplete", ui->chkAutoIndent->isChecked()?1:0);
+    m_ini->setFloat("editor_autocomplete_nobug", ui->chkAutoComplete->isChecked()?1:0);
     m_ini->setFloat("compile_thread", ui->chkCompileThread->isChecked()?1:0);
 
     m_ini->setString("user_defined_command",ui->leUserDefined->text());
@@ -222,6 +288,7 @@ void DialogTRSESettings::FillToIni()
     m_ini->setFloat("disable_file_colors", ui->chkDisableFileColors->isChecked()?1:0);
 
     m_ini->setFloat("exomizer_version_3", ui->chkExomizer->isChecked()?1:0);
+
 
 
 
@@ -236,12 +303,15 @@ void DialogTRSESettings::FillToIni()
 
     m_ini->setString("assembler", ui->cmbAssembler->currentText());
     m_ini->setString("assembler_z80", ui->cmbAssemblerZ80->currentText());
+    m_ini->setString("assembler_6809", ui->cmb6809Assembler->currentText());
+    m_ini->setString("assembler_m68k", ui->cmbAssemblerM68k->currentText());
 
-    m_ini->setStringList("custom_keyword_list", ui->leKeywords->text().split(","));
-    m_ini->setStringList("custom_keyword_colour", ui->leColour->text().split(","));
-    m_ini->setFloat("custom_keyword_bold",ui->chkBold->isChecked());
-    m_ini->setFloat("custom_keyword_italic",ui->chkItalic->isChecked());
+    m_ini->setStringList("custom_keyword_list", ui->leKeywords_2->text().split(","));
+    m_ini->setStringList("custom_keyword_colour", ui->leColour_2->text().split(","));
+    m_ini->setFloat("custom_keyword_bold",ui->chkBold_2->isChecked());
+    m_ini->setFloat("custom_keyword_italic",ui->chkItalic_2->isChecked());
 
+    m_ini->setString("tripe_location",ui->leTripeLoc->text());
 
 
 }
@@ -254,8 +324,13 @@ DialogTRSESettings::~DialogTRSESettings()
 void DialogTRSESettings::FillFont(QComboBox *cbmFont, QString keep) {
     //        QString keep = m_ini->getString("editor_font");
     cbmFont->clear();
+#if QT_VERSION <= 0x060000
     QFontDatabase d;
-    QStringList fam = d.families();
+    auto fam = d.families();
+#else
+    auto fam = QFontDatabase::families();
+
+#endif
     if (!fam.contains("Courier"))
         fam<<"Courier";
     cbmFont->addItems(fam);
@@ -278,10 +353,12 @@ void DialogTRSESettings::Help(QString tit, QString text)
 void DialogTRSESettings::SetupExtras()
 {
     QStringList data;
-    data<<"C64"<<"C128"<<"VIC20"<<"PET"<<"PLUS4"<<"NES"<<"GAMEBOY"<<"SPECTRUM"<<"MSX" << "COLECO"<<"AMSTRADCPC"<<"ATARI2600"<<"TIKI100"<<"X86" << "OK64" << "X16" <<"MEGA65"<<"BBCM" <<"ATARI800" <<"APPLEII" ;
+    data<<"C64"<<"C128"<<"VIC20"<<"PET"<<"PLUS4"<<"NES"<<"GAMEBOY"<<"SPECTRUM"<<"TIM"<<"PCW"<<"THOMSON"<<"MSX" << "DRAGON"<<"BK0010"<<"AGON" <<"TVC" << "PRIMO"<<"VECTREX"<<"COLECO"<<"AMSTRADCPC"<<"ATARI2600"<<"TIKI100"<<"X86" << "OK64" << "X16" <<"MEGA65"<<"BBCM"<<"FOENIX" <<"ATARI800" <<"APPLEII" <<"ORIC"<<"TRS80"<<"SNES"<<"VZ200"<<"ACORN"<<"QEMU"<<"JDH8"<<"POKEMONMINI"<<"WONDERSWAN" ;
     for (int i=0;i<ui->grdEmulators->rowCount();i++) {
+        if (data[i]=="QEMU")
+            continue;
         QPushButton* btn = new QPushButton("params");
-        ui->grdEmulators->addWidget(btn,i,4);
+        ui->grdEmulators->addWidget(btn,i,5);
         QString name = "emulator_additional_parameters_"+data[i];
         connect(btn, &QPushButton::clicked,  [=](){
             DialogSimpleLineEdit* de = new DialogSimpleLineEdit(data[i]+" emulator additional params",
@@ -549,7 +626,7 @@ void DialogTRSESettings::on_btnHelpGB_clicked()
 
 void DialogTRSESettings::on_btnHelpZX_clicked()
 {
-    Help("ZX Spectrum Emulator", "Please use https://www.retrovirtualmachine.org/en/ ");
+    Help("ZX Spectrum Emulator", "Please use https://www.retrovirtualmachine.org/en/ version 2.0 (not newer!)");
 }
 
 void DialogTRSESettings::on_btnHelpTiki_clicked()
@@ -731,3 +808,326 @@ void DialogTRSESettings::on_btnLZ4_clicked()
         ui->leLZ4->setText(filename);
 
 }
+
+void DialogTRSESettings::on_btnQemuHelp_clicked()
+{
+
+}
+
+void DialogTRSESettings::on_btnQemu_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Qemu directory"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leQemuDir->setText(filename);
+
+}
+
+void DialogTRSESettings::on_btnOric_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Oric emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leOricEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnSnes_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("SNES emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leSNES->setText(filename);
+
+
+}
+
+
+void DialogTRSESettings::on_btnCL65_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("CL65 assembler location"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leCL65->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnVZ200_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("VZ200 emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leVZ200Emulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnVZ200Help_clicked()
+{
+    Help("VZ200 emulator","Download from https://bluebilby.com/sdm_categories/tools/");
+
+}
+
+
+void DialogTRSESettings::on_btnAcornHelp_clicked()
+{
+    Help("Acorn emulator","Download http://atomulator.acornatom.co.uk/");
+
+}
+
+
+void DialogTRSESettings::on_btnAcornEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Acorn emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leAcornEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnJDH8Emu_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("JDH-8 base directory"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leJDH8Emulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnMameEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Mame Emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->lePokemonMinEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnPMAS_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Location of PMAS"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->lePMAS->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnTRS80help_clicked()
+{
+    Help("TRS80 emulator","Download http://48k.ca/trs80gp.html");
+
+}
+
+
+void DialogTRSESettings::on_btnTRS80_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("TRSE80gb emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leTRS80->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnWasm_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("lwasm assembler"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leWasm->setText(filename);
+}
+
+
+void DialogTRSESettings::on_btnWonderswan_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Wonderswan emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leWonderswanEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnTimEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("TIM emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leTimEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnCPMTOOLS_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("CPMTools directory"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leCpmTools->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnTVCEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("TVC TV Emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leTVCEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnHelpTVC_clicked()
+{
+    Help("TVC Emulator","WinTVC: http://gaia.atilia.eu/category/wintvc/ ");
+
+}
+
+
+void DialogTRSESettings::on_btnVectrexEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Vectrex Emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leVectrexEmulator->setText(filename);
+
+}
+
+
+
+void DialogTRSESettings::on_btnHelpThomson_clicked()
+{
+    Help("Thomson Emulator","Mame (for now)");
+
+}
+
+
+void DialogTRSESettings::on_btnThomsonEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Thomson emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leThomsonEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnPCWEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("PCW emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->lePCWEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnHelpPCW_clicked()
+{
+    Help("PCW Emulator","Mame");
+}
+
+
+void DialogTRSESettings::on_btnHelpBK0010_clicked()
+{
+    Help("BK0010 Emulator","Use http://sandro.pdp-11.ru/");
+
+}
+
+
+void DialogTRSESettings::on_btnBK0010Emulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("BK0010 emulator"), m_ini->getString("project_path"), "*.jar");
+    if (filename!="")
+        ui->leBK0010Emulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnDragonEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+        tr("Dragon emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leDragonEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnSparkle_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+                                                    tr("Sparkle 3 executable"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leSparkle->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnHelpVectrex_clicked()
+{
+    Help("Vectrex Emulator","Use RetroArch. Install the GCE Vectrex core. ");
+
+}
+
+
+void DialogTRSESettings::on_btnFoenixEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+                                                    tr("Foenix emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leFoenixEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnFoenixHelp_clicked()
+{
+    Help("Foenix Emulator","Use https://github.com/FoenixRetro/junior-emulator");
+
+}
+
+
+void DialogTRSESettings::on_btnHelpAgon_clicked()
+{
+    Help("Agon Emulator","Use https://github.com/tomm/fab-agon-emulator/");
+
+}
+
+
+void DialogTRSESettings::on_btnAgon_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+                                                    tr("Agon emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->leAgonEmulator->setText(filename);
+
+}
+
+
+
+
+void DialogTRSESettings::on_btnPrimoEmulator_clicked()
+{
+    QString filename = QFileDialog::getOpenFileName(this,
+                                                    tr("Primo emulator"), m_ini->getString("project_path"), "*");
+    if (filename!="")
+        ui->lePrimoEmulator->setText(filename);
+
+}
+
+
+void DialogTRSESettings::on_btnHelpTVC_2_clicked()
+{
+    Help("Primo Emulator","Use http://primo.homeserver.hu/html/ultimoemulator.html");
+
+}
+

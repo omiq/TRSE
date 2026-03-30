@@ -1,0 +1,54 @@
+program Image;
+@use "graphics"
+var  
+
+
+/*
+
+	This example initialises a 320x256 16-color image
+ 
+ 
+ 	How to compile and run A500 TRSE examples:
+ 		- Download vasm_mot from https://www.irio.co.uk/trse/assembler/vasmm68k_mot_win32.exe 
+ 		- Install winUAE and create a new A500 device with an emulated hard drive located at [some path]
+ 		- In the TRSE settings panel "assemblers", point to vasmm68k_mot.execute
+ 		- In the TRSE settings panel "assemblers", point the "target deployment directory" for the A500 to your emulated hard drive [some path]
+ 		
+ 	You build programs by pressing ctrl-B. To run the program, switch to your emulator and make sure
+ 	you are running in command line on drive C, then simply type in the name of your file to run it. 
+ 	
+ 	It is recommended to keep a save state of your emulator so you can easily reset the computer back to 
+ 	a state where you can easily type the program name again
+ 		
+
+*/
+
+
+
+/*
+	
+	@export will automatically export a 320x256 16-color (4-bitplane) image to 
+	a file containing raw 4 bitplane image data. The export command will also
+	generate a the "trse.pal" palette binary file
+
+*/
+@export "resources/images/trse.flf"	 "resources/images/trse.bin" 256
+
+   	i,j,k, isDone: integer = 0; 
+   	image : incbin("resources/images/trse.bin") chipmem;
+	image_palette : incbin("resources/images/trse.pal");
+	
+	const noBitPlanes : byte = 4;
+	const noColors : byte = 16;
+	
+// Some random image   	
+
+begin
+	
+	// Set to default interleaved 4-bpl screen, point to the 320x256 image
+	Graphics::SetupDefaultScreen(#image,noBitPlanes);	
+	// Sets the palette in the copper list
+	setpalette(#image_palette,#copper_palette,noColors);
+	
+	loop();
+end.

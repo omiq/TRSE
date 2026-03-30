@@ -25,12 +25,19 @@
 #include "node.h"
 
 
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
+/* 
+    Node for an asm block
+    m_left: undefined
+    m_right: undefined
+    m_op: Token associated with the assembly string.
+*/
 class NodeAsm : public Node
 {
 public:
-    QString m_asm;
+    /* Assembly code associated with the node as a QString */
+    QString m_asm, m_outAsm;
 
 
     NodeAsm(Token t):Node() {
@@ -41,10 +48,16 @@ public:
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override {
 
     }
+    // This method is used for finding symbols/variables used in the assembly block, so the
+    // optimiser won't flag them as "unused"
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override;
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeAsm>(sharedFromThis()));
     }
+
+    void ReplaceInlineAssemblerVariables(Assembler* as, QString var, QString val) override;
+    void ResetInlineAssembler() override;
 
 };
 

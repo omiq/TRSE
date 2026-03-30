@@ -4,9 +4,9 @@
 
 PostOptimiserZ80::PostOptimiserZ80()
 {
-    m_registers = QStringList() <<"a"<<"b"<<"c"<<"d"<<"af"<<"bc"<<"de"<<"hl"<<"ix"<<"iy"<<"p"<<"sp";
+    m_registers = QStringList() <<"a"<<"b"<<"c"<<"d"<<"h"<<"l"<<"d"<<"e"<<"af"<<"bc"<<"de"<<"hl"<<"ix"<<"iy"<<"p"<<"sp";
     m_branches = QStringList() <<"call" <<"jp";
-    m_registerChangingCommands = QStringList() << "call" <<"jp";
+    m_registerChangingCommands = QStringList() << "call" <<"jp" << "pop";
     m_bops = QStringList() << "add"<<"sub"<<"xor"<<"or"<<"and"<<"inc"<<"dec"<<"adc"<<"sbc";
 //    m_axModifiers = QStringList() << "div"<<"idiv"<<"mul"<<"imul";
 }
@@ -47,6 +47,8 @@ void PostOptimiserZ80::Analyze(SourceLine &line) {
         st = st.simplified().trimmed();
 
 
+    if (line.m_orgLine.contains(";keep"))
+        return;
     // Not implemented anything yet!
     // Below are stuff for the x86
 /*
@@ -57,12 +59,20 @@ void PostOptimiserZ80::Analyze(SourceLine &line) {
 */
     if (cmd=="ld") {
         QString reg = par[0];
+        if (prevLine->m_orgLine.toLower().simplified()==line.m_orgLine.toLower().simplified()) {
+            line.m_forceOptimise = true;
+
+        }
         if (m_registers.contains(reg))
         {
             // Don't assume "mov ax,dx" to hold
 
             if (!m_registers.contains(par[1]))
                 line.m_potentialOptimise = true;
+
+//            if (reg=="de")
+  //                 qDebug() << "DE : " <<line.m_orgLine;// << prevLine->m_changeRegs["de"];
+
 
             if (par[1].contains("[") || par[1].contains("("))
                 line.m_potentialOptimise = false;
@@ -76,15 +86,20 @@ void PostOptimiserZ80::Analyze(SourceLine &line) {
             }
 
 //            if (line.m_potentialOptimise)
-  //              qDebug() << "Changinbg : " <<reg<<par[1];
+  //              qDebug() << "Changing : " <<reg<<par[1] << line.m_orgLine;
 
             ChangeReg(line, reg, par[1]);
 
         }
     }
+    if (cmd=="ldir") {
+        ChangeReg(line, "de", "");
+        ChangeReg(line, "hl", "");
+        ChangeReg(line, "bc", "");
 
+    }
 
-    if (cmd=="ex" && line.m_orgLine.contains(";keep")) {
+    if (cmd=="ex" && !line.m_orgLine.contains(";keep")) {
 //        qDebug() << "h0 " << line.m_orgLine << cmd << prevLine << par;
 
         if (par.count()>=2 && prevLine!=nullptr)
@@ -97,9 +112,14 @@ void PostOptimiserZ80::Analyze(SourceLine &line) {
                  *
                  * ld de,$10
                 */
+            if (par[0]=="de" && par[1]=="hl") {
+                prevLine->m_changeRegs["de"] = line.m_changeRegs["hl"];
+                prevLine->m_changeRegs["hl"] = line.m_changeRegs["de"];
+
+            }
 
             if (par[0]=="de" && par[1]=="hl") {
-//                qDebug() << "h1 " << line.m_orgLine << prevLine->m_orgLine;;
+  //              qDebug() << "h1 " << line.m_orgLine << prevLine->m_orgLine;;
                 if (prevPar.count()>=2 && prevCmd == "ld" && prevPar[0]=="hl") {
   //                  qDebug() << "h2 " << prevLine->m_orgLine;
                     line.m_potentialOptimise = true;
@@ -114,6 +134,7 @@ void PostOptimiserZ80::Analyze(SourceLine &line) {
                 }
                 if (prevPar.count()>=2 && prevCmd == "ex" && prevPar[0]=="de" && prevPar[1]=="hl")
                 {
+//                    qDebug() << "OOPS";
                     prevLine->m_forceOptimise = true;
                     line.m_forceOptimise = true;
                 }
@@ -169,7 +190,7 @@ void PostOptimiserZ80::ChangeReg(SourceLine &line, QString reg, QString val)
 
     line.m_changeRegs[reg] = val;
 //    if (reg[1]=='h' || reg[1]=='l')
-    if (reg.count()>=2) {
+    if (reg.length()>=2) {
         if (val.startsWith("$")) {
         line.m_changeRegs[QString(reg[0])] = Util::numToHex(Util::NumberFromStringHex(val)&0xFF);
         line.m_changeRegs[QString(reg[1])] = Util::numToHex((Util::NumberFromStringHex(val)>>8)&0xFF);
@@ -183,7 +204,7 @@ void PostOptimiserZ80::ChangeReg(SourceLine &line, QString reg, QString val)
     // setting ld a,b etc.. to a register.. cancel value
     if (m_registers.contains(val)) {
         line.m_changeRegs[reg]  ="";
-        if (reg.count()>=2) {
+        if (reg.length()>=2) {
             line.m_changeRegs[QString(reg[0])] = "";
             line.m_changeRegs[QString(reg[1])] = "";
 

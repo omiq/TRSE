@@ -1,0 +1,181 @@
+# Separate build for the AppImage as it's been failing lately so we want a distinct notification for it.
+# This also allows to experiment without affecting the regular linux build.
+name: linux-appimage
+
+on:
+  push:
+    tags:
+      - 'nightly'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v2
+
+      - run: |
+          sudo apt-get update
+          sudo apt-get install qt5-default qt5-qmake qtdeclarative5-dev
+          # For 'Verify all' tests
+          # dbus-x11, at-spi2-core, libavformat58, libswscale5 and libswresample3 seem to be required by vice yet not pulled by its package
+          # libsdl2-dev, libfreetype6-dev, zlib1g-dev and libpng-dev are needed to build Caprice32
+          sudo apt-get install lz4 python3 xvfb vice dosbox nasm dbus-x11 at-spi2-core libavformat58 libswscale5 libswresample3 libsdl2-dev libfreetype6-dev zlib1g-dev libpng-dev
+
+      - name: Build and configure assemblers and emulators (vasm, rgbasm, VICE, cap32)
+        run: |
+          mkdir tools
+          pushd tools
+          # vasm (Atari)
+          # wget --tries=3 http://sun.hasenbraten.de/vasm/daily/vasm.tar.gz
+          wget --tries=3 https://www.irio.co.uk/div/vasm.tar.gz
+          tar -xzf vasm.tar.gz
+          pushd vasm
+          make CPU=m68k SYNTAX=mot -j 2
+          popd
+          # rgbasm (GameBoy)
+          git clone https://github.com/gbdev/rgbds.git
+          pushd rgbds
+          # v0.5 removes GLOBAL keyword
+          git checkout tags/v0.4.2
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j 2
+          popd
+          # exomizer
+          wget --tries=3 https://bitbucket.org/magli143/exomizer/get/3.1.1.zip
+          unzip 3.1.1.zip -d exomizer
+          pushd exomizer/*/src
+          make -j 2
+          popd
+          # Install ROMs to be able to run VICE
+          wget --tries=3 https://sourceforge.net/projects/vice-emu/files/releases/vice-3.5.tar.gz/download -O vice-3.5.tar.gz
+          tar -xzf vice-3.5.tar.gz
+          mkdir -p ~/.config/vice/
+          cp -r vice-3.5/data/* ~/.config/vice/
+          # Build Caprice32 (Amstrad CPC emulator)
+          git clone https://github.com/ColinPitrat/caprice32.git
+          pushd caprice32
+          make -j 2
+          popd
+          # Build SameBoy (GameBoy emulator): requires rgbasm (built before)
+          export PATH=`pwd`/rgbds/build/src:$PATH
+          git clone https://github.com/LIJI32/SameBoy.git
+          pushd SameBoy
+          make -j 2
+          popd
+          # leave tools directory
+          popd
+          # patch dirs
+          exomizer=`ls ${PWD}/tools/exomizer/*/src/exomizer`
+          sed -i "s,^vasmm =.*,vasmm = ${PWD}/tools/vasm/vasmm68k_mot," Publish/publish_linux/trse.ini
+          sed -i "s,^gameboy_rgbasm_dir =.*,gameboy_rgbasm_dir = ${PWD}/tools/rgbds/build/src," Publish/publish_linux/trse.ini
+          sed -i "s,^exomizer =.*,exomizer = ${exomizer}," Publish/publish_linux/trse.ini
+          c1541=$(which c1541)
+          sed -i "s,^c1541 =.*,c1541 = ${c1541}," Publish/publish_linux/trse.ini
+          x64=$(which x64)
+          sed -i "s,^emulator =.*,emulator = ${x64}," Publish/publish_linux/trse.ini
+          cap32=`pwd`/tools/caprice32/cap32
+          sed -i "s,^amstradcpc_emulator =.*,amstradcpc_emulator = ${cap32}," Publish/publish_linux/trse.ini
+          dosbox=$(which dosbox)
+          sed -i "s,^dosbox =.*,dosbox = ${dosbox}," Publish/publish_linux/trse.ini
+          nasm=$(which nasm)
+          sed -i "s,^nasm =.*,nasm = ${nasm}," Publish/publish_linux/trse.ini
+          sed -i "s,^gameboy_emulator =.*,gameboy_emulator = ${PWD}/tools/SameBoy/build/bin/SDL/sameboy," Publish/publish_linux/trse.ini
+
+      - name: Build TRSE
+        run: |
+          # PREFIX is here for the AppImage build
+          qmake PREFIX=/usr TRSE.pro
+          make -j 2 -k
+
+      - name: Build OK64
+        run: |
+          git clone https://github.com/leuat/OK64.git
+          pushd OK64
+          OK64dir=`pwd`
+          sudo apt-get install qtmultimedia5-dev
+          # Build resid
+          #wget --tries=3 http://www.zimmers.net/anonftp/pub/cbm/crossplatform/emulators/resid/resid-0.16.tar.gz
+          # www.zimmers.net seems to be very unstable around the time of the nightly (or some other problem) so
+          # we have our own copy of resid.
+          wget --tries=3 http://www.irio.co.uk/trse/resid-0.16.tar.gz
+          tar -xzf resid-0.16.tar.gz
+          pushd resid-0.16
+          ./configure --prefix=$OK64dir/resid
+          make
+          make install
+          popd
+          # Build OK64
+          pushd OK64
+          qmake INCLUDEPATH=$OK64dir/resid/include QMAKE_LFLAGS=-Wl,-L$OK64dir/resid/lib/ OK64.pro
+          make
+          popd
+          popd
+
+      # Construct and publish the linux binary package
+      - name: Build tar.gz
+        run: cd Publish/publish_linux && ./publish nightly
+      - name: Publish tar.gz
+        uses: ColinPitrat/update-release@master
+        with:
+          release: nightly
+          message: Nightly build
+          body: TRSE ${{ steps.version.outputs.TRSE_VERSION }} <br/> The latest automated nightly build of TRSE which succeeded. This is the recommended version to use.
+          files: Publish/publish_linux/trse_linux64.tar.gz
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Construct and publish the AppImage
+      # Note: we're relying on the previous call to publish_linux to have copied everything that is needed under Publish/publish_linux/trse
+      # TODO(ColinPitrat): Migrate the whole of publish_linux to the `make install` generated by qmake
+      - name: Build AppImage
+        run: |
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export LD_LIBRARY_PATH=${ANDROID_HOME}/emulator/lib64/qt/lib:${LD_LIBRARY_PATH}
+          make INSTALL_ROOT=Publish/publish_linux/trse install; find Publish/publish_linux/trse
+          cd Publish/publish_linux/
+          # TODO(ColinPitrat): This cleanup wouldn't be necessary if we were using `make install` to do the full publish part (we would need 2 make install calls though: one for tar.gz and one for AppImage)
+          rm -rf trse/{bin,lib}
+          # We need (at least some of) those dirs in both places, which is a bit weird.
+          # TODO(ColinPitrat): Understand why and try to have them in only one place.
+          cp -r trse/{project_templates,themes,tutorials,units} trse/usr/
+
+          wget --tries=3 -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases -O - | grep "appimagetool-.*-x86_64.AppImage" | head -n 1 | cut -d '"' -f 2) -O appimagetool
+          chmod +x appimagetool
+          ./appimagetool -s deploy trse/usr/share/applications/trse.desktop
+
+          find trse | grep ld-linux
+          chmod a+x trse/lib*/ld-linux-* trse/usr/lib*/ld-linux-* || echo "chmod failed"
+          chmod 755 trse
+          VERSION=nightly ARCH=x86_64 ./appimagetool ./trse
+      - name: Publish AppImage
+        uses: ColinPitrat/update-release@master
+        with:
+          release: nightly
+          message: Nightly build
+          body: TRSE ${{ steps.version.outputs.TRSE_VERSION }} <br/> The latest automated nightly build of TRSE which succeeded. This is the recommended version to use.
+          files: Publish/publish_linux/TRSE-nightly-x86_64.AppImage
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify tutorials
+        run: |
+          mkdir bin
+          cp trse bin/
+          ln -s Publish/tutorials tutorials
+          ln -s Publish/source/themes themes
+          mkdir -p ~/.local/share/TRSE
+          cp Publish/publish_linux/trse.ini ~/.local/share/TRSE/
+          cd bin
+          # This is the default value but defining the var should avoid logs polluting the output
+          export XDG_RUNTIME_DIR=/tmp/runtime-runner
+          xvfb-run --auto-servernum python3 ../Publish/verify_all/verify_all.py --trse `pwd`/trse --trse.ini ~/.local/share/TRSE/trse.ini
+
+      #- name: Build notification
+      #  if: failure()
+      #  uses: adamkdean/simple-slack-notify@master
+      #  env:
+      #    SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #  with:
+      #    channel: #bugs
+      #    text: "[GitHub Actions Notification] Linux AppImage build failed: ${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}"

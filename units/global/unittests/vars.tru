@@ -3,13 +3,43 @@ var
 	sc, co : pointer; 			// screen and colour RAM pointers
 	text: string = "TEST                 ";	// text to display when writing a test result
 	@define COLUMNWIDTH 5
-
+	barr : array[10] of byte;
 	v1, v2,v3,rb,v4 : byte;
 	i1, i2,i3,i4,ri, j2 : integer;
 	p1, p2,rp : pointer;
+	ip : pointer of integer;
 	a1,a2 : array[10] of integer;
 	j,i : byte;
+@ifdef OVERRIDE
+	const addr : address = @OVERRIDE;
+@else
+	const addr : address = $8800;
+	
+@endif
+	bl1,bl2 : boolean;
+@if SUPPORTS_LONG = "1"
+@ifndef CPU_PX86
+	l1, l2 : long;
+@endif
+@endif
+/*
+@ifdef CPU_Z80	
+@endif
+@ifdef CPU_MOS6502	
+	const addr : address = $8800;
+@endif
+@ifdef CPU_M6809
+	const addr : address = $8800;
+@endif
+@ifdef CPU_PX86
+	const addr : address = $8800;
+@endif
+*/	
+	ia1 : array[10] of integer = buildtable("i*100");
+	ba1 : array[10] of byte = buildtable("i");
+	strLst : array[] of string = ("S1","S2",("J",75), "S3");
 
+@if SUPPORTS_CLASSES=1
 	Mini = class
 		a:integer; // 4   // 7
 		b:byte;    // 6   // 9
@@ -20,6 +50,8 @@ var
 		end;
 		
 	end;
+
+
 
 
 	Point = class
@@ -35,17 +67,17 @@ var
 
 	Monster = class
 		x,y : byte;
-		// 2
+		// 2    4
 		ival : integer;
-		//4
+		//4     6 
 		pos: Point;
-		// c 
+		// c    18 
 		byteData : array[5] of byte;
-		// 11
+		// 11   24
 		c : byte;
-		// 12 
+		// 12   26 
 		intData : array[7] of integer;
-		// 20 
+		// 20   40  0 $2A
 	//	more : array[3] of Point;		
 		procedure Move1( m1, m2 : byte);
 		begin
@@ -57,8 +89,27 @@ var
 
 	pm : pointer of Monster;
 	m : Monster;
-	const NN : integer = 10;
+	const NN : byte = 10;
 	monsters: array[ NN ] of Monster;
+@endif
 	zp: pointer;
+
+
+
+function IntegerReturn(ir_p1 : byte) : integer;  
+var
+	
+begin
+	j2:=ir_p1*2;
+	IntegerReturn:=j2;
+end;	
+
+function ByteReturn(ir_p1 : global byte) : byte;  
+var
+	
+begin
+	v3:=ir_p1*2;
+	ByteReturn:=v3;
+end;	
 
 end.

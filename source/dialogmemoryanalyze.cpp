@@ -22,14 +22,16 @@
 #include "dialogmemoryanalyze.h"
 #include "ui_dialogmemoryanalyze.h"
 #include "source/LeLib/util/util.h"
+#include "source/Compiler/misc/sidfile.h"
 
-DialogMemoryAnalyze::DialogMemoryAnalyze(QSharedPointer<CIniFile> ini, AbstractSystem* system,QWidget *parent) :
+DialogMemoryAnalyze::DialogMemoryAnalyze(QSharedPointer<CIniFile> ini,QSharedPointer<CIniFile> pini, AbstractSystem* system,QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogMemoryAnalyze)
 {
     ui->setupUi(this);
     m_system = system;
     m_iniFile = ini;
+    m_projectIni = pini;
 }
 
 
@@ -52,6 +54,19 @@ void DialogMemoryAnalyze::RenderSystemLabels(QPainter& p, int xstart, int fs )
             curT = l.m_name;
             cur.setX(l.m_from);
             cur.setY(l.m_to);
+            // Calculate free memory in current block
+            int free = l.m_to - l.m_from;
+            for (QSharedPointer<MemoryBlock> mb:m_blocks) {
+
+                int bs = std::max(mb->m_start, l.m_from);
+                int be = std::min(mb->m_end, l.m_to);
+                if (be>bs)
+                   free-=(be-bs);
+
+            }
+
+            curFree = free;
+
         }
         p.setPen(c);
         p.setBrush(QBrush(c,Qt::Dense4Pattern));
@@ -60,7 +75,7 @@ void DialogMemoryAnalyze::RenderSystemLabels(QPainter& p, int xstart, int fs )
 
         p.setPen(QPen(QColor(32,32,48)));
 
-        p.setFont(QFont("Courier", std::min(fs,height)));
+        p.setFont(QFont("Courier", std::fmin(fs,height*zoomVal)));
         p.drawText(r, Qt::AlignTop | Qt::AlignLeft, l.m_name);
     }
 
@@ -78,7 +93,7 @@ void DialogMemoryAnalyze::Initialize(QVector<QSharedPointer<MemoryBlock>> &block
     ysize= ui->lblImage->height()-8;
 
     fontSize/=2;
-
+    fontSize*=zoomVal;
     InitColors();
 
 
@@ -93,6 +108,7 @@ void DialogMemoryAnalyze::Initialize(QVector<QSharedPointer<MemoryBlock>> &block
     img.fill(m_system->m_systemColor);
     QString prevT = curT;
     curT="";
+    curFree = 0;
     int xstart = xsize/3;
     int ww = xsize/5;
     int xborder = 40;
@@ -167,6 +183,9 @@ void DialogMemoryAnalyze::Initialize(QVector<QSharedPointer<MemoryBlock>> &block
             curT = mb->m_name;
             cur.setX(mb->m_start);
             cur.setY(mb->m_end);
+
+
+
         }
 
 
@@ -199,7 +218,7 @@ void DialogMemoryAnalyze::Initialize(QVector<QSharedPointer<MemoryBlock>> &block
             if (mb->m_zeropages.count()!=0)
                 zp = "zp :"+zp;
             zp=zp.trimmed();
-            p.setFont(QFont("Courier", std::min(fontSize,height), QFont::Bold));
+            p.setFont(QFont("Courier", std::fmin(fontSize,height), QFont::Bold));
 
             p.drawText(Trans(x2-xborder-box2s+12, y0,box2, y1-y0), Qt::AlignLeft|Qt::AlignTop, zp);
         }
@@ -250,7 +269,10 @@ void DialogMemoryAnalyze::Initialize(QVector<QSharedPointer<MemoryBlock>> &block
        int size = cur.y()-cur.x();
        p.drawText(QRect(mpos.x(),mpos.y()+4,500,60), address);
        QString sizeText = Util::numToHex(size) + " / " + QString::number(size) + " bytes";
-       p.drawText(QRect(mpos.x(),mpos.y()+24,500,60), sizeText);
+       p.drawText(QRect(mpos.x(),mpos.y()+20,500,60), sizeText);
+       QString blockUsage = "Free space in block: "+Util::numToHex(curFree) + " bytes";
+       // Find block size:
+       p.drawText(QRect(mpos.x(),mpos.y()+40,500,60), blockUsage);
     }
 
 
@@ -296,6 +318,8 @@ void DialogMemoryAnalyze::VerifyZPMusic(QVector<QSharedPointer<MemoryBlock>> &bl
             music.append(mb);
     }
     QString infoText="";
+
+/*
     for (QSharedPointer<MemoryBlock> mb: music) {
         bool overlaps=false;
         QString overlapString="";
@@ -317,6 +341,14 @@ void DialogMemoryAnalyze::VerifyZPMusic(QVector<QSharedPointer<MemoryBlock>> &bl
         }
 
     }
+    */
+    infoText +="SID file uses zp: ";
+    for (int i=0;i<SidFile::m_zp.size();i++) {
+        infoText+= Util::numToHex((uchar)SidFile::m_zp[i]) + ",";
+
+    }
+    infoText.remove(infoText.size()-1,1);
+
     ui->leInfoText->setText(infoText);
 }
 

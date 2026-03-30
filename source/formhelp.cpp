@@ -75,7 +75,7 @@ void formHelp::LoadItems(int idx)
 
     for (QString s: Syntax::s.m_syntaxData.split('\n')) {
         s= s.simplified();
-        if (s.count()==0) continue;
+        if (s.length()==0) continue;
         if (s.startsWith("#")) continue;
         s=s.replace(" ", "");
 
@@ -84,10 +84,12 @@ void formHelp::LoadItems(int idx)
             QString word = data[1];
             QString system = data[2].toLower();
             bool isFjong = data[0]=="f";
+//            qDebug() << word <<system;
+
             if (word.toLower().startsWith("init")) continue;
-            if (!isFjong && !AbstractSystem::isSupported(Syntax::s.m_currentSystem->m_system, system))
+            if (!isFjong && !Syntax::s.m_currentSystem->systemIsOfType(system.split(",")))
                 continue;
-            if (system.contains(currentSystem)||isFjong) {
+            if (system.contains(currentSystem)||isFjong || system.contains("all") || system.contains(AbstractSystem::StringFromProcessor(Syntax::s.m_currentSystem->m_processor).toLower())) {
 /*                QString val = word + "(";
                 for (QString s: params) {
                     if (s=="b") val+="[byte variable]";
@@ -129,7 +131,7 @@ void formHelp::LoadItem(QString findword)
 
     for (QString s: Syntax::s.m_syntaxData.split('\n')) {
         s= s.simplified();
-        if (s.count()==0) continue;
+        if (s.length()==0) continue;
         if (s.startsWith("#")) continue;
         s=s.replace(" ", "");
 
@@ -137,13 +139,16 @@ void formHelp::LoadItem(QString findword)
         QString word = data[1];
         if (word!=findword)
             continue;
+
         m_currentWord = findword;
 
         QString type = data[0].toLower();
         m_currentType = type;
         QString system = data[2].toLower();
-        if (type!="f" && !AbstractSystem::isSupported(Syntax::s.m_currentSystem->m_system, system))
+        if (type!="f" && !Syntax::s.m_currentSystem->systemIsOfType(system.split(",")))
             continue;
+
+
         if (type=="f")
          {
                 QStringList params = data[2].toLower().split(",");
@@ -168,7 +173,7 @@ void formHelp::LoadItem(QString findword)
 
                     s = ApplyColors(s);
 
-                    val+="<div style=\"font-size: 10pt\">" + s + "</div>";
+                    val+="<div style=\"font-size: "+sz1+"\">" + s + "</div>";
 
              //       m_highlighter->HighlightText(val);
            //         qDebug() << val;
@@ -208,7 +213,7 @@ void formHelp::LoadItem(QString findword)
 
                     s = ApplyColors(s);
 
-                    val+="<div style=\"font-size: 10pt\">" + s + "</div>";
+                    val+="<div style=\"font-size: "+sz1+"\">" + s + "</div>";
 
              //       m_highlighter->HighlightText(val);
            //         qDebug() << val;
@@ -240,7 +245,7 @@ void formHelp::LoadItem(QString findword)
 
                     s = ApplyColors(s);
 
-                    val+="<div style=\"font-size: 10pt\">" + s + "</div>";
+                    val+="<div style=\"font-size: "+sz1+"\">" + s + "</div>";
 
                 }
 
@@ -263,7 +268,7 @@ void formHelp::LoadItem(QString findword)
 
                     s = ApplyColors(s);
 
-                    val+="<div style=\"font-size: 10pt\">" + s + "</div>";
+                    val+="<div style=\"font-size: "+sz1+"\">" + s + "</div>";
 
                 }
 
@@ -284,7 +289,7 @@ void formHelp::LoadItem(QString findword)
                     QString s = f.readAll();
                     f.close();
                     s = ApplyColors(s);
-                    val+="<div style=\"font-size: 10pt\">" + s + "</div>";
+                    val+="<div style=\"font-size: "+sz1+"\">" + s + "</div>";
 
                 }
 
@@ -310,8 +315,8 @@ QString formHelp::ApplyColors(QString s)
     s=s.replace("<code>","<pre><code style=\"color: #E0B050\">");
     s=s.replace("</code>","</code></pre>");
 
-    s=s.replace("<h3>","<h3 style=\"color: yellow;font-size: 16pt;margin: 35px 0px 20px\">");
-    s=s.replace("<h1>","<h1 style=\"color: lightblue;font-size: 18pt;margin: 35px 0px 20px\">");
+    s=s.replace("<h3>","<h3 style=\"color: yellow;font-size: 20pt;margin: 35px 0px 20px\">");
+    s=s.replace("<h1>","<h1 style=\"color: lightblue;font-size: 24pt;margin: 35px 0px 20px\">");
 
     return s;
 }
@@ -347,52 +352,72 @@ void formHelp::SearchForItem(QString item)
     m_idx=0;
     ui->lstItems->clear();
     m_currentItems.clear();
-
+    item = item.simplified().trimmed();
     // First search through locally generated help
     m_curIsTru = false;
-    for (auto d : m_hdb.m_documents) {
-        if (d->m_name.contains(item)) {
-            m_curIsTru = true;
-            LoadItem(d->m_name);
-//            ui->txtHelp->setText(ApplyColors(d->m_document));
-            return;
+    for (int k = 0; k < 2; k++)
+    {
+        for (auto d : m_hdb.m_documents) {
+            if (k==0) {
+                if (d->m_name.toLower() == item.toLower()) {
+                    m_curIsTru = true;
+                    LoadItem(d->m_name);
+        //            ui->txtHelp->setText(ApplyColors(d->m_document));
+                    LoadItems(1);
+                    return;
+                }
+            }
+            else if (k==1) {
+                if (d->m_name.contains(item)) {
+                    m_curIsTru = true;
+                    LoadItem(d->m_name);
+                    LoadItems(1);
+        //            ui->txtHelp->setText(ApplyColors(d->m_document));
+                    return;
+                }
+            }
         }
-    }
 
+        for (QString s: Syntax::s.m_syntaxData.split('\n')) {
+            s= s.simplified();
+            if (s.length()==0) continue;
+            if (s.startsWith("#")) continue;
+            s=s.replace(" ", "");
 
-    for (QString s: Syntax::s.m_syntaxData.split('\n')) {
+            QStringList data = s.split(";");
 
-        s= s.simplified();
-        if (s.count()==0) continue;
-        if (s.startsWith("#")) continue;
-        s=s.replace(" ", "");
+            bool isTrue = false;
+            // first, check for words that are *equal*.. then for startswith
+            if (k==0)
+                isTrue = data[1].toLower() == item.toLower();
+            else if (k==1)
+                isTrue = data[1].toLower().startsWith(item.toLower());
 
-        QStringList data = s.split(";");
-        if (data[1].toLower().startsWith(item.toLower())) {
-            //HelpType ht = m_helpTypes[idx];
-            int idx = 0;
-            for (int i=0;i<m_helpTypes.count();i++)
-                if (m_helpTypes[i].id.toLower()==data[0].toLower())
-                    idx=i;
+            if (isTrue) {
+                //HelpType ht = m_helpTypes[idx];
+                int idx = 0;
+                for (int i=0;i<m_helpTypes.count();i++)
+                    if (m_helpTypes[i].id.toLower()==data[0].toLower())
+                        idx=i;
 
-            if (idx>=0) {
-                ui->lstTopic->setCurrentRow(idx);
+                if (idx>=0) {
+                    ui->lstTopic->setCurrentRow(idx);
+                }
+                LoadItems(idx);
+                auto items =  ui->lstItems->findItems(item,Qt::MatchContains);
+                if (m_currentSearchItem>=items.count())
+                    m_currentSearchItem=0;
+                if (items.count()!=0) {
+                    ui->lstItems->setCurrentItem(items[m_currentSearchItem]);
+                    data[1] = items[m_currentSearchItem]->text();
+                }
+                LoadItem(data[1]);
+                return;
             }
-            LoadItems(idx);
-            auto items =  ui->lstItems->findItems(item,Qt::MatchContains);
-            if (m_currentSearchItem>=items.count())
-                m_currentSearchItem=0;
-            if (items.count()!=0) {
-                ui->lstItems->setCurrentItem(items[m_currentSearchItem]);
-                data[1] = items[m_currentSearchItem]->text();
-            }
-            LoadItem(data[1]);
-            return;
         }
     }
     LoadItems(0);
 }
-
 
 
 void formHelp::on_lstTopic_itemClicked(QListWidgetItem *item)

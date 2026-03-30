@@ -21,6 +21,8 @@
 
 #include "nodevardecl.h"
 
+QHash<QString, int> NodeVarDecl::s_mProcStackPos;
+
 
 NodeVarDecl::NodeVarDecl(QSharedPointer<Node> varNode, QSharedPointer<Node> typeNode):Node() {
     m_varNode = varNode;
@@ -38,8 +40,10 @@ void NodeVarDecl::ExecuteSym(QSharedPointer<SymbolTable> symTab) {
 //    qDebug() << varName << typeNode->m_flags;
     if (!symTab->isRegisterName(varName))
 //        if (!symTab->isThisPointer(varName))
-        if (symTab->exists(varName))
+        if (symTab->exists(varName)) {
+            varName = varName.remove("varPrefixed_");
               ErrorHandler::e.Error("Variable '" + varName +"' is already defined!",m_op.m_lineNumber);
+        }
 
 
     if (typeName=="ARRAY"){
@@ -49,7 +53,6 @@ void NodeVarDecl::ExecuteSym(QSharedPointer<SymbolTable> symTab) {
             typeName = typeNode->m_arrayVarType.m_value;
 
     }
-
     QSharedPointer<Symbol> typeSymbol = symTab->Lookup(typeName, m_op.m_lineNumber);
 
 
@@ -80,6 +83,7 @@ void NodeVarDecl::ExecuteSym(QSharedPointer<SymbolTable> symTab) {
                 ns->m_flags<< s->m_flags;
                 ns->m_bank = typeNode->m_bank;
                 ns->m_size = s->m_size;
+
 //                ns->setSizeFromCountOfData(typeNode->m_declaredCount);
 
 //                qDebug() << "NODEVARDECL Defining "<<ns->m_name << ns->m_size << s->m_size;
@@ -97,9 +101,21 @@ void NodeVarDecl::ExecuteSym(QSharedPointer<SymbolTable> symTab) {
     varSymbol->m_pointsTo = typeNode->m_arrayVarType.m_value;
    // varSymbol->m_size = typeSymbol->m_size;
     varSymbol->setSizeFromCountOfData(typeNode->m_declaredCount);
+//    qDebug() <<typeNode->m_flags;
+//    varSymbol->m_for
+
+    if (typeNode->m_flags.contains("stack")) {
+        varSymbol->m_isStackVariable = true;
+//        qDebug() <<symTab->m_currentProcedureClean;
+        s_mProcStackPos[symTab->m_currentProcedureClean]-=varSymbol->m_size;
+        varSymbol->m_stackPos = s_mProcStackPos[symTab->m_currentProcedureClean];
+     //   qDebug() <<varSymbol->m_stackPos;
+
+    }
 //    qDebug() <<"NODEVARDECL " <<varSymbol->m_name <<varSymbol->m_size <<typeNode->m_declaredCount;
 
-
+//    if (varSymbol->m_name.contains("balle"))
+//        qDebug() << "NODEVARDECL :: "<<(varSymbol->m_name);
     symTab->Define(varSymbol,isFlaggedAsUsed);
 
 
@@ -124,6 +140,7 @@ void NodeVarDecl::InitSid(QSharedPointer<SymbolTable> symtab, QString projectDir
         sid.LoadNSF(t->m_filename, projectDir);
         sid.Convert(headerShift,VICAddress,type,0x80,false);
     }
+
 
 
 /*            qDebug() << "SID LOAD: " << QString::number(sid.m_loadAddress,16);

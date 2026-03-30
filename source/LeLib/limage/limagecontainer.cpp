@@ -12,12 +12,14 @@ LImageContainer::LImageContainer()
 void LImageContainer::Prev()  {
     if (m_current>0)
         m_current--;
+
 }
 
 //template <class T>
 void LImageContainer::Next()  {
     if (m_current<m_items.count()-1)
         m_current++;
+
 }
 
 //template<class T>
@@ -28,7 +30,7 @@ void LImageContainer::Delete()
         if (m_current>=m_items.count())
             m_current = m_items.count()-1;
 
-        delete m_items[m_current];
+        //delete m_items[m_current];
         m_items.remove(m_current);
 
         if (m_current>=m_items.count())
@@ -47,7 +49,7 @@ void LImageContainer::Shift(int val)
     if (m_items.count()<=1)
         return;
 
-    LImageContainerItem* tmp = ((LImageContainerItem*)m_items[m_current]);
+    auto tmp = m_items[m_current];
     m_items[m_current] = m_items[nxt];
     m_items[nxt] = tmp;
 

@@ -16,6 +16,7 @@ LImageAtari520ST::LImageAtari520ST(LColorList::Type t, int type)  : LImageAmiga(
         m_type = LImage::Type::AMIGA320x256;
     }*/
     m_type = LImage::Type::ATARI320x200;
+    m_charHeight=40;
     Initialize(320,200);
     m_scale = 1;
     m_colorList.setNoBitplanes(4);
@@ -42,12 +43,14 @@ void LImageAtari520ST::ExportBin(QFile &file)
 //    data.resize(320*200/2); // 4 bitplanes
   //  data.fill(0);
 
-
+    int type = 0;
+    if (m_exportParams.contains("export1")) type = m_exportParams["export1"];
     int curBit = 0;
     int idx = 0;
     QVector<int> is;
     is.resize(4);
     is.fill(0);
+    if (type!=0) nobp = std::fmin(type,nobp);
     for (int y=0;y<m_height;y++) {
         for (int x=0;x<320;x++) {
 
@@ -107,7 +110,9 @@ void LImageAtari520ST::SaveBin(QFile &file)
 {
     m_height  = 200;
     LImageQImage::SaveBin(file);
-    file.write(m_colorList.toArray());
+    QByteArray data;
+    m_colorList.toArray(data);
+    file.write(data);
 }
 
 void LImageAtari520ST::LoadBin(QFile &file)
@@ -123,4 +128,90 @@ void LImageAtari520ST::LoadBin(QFile &file)
         d.insert(0,size);
         m_colorList.fromArray(d);
     }
+}
+
+
+
+
+
+QStringList LImageAtari520ST::SpriteCompiler(QString name, QString currentDir, QString src, QString dst, int xp, int yp, int w, int h, QString pparam)
+{
+    QString sprf = currentDir + name;
+
+    QString p = pparam;
+
+    dst = p+"_dst";
+    QString xx = p+"_x";
+    QString yy = p+"_y";
+    QString s = "";
+
+    for (int i=0;i<16;i++) {
+        PrintShift(p + "_"+QString::number(i),s,xp,yp,w,h,15-i);
+    }
+
+    s+= "procedure "+p+"("+dst+":^byte, "+xx+","+yy+":integer);\n";
+    s+="begin\n";
+    s+="\t"+dst+"+=toPointer("+yy+"*160);\n";
+    s+="\t"+dst+"+=toPointer(("+xx+">>1)&$FFF8);\n";
+    s+="\tasm(\" move.l "+dst+",a0\");\n";
+    s+="\t"+xx+"&=15;\n";
+//    s+="\t"+xx+":=1;\n";
+    for (int i=0;i<16;i++) {
+        s+="\tif ("+xx+"="+QString::number(i)+") then "+p+"_"+QString::number(i)+"();\n";
+    }
+
+
+  //  s+="\t\");\n";
+    s+="end;\n";
+    Util::SaveTextFile(sprf,s);
+    return QStringList();
+}
+
+void LImageAtari520ST::PrintShift(QString name, QString &s, int xp, int yp, int w, int h, int shift)
+{
+    int nobp = m_colorList.getNoBitplanes();
+
+    int curBit = 0;
+    int idx = 0;
+    QVector<int> is;
+    is.resize(4);
+    is.fill(0);
+    s+= "procedure "+name+"();\n";
+    s+="begin\n";
+    s+="\tasm(\"\n";
+
+    for (int y=0;y<h;y++) {
+        for (int x=0;x<w*8;x++) {
+            char val = m_qImage->pixel(x+xp*8+shift,y+yp);
+            for (int i=0;i<nobp;i++) {
+                int bit = CHECK_BIT(val,i);
+                is[i] = is[i] | (bit<<(15-curBit));
+                //data[4*idx+i] = data[i][idx] | (bit<<(7-curBit));
+            }
+            curBit++;
+            if (curBit==16) {
+                curBit=0;
+                idx++;
+//                int pos = y*160 + (x>>5)*16;
+                int pos = y*160 + (x>>4)*8;
+
+                for (int i=0;i<nobp;i+=1) {
+                    //                    is[i] = x+y;
+                    if (is[i]!=0) {
+//                        qDebug() << pos+i*2;;
+                        s+="\tor.w #"+QString::number(is[i])+","+QString::number(pos+i*2)+"(a0)\n";
+                    }
+                    //data.append((is[i]>>8)&0xFF);
+                    //data.append(is[i]&0xFF);
+                }
+                is.fill(0);
+                // Append to data
+            }
+            //            qDebug() << QString::number(idx);
+
+        }
+    }
+    s+="\t\");\n";
+    s+="end;\n";
+
 }

@@ -50,12 +50,12 @@ void DialogNewImage::CreateCategories()
 {
     m_categories.clear();
     for (ImageType& it: m_types)
-        if (!m_categories.contains(it.category))
+        if (!m_categories.contains(it.category) || it.category=="all")
             m_categories << it.category;
 
 
    ui->cmbSystem->addItems(m_categories);
-   ui->cmbSystem->setCurrentText(Syntax::s.m_systemString.toLower());
+   ui->cmbSystem->setCurrentText(Syntax::s.m_systemString);
 }
 
 void DialogNewImage::SetResizeMeta(CharmapGlobalData gd)

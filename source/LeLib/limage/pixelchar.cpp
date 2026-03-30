@@ -20,14 +20,23 @@ unsigned char PixelChar::get(int x, int y, unsigned char bitMask)
 
 }
 
-void PixelChar::set(int x, int y, unsigned char color, unsigned char bitMask, unsigned char maxCol, unsigned char minCol)
+unsigned char PixelChar::getByteValue(int x, int y, unsigned char bitMask)
+{
+    if (x<0 || x>=8 || y<0 || y>=8)
+        return 0;
+
+    return (p[y]>>x) & bitMask;
+
+
+}
+
+void PixelChar::set(int x, int y, unsigned char color, unsigned char bitMask, unsigned char maxCol, unsigned char minCol, int forceD800)
 {
     m_lastBitmask = bitMask;
     if (x<0 || x>=8 || y<0 || y>=8) {
         qDebug() << "Trying to set " << x << ", " << y << " out of bounds";
         return;
     }
-
 
     // Special case hires
     if (maxCol==2) {
@@ -92,6 +101,17 @@ void PixelChar::set(int x, int y, unsigned char color, unsigned char bitMask, un
 
     }
 
+    if (forceD800!=-1) {
+        c[3] = forceD800;
+//        if (color!=0 )
+  //          qDebug() << QString::number(winner) <<QString::number(color) ;
+        if (winner==3 && color != forceD800){
+            color = forceD800;
+//            qDebug() << "ABORTING " <<QString::number(color);
+//            return;
+        }
+    }
+
 
     unsigned int f = ~(bitMask << x);
     p[y] &= f;
@@ -112,6 +132,7 @@ void PixelChar::set(int x, int y, unsigned char color, unsigned char bitMask)
 
     // find index
     uchar index = 10;
+
     if (c[0]==color) index=0;
     else
     if (c[1]==color) index=1;
@@ -129,6 +150,11 @@ void PixelChar::set(int x, int y, unsigned char color, unsigned char bitMask)
     p[y] &= f;
     // Add
     p[y] |= (index&bitMask)<<x;
+
+/*    if (color==2) {
+        qDebug() << index  << x << bitMask << QString::number((index&bitMask)<<x,02);
+    }
+*/
 
 }
 
@@ -210,19 +236,20 @@ QString PixelChar::colorToAssembler()
 
 }
 
-QImage PixelChar::toQImage(int size, uchar bmask, LColorList& lst, int scale)
+QImage PixelChar::toQImage(int size, uchar bmask, LColorList& lst, int scale, bool isHybrid)
 {
     QImage img= QImage(size,size,QImage::Format_RGB32);
+    if (isHybrid && c[3]>=8) {
+        bmask = 0b11;
+        scale = 2;
+    }
     for (int i=0;i<size;i++)
         for (int j=0;j<size;j++) {
             int x = i/(float)(size)*8;
             int ix = (x % (8)/scale)*scale;
             int y = j/(float)(size)*8;
-            uchar c = get(ix,y, bmask);
-
-           // if (rand()%100==0 && c!=0)
-           //     qDebug() << lst.m_list[c].color;
-            img.setPixelColor(i,j,lst.get(c).color);
+            uchar cc = get(ix,y, bmask);
+            img.setPixelColor(i,j,lst.get(cc).color);
         }
 
     return img;
@@ -246,10 +273,21 @@ bool PixelChar::isEqualBytes(PixelChar &o)
     return true;
 }
 
-void PixelChar::Reorganize(unsigned char bitMask, unsigned char scale, unsigned char minCol, unsigned char maxCol, unsigned char bgCol)
+void PixelChar::Reorganize(unsigned char bitMask, unsigned char scale, unsigned char minCol, unsigned char maxCol, unsigned char bgCol, unsigned char forceD800Color)
 {
 //    if (rand()%1000==0)
   //      qDebug() << bgCol << minCol << maxCol;
+
+    if (forceD800Color!=255) {
+        // First, swap potential 1 and 2
+//        qDebug() << "HERE";
+        if (c[1]==forceD800Color)
+            swapMCBits(1,3);
+        if (c[2]==forceD800Color)
+            swapMCBits(2,3);
+
+        c[3] = forceD800Color;
+    }
     if (c[0]!=bgCol)
         for (int i=1;i<maxCol;i++)
             if (c[i]==bgCol) {
@@ -284,6 +322,7 @@ int PixelChar::Count(unsigned int col, unsigned char bitMask, unsigned char scal
                 cnt++;
     return cnt;
 }
+
 
 double PixelCharSSIM::getVal(int x, int y) {
     if (x<0 || x>=8 || y<0 || y>=8)
@@ -343,6 +382,21 @@ void PixelChar::ForceBackgroundColor(int col, int swapcol)
 
 }
 
+void PixelChar::swapMCBits(uchar b1, uchar b2)
+{
+    for (int i=0;i<8;i++) {
+        uchar c = 0;
+        uchar org = p[i];
+        for (int j=0;j<4;j++) {
+            uchar v = (org>>(j*2))&0b11;
+            if (v==b1)
+                v=b2;
+            c |= (v<<j*2);
+        }
+        p[i] = c;
+    }
+}
+
 bool PixelChar::isPure()
 {
     uchar p0 =p[0];
@@ -400,6 +454,64 @@ int PixelChar::CompareLength2(PixelChar &other) {
     return l;
 
 }
+
+void PixelChar::MergeColor3(int target)
+{
+    for (int i=0;i<8;i++)
+        for (int j=0;j<8;j+=2) {
+            if ( ((p[i]>>j) & 0b11)==0b11)
+                p[i] = (p[i]&(~((0b11<<j))))|(target<<j);
+
+        }
+//    c2[]
+//    if (c[target]==0)
+//        c[target] = c[3];
+//    c[3] = 0;
+
+}
+
+void PixelChar::SwapColors12()
+{
+    //return;
+    uchar t = c[2];
+    c[2] = c[1];
+    c[1]  = t;
+//    return;
+    for (int j=0;j<8;j++) {
+        uchar cc = 0;
+        for (int k=0;k<8;k+=2)  {
+            t = (p[j]>>k)&0b11;
+            if (t==1) t=2;
+            else
+             if (t==2) t=1;
+            cc|=t<<k;
+
+        }
+    p[j]=cc;
+    }
+}
+
+void PixelChar::SwapColors13()
+{
+    //return;
+    uchar t = c[3];
+    c[3] = c[1];
+    c[1]  = t;
+//    return;
+    for (int j=0;j<8;j++) {
+        uchar cc = 0;
+        for (int k=0;k<8;k+=2)  {
+            t = (p[j]>>k)&0b11;
+            if (t==1) t=3;
+            else
+             if (t==3) t=1;
+            cc|=t<<k;
+
+        }
+    p[j]=cc;
+    }
+}
+
 
 int PixelChar::CompareLength3(PixelChar &other)
 {

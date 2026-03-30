@@ -12,18 +12,18 @@ LImageFooter::LImageFooter() {
 }
 
 uchar LImageFooter::get(int pos) {
-    if (pos<m_data.count())
+    if (pos<m_data.length() && pos>=0)
         return m_data[pos];
     return 0;
 }
 
 void LImageFooter::set(int pos, uchar val) {
-    if (pos<m_data.count())
+    if (pos<m_data.length())
         m_data[pos] = val;
 }
 
 void LImageFooter::toggle(int pos) {
-    if (pos<m_data.count()) {
+    if (pos<m_data.length()) {
         m_data[pos] = !((bool)m_data[pos]);
     }
 }

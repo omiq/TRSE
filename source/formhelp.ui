@@ -49,6 +49,13 @@
       </property>
      </widget>
      <widget class="QTextEdit" name="txtHelp">
+      <property name="font">
+       <font>
+        <family>Helvetica</family>
+        <pointsize>15</pointsize>
+        <bold>false</bold>
+       </font>
+      </property>
       <property name="acceptRichText">
        <bool>true</bool>
       </property>
@@ -60,7 +67,7 @@
      <item>
       <widget class="QLabel" name="label">
        <property name="text">
-        <string>Search:</string>
+        <string>Search in help:</string>
        </property>
       </widget>
      </item>

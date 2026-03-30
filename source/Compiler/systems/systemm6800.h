@@ -1,5 +1,5 @@
-#ifndef SYSTEMM6800_H
-#define SYSTEMM6800_H
+#ifndef SYSTEMM68000_H
+#define SYSTEMM68000_H
 
 #include "abstractsystem.h"
 #include <QProcess>
@@ -14,6 +14,11 @@ public:
         return false;
     }
     int getPointerSize() override {
+        return 4;
+    }
+    virtual TokenType::Type getPointerType() override { return TokenType::Type::LONG;}
+
+    virtual int addressBusBits() override {
         return 32;
     }
 

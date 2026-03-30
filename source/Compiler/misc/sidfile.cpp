@@ -21,6 +21,8 @@
 
 #include "sidfile.h"
 #include <QDebug>
+QByteArray SidFile::m_zp;
+
 SidFile::SidFile()
 {
 
@@ -32,6 +34,7 @@ void SidFile::Load(QString filename, QString path)
     m_fileName = filename;
     if (!filename.endsWith(".sid"))
         ErrorHandler::e.Error("Unable to load '" + filename +"', must be sid file!");
+
     QFile file(path + filename);
 
     if (!QFile::exists(path + filename))
@@ -39,10 +42,9 @@ void SidFile::Load(QString filename, QString path)
 
     file.open(QIODevice::ReadOnly);
     m_blob = file.readAll();
-    //qDebug() << "sid file size: " << m_blob.count();
 
 
-    if (!(m_blob.at(0)=='P' && m_blob.at(1)=='S' && m_blob.at(2)=='I' && m_blob.at(3)=='D'))
+    if (!((m_blob.at(0)=='P'||m_blob.at(0)=='R') && m_blob.at(1)=='S' && m_blob.at(2)=='I' && m_blob.at(3)=='D'))
         ErrorHandler::e.Error("File '" + filename +"' not identified as a SID file");
 
 
@@ -50,10 +52,24 @@ void SidFile::Load(QString filename, QString path)
     m_initAddress = (unsigned char)(m_blob.at(0xa))<<8 | (unsigned char)(m_blob.at(0xa+1))<<0;
     m_playAddress = (unsigned char)(m_blob.at(0xc))<<8 | (unsigned char)(m_blob.at(0xc+1))<<0;
 
+    m_zp.clear();
+    for (int i=0;i<m_blob.size()-1;i++) {
+        uchar d = m_blob[i];
+        uchar n = m_blob[i+1];
+//        if (d==0x81 || d==0x91) {
+            if (d==0x85 || d==0xA5) {
+//                if (d==0xB1 || d==0x91) {
+                if (!m_zp.contains(n))
+                     m_zp.append(n);
+        }
 
-//    qDebug() << Util::numToHex(m_playAddress);
-  //  qDebug() << Util::numToHex(m_initAddress);
+    }
 
+/*
+    qDebug() << Util::numToHex(m_playAddress);
+    qDebug() << Util::numToHex(m_initAddress);
+    qDebug() << Util::numToHex(m_loadAddress);
+*/
     file.close();
 }
 
@@ -131,7 +147,7 @@ void SidFile::Convert(int headerShift, int newAddress, QString fileEnding, int h
     if (Syntax::s.m_currentSystem->m_system==AbstractSystem::OK64)
     {
 //        qDebug() << "VSID CONVERSION: ";
-        for (int i=0;i<m_blob.count()-1;i++) {
+        for (int i=0;i<m_blob.length()-1;i++) {
             uchar lo = m_blob[i];
             uchar hi = m_blob[i+1];
             if (hi==0xD4) {

@@ -4,8 +4,11 @@
 void CompilerZ80::InitAssemblerAnddispatcher(QSharedPointer<AbstractSystem> system)
 {
     m_assembler = QSharedPointer<AsmZ80>(new AsmZ80());//
-    m_dispatcher = QSharedPointer<ASTdispatcherZ80>(new ASTdispatcherZ80());
-    m_dispatcher->m_outputLineNumbers = false;
+    m_codeGen = QSharedPointer<CodeGenZ80>(new CodeGenZ80());
+    m_codeGen->dontOutputLineNumbers();
+
+    m_assembler->m_startInsertAssembler << m_parser.m_initAssembler;
+
 
     if (m_projectIni->getdouble("override_target_settings")==1) {
         Syntax::s.m_currentSystem->m_programStartAddress = Util::NumberFromStringHex(m_projectIni->getString("override_target_settings_org"));
@@ -15,11 +18,15 @@ void CompilerZ80::InitAssemblerAnddispatcher(QSharedPointer<AbstractSystem> syst
     if (m_projectIni->getdouble("exomizer_toggle")==1.0)
         Syntax::s.m_currentSystem->m_programStartAddress = 0x300; // Unpack address
 
-
-    m_assembler->Asm("CPU "+m_projectIni->getString("cpu_Z80_system"));
+    auto sys = m_projectIni->getString("cpu_Z80_system");
+//    if (sys=="") sys ="z80";
+    if (m_ini->getString("assembler_z80")!="Pasmo")
+  //      if (Syntax::s.m_currentSystem->m_system != AbstractSystem::GAMEBOY)
+        m_assembler->Asm("CPU "+Syntax::s.m_currentSystem->StringFromProcessor(Syntax::s.m_currentSystem->m_processor));
 
     if (Syntax::s.m_currentSystem->m_system != AbstractSystem::COLECO)
-        m_assembler->Asm(" org "+Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress));
+//        if (Syntax::s.m_currentSystem->m_system != AbstractSystem::GAMEBOY)
+        m_assembler->Asm(m_assembler->GetOrg(Syntax::s.m_currentSystem->m_programStartAddress));
 
     if (Syntax::s.m_currentSystem->m_system == AbstractSystem::MSX) {
         /*        m_assembler->Asm("db $FE     ; magic number");
@@ -35,12 +42,24 @@ void CompilerZ80::InitAssemblerAnddispatcher(QSharedPointer<AbstractSystem> syst
         m_assembler->Asm("dw 0		; TEXT");
         m_assembler->Asm("dw 0,0,0	; Reserved    ");
         m_assembler->Label("msx_prg_start");
+
+
+    }
+
+    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::AGON) {
+        m_assembler->Asm("jp main_start_gen");
+//        m_assembler->Asm(".align $40");
+        m_assembler->Asm("ds 60");
+        m_assembler->Asm("db \"MOS\"");
+        m_assembler->Asm("db 0");
+        m_assembler->Asm("db 1");
+
+
+        m_assembler->Label("main_start_gen");
     }
 
 
     if (Syntax::s.m_currentSystem->m_system == AbstractSystem::TIKI100) {
-        m_assembler->Asm(" jp $8000");
-        m_assembler->Asm(" org $8000");
 
     }
 
@@ -48,11 +67,15 @@ void CompilerZ80::InitAssemblerAnddispatcher(QSharedPointer<AbstractSystem> syst
         m_assembler->IncludeFile(":resources/code/coleco/header.asm");
 //        m_assembler->Asm(" org 8000h");
 
-
     }
+    if (Syntax::s.m_currentSystem->m_system == AbstractSystem::TVC)
+        m_assembler->IncludeFile(":resources/code/videoton.asm");
+
     if (Syntax::s.m_currentSystem->m_system == AbstractSystem::AMSTRADCPC ||
-        Syntax::s.m_currentSystem->m_system == AbstractSystem::SPECTRUM ||
-        Syntax::s.m_currentSystem->m_system == AbstractSystem::MSX
+        Syntax::s.m_currentSystem->m_system == AbstractSystem::SPECTRUM
+      ||  Syntax::s.m_currentSystem->m_system == AbstractSystem::MSX
+            ||  Syntax::s.m_currentSystem->m_system == AbstractSystem::TIM
+            ||  Syntax::s.m_currentSystem->m_system == AbstractSystem::TVC
         ) {
         m_assembler->m_symTab->m_constants = m_parser.m_symTab->m_constants;
         m_assembler->WriteConstants();
@@ -67,8 +90,15 @@ void CompilerZ80::InitAssemblerAnddispatcher(QSharedPointer<AbstractSystem> syst
 void CompilerZ80::Connect()
 {
     m_assembler->m_source<<m_parser.m_parserAppendix;
-    m_assembler->IncludeFile(":resources/code/Z80/memcpy.asm");
-    m_assembler->IncludeFile(":resources/code/Z80/init.s");
+//    if (Syntax::s.m_currentSystem->m_system!=AbstractSystem::TRS80)
+  //  {
+        m_assembler->IncludeFile(":resources/code/Z80/memcpy.asm");
+    if (Syntax::s.m_currentSystem->m_processor==AbstractSystem::Z180) {
+        m_assembler->IncludeFile(":resources/code/Z80/init_z180.s");
+    }
+    else
+        m_assembler->IncludeFile(":resources/code/Z80/init.s");
+    //    }
     m_assembler->Connect();
 
     m_assembler->EndMemoryBlock();
@@ -82,7 +112,7 @@ void CompilerZ80::Connect()
 
     }
 
-    if (Syntax::s.m_currentSystem->m_system != AbstractSystem::COLECO)
+    if (Syntax::s.m_currentSystem->m_system != AbstractSystem::COLECO && Syntax::s.m_currentSystem->m_system!=AbstractSystem::AGON)
         m_assembler->Asm("end");//+Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress));
 
 
@@ -101,22 +131,17 @@ void CompilerZ80::Connect()
 
 }
 
-bool CompilerZ80::SetupMemoryAnalyzer(QString filename, Orgasm* orgAsm)
+/*bool CompilerZ80::SetupMemoryAnalyzer(QString filename, Orgasm* orgAsm)
 {
- /*   Orgasm orgAsm;
-    orgAsm.SetupConstants(m_parser.m_symTab);
-    //orgAsm.Codes();
-    orgAsm.Assemble(filename+".asm", filename+".prg");
-    if (!orgAsm.m_success) {
-        return;
-    }
-    */
-    QProcess process;
-    QString assembler = m_ini->getString("pasmo");
     QString output;
+    QString assembler = m_ini->getString("pasmo");
     Syntax::s.m_currentSystem->StartProcess(assembler, QStringList() << "-1"<< filename+".asm" <<filename+".bin", output, true);
     if (m_assembler==nullptr)
         return true;
+
+//    qDebug().noquote() << output;
+
+  //  output = Util::loadTextFile(filename+".sym");
 
     QVector<QSharedPointer<MemoryBlock>> nb;
     for (QSharedPointer<MemoryBlock> mb: m_assembler->blocks) {
@@ -127,11 +152,6 @@ bool CompilerZ80::SetupMemoryAnalyzer(QString filename, Orgasm* orgAsm)
     m_assembler->blocks.clear();
     m_assembler->blocks = nb;
 
-/*    int codeEnd=FindEndSymbol(orgAsm);
-    QVector<int> ends = FindBlockEndSymbols(orgAsm);
-    //    qDebug() << "B";
-    ConnectBlockSymbols(ends);
-        */
     int start = 0;
     int end = 0;
     QStringList lst = output.split("\n");
@@ -162,12 +182,6 @@ bool CompilerZ80::SetupMemoryAnalyzer(QString filename, Orgasm* orgAsm)
 //            qDebug() << "Found FILE " << file << Util::numToHex(binStart) << Util::numToHex(binEnd);
 
         }
-/*        if (l[0].toLower().startsWith("endblock")) {
-//            qDebug() << "FOUND END AT " <<
-            end = l[0].toLower().remove("endblock").toInt(&ok,16);
-            codeBlocks.append(QSharedPointer<MemoryBlock>(new MemoryBlock(start, end, MemoryBlock::CODE, "code")));
-
-        }*/
 
         if (l.count()>=2) {
             if (l[1].toLower()=="label") {
@@ -179,13 +193,6 @@ bool CompilerZ80::SetupMemoryAnalyzer(QString filename, Orgasm* orgAsm)
 
                 }
             }
-/*            if (l[1].toLower() == "end") {
-                end = l[0].split(":")[0].toInt(&ok,16);
-                codeBlocks.append(QSharedPointer<MemoryBlock>(new MemoryBlock(start, end, MemoryBlock::CODE, "code")));
-                qDebug() << "**************************** END found at "<< Util::numToHex(end);
-                continue;
-            }
-            */
             if (l[1].toLower() == "end") {
 //                qDebug() <<" Breaking at END";
                 ignore = true;
@@ -205,4 +212,4 @@ bool CompilerZ80::SetupMemoryAnalyzer(QString filename, Orgasm* orgAsm)
     m_assembler->blocks = codeBlocks <<m_assembler->blocks;
     return true;
 }
-
+*/

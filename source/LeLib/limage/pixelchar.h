@@ -14,7 +14,8 @@ public:
     unsigned char c[4];
     static int m_lastBitmask;
     unsigned char get(int x, int y, unsigned char bitMask);
-    void set(int x, int y, unsigned char color, unsigned char bitMask, unsigned char maxCol, unsigned char minCol);
+    unsigned char getByteValue(int x, int y, unsigned char bitMask);
+    void set(int x, int y, unsigned char color, unsigned char bitMask, unsigned char maxCol, unsigned char minCol, int forceD800Col=-1);
     void set(int x, int y, unsigned char color, unsigned char bitMask);
     void Clear(unsigned char background);
     QString bitmapToAssembler();
@@ -23,13 +24,15 @@ public:
     QByteArray data();
     uchar flipSpriteBit(int i, int mask);
     QString colorToAssembler();
-    QImage toQImage(int size, uchar bmask, LColorList& lst, int scale);
+    QImage toQImage(int size, uchar bmask, LColorList& lst, int scale, bool isHybrid);
     bool isEmpty();
     bool isEqualBytes(PixelChar& o);
-    void Reorganize(unsigned char bitMask, unsigned char Scale,unsigned char minCol, unsigned char maxCol, unsigned char bgCol);
+    void Reorganize(unsigned char bitMask, unsigned char Scale,unsigned char minCol, unsigned char maxCol, unsigned char bgCol, unsigned char forceD800Color);
     int Count(unsigned int col, unsigned char bitMask, unsigned char Scale);
+    void MergeColor3(int target);
 
     void ForceBackgroundColor(int col, int swapcol);
+    void swapMCBits(uchar b1, uchar b2);
 
     bool isPure();
 
@@ -39,6 +42,10 @@ public:
     int CompareLength(PixelChar& other);
 
     int CompareLength2(PixelChar& other);
+
+    void SwapColors12();
+    void SwapColors13();
+
 
     int CompareLength3(PixelChar& other);
     double CompareLengthSSIM(PixelChar& other);

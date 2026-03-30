@@ -30,6 +30,8 @@
 #include <QImage>
 #include <QtMath>
 #include <QByteArray>
+
+#include "source/Compiler/errorhandler.h"
 //#include <source/effects/demoeffectraytracer.h>
 
 
@@ -67,9 +69,6 @@ public:
 //    QVector<CharPos> m_charPos;
     QByteArray m_outputData;
     int m_Index = 0;
-    int m_charWidth=40;
-    int m_charHeight=25;
-
     MultiColorImage(LColorList::Type t);
 //    QVector<PixelChar> m_data;
     PixelChar m_data[40*25*10];
@@ -79,11 +78,12 @@ public:
 
     int LookUp(PixelChar pc);
     QString m_charsetFilename ="";
-
+    void SetFixed23(int a, int b);
     CharsetImage* m_charset = nullptr;
     virtual void setMultiColor(bool doSet) override;
     void ForceBackgroundColor(int col, int swapCol);
 
+    void FixYColors();
 
     void AppendSaveBinCharsetFilename(QFile& file);
     void LoadBinCharsetFilename(QFile& file);
@@ -103,6 +103,7 @@ public:
 
     virtual void SetHybridMode(bool checked) override;
 
+    int getCanvasColor(int x, int y) override;
 
     virtual int getCharAtPos(QPoint p, float zoom, QPointF center) override;
     void setHybrid();
@@ -123,15 +124,17 @@ public:
 
     void Reorganize();
     virtual bool KeyPress(QKeyEvent *e) override;
+    void FixSameColorsForDemoEffects();
 
     void SaveBin(QFile& f) override;
     void LoadBin(QFile& f) override;
 
-    virtual void Color2Raw(QByteArray& ba, int ly);
+    virtual void Color2Raw(QByteArray& ba, int ly,int sx, int sy, int ex, int ey);
 
     virtual int charWidthDisplay() {
         return m_charWidth;
     }
+    virtual void FixHires();
 
     void ImportKoa(QFile& f) override;
     void ExportKoa(QFile& f) override;
@@ -139,16 +142,16 @@ public:
     virtual QString getMetaInfo() override;
 
 
-    void FloydSteinbergDither(QImage& img, LColorList& colors, bool dither) override;
+    void FloydSteinbergDither(QImage& img, LColorList& colors, bool dither, double strength) override;
     void OrdererdDither(QImage& img, LColorList& colors, QVector3D strength, QPoint size, float gamma) override;
 
     void Initialize(int width, int height) override {}
     virtual void CopyImageData(LImage* img) override;
 
-    void ToQImage(LColorList& lst, QImage& img, float zoom, QPointF center) override;
+    void ToQImage(LColorList& lst, QImage& img, double zoom, QPointF center) override;
 
     void Release() override {}
-    virtual void RenderEffect(QMap<QString, float> params);
+    virtual void RenderEffect(QHash<QString, float> params) override;
 
     void ApplyToLabel(QLabel* l) override {}
 
@@ -172,6 +175,8 @@ public:
     void VBMExportColor(QFile& file, int p1, int p2, int p3, int p4) override;
 
     void VBMExportChunk(QFile& file, int p1, int p2, int p3, int p4) override;
+    void VBMCompileChunk(QTextStream &f, QString procName, QString pointerName, QString asmOperation, int start, int width, int height, int isMulticolor) override;
+
     void FromLImageQImage(LImage* other) override;
 
     void SetCharSize(int x, int y);
@@ -183,6 +188,8 @@ public:
    virtual void CompressAndSave(QByteArray& chars, QVector<int>& screen, int x0,int x1, int y0, int y1, int& noChars, double compression, int maxChars, int type, bool addChars);
 
    void SetColor(uchar col, uchar idx) override;
+
+   void SetForceD800Color(int val ) override;
 
 
 };

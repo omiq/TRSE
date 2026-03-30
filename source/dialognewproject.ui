@@ -53,16 +53,6 @@
           </item>
           <item>
            <property name="text">
-            <string>NES</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
-            <string>GAMEBOY</string>
-           </property>
-          </item>
-          <item>
-           <property name="text">
             <string>C128</string>
            </property>
           </item>
@@ -73,7 +63,32 @@
           </item>
           <item>
            <property name="text">
+            <string>NES</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>SNES</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>GAMEBOY</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>PLUS4</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>SPECTRUM</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>TRS80COCO</string>
            </property>
           </item>
           <item>
@@ -98,6 +113,16 @@
           </item>
           <item>
            <property name="text">
+            <string>TVC</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>THOMSON</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>ATARI520ST</string>
            </property>
           </item>
@@ -118,7 +143,17 @@
           </item>
           <item>
            <property name="text">
+            <string>TIM</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
             <string>ATARI800</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>VZ200</string>
            </property>
           </item>
          </widget>

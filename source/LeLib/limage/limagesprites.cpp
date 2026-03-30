@@ -49,7 +49,7 @@ LImageSprites::LImageSprites(LColorList::Type t) : CharsetImage(t) {
 void LImageSprites::FromRaw(QByteArray &arr)
 {
     Clear();
-    int count = m_rawData.count()/64;
+    int count = m_rawData.length()/64;
     // qDebug() << "Count: " << count;
     int xp = 0;
     int yp = 0;
@@ -96,7 +96,7 @@ void LImageSprites::FromRaw(QByteArray &arr)
 void LImageSprites::ToRaw(QByteArray &arr)
 {
     arr.clear();
-    int count = m_rawData.count()/64;
+    int count = m_rawData.length()/64;
     // qDebug() << "Count: " << count;
     int xp = 0;
     int yp = 0;
@@ -133,7 +133,7 @@ void LImageSprites::ToRaw(QByteArray &arr)
         }
         noSprites++;
     }
-    qDebug() << "Converted : " << (arr.count()/64) << " sprites";
+    qDebug() << "Converted : " << (arr.length()/64) << " sprites";
 }
 
 
@@ -223,9 +223,9 @@ unsigned int LImageSprites::getPixel(int x, int y)
 
 }
 
-void LImageSprites::FlipVertical()
+/*void LImageSprites::FlipVertical()
 {
-    /*if (m_currentMode==CHARSET2x2)
+    if (m_currentMode==CHARSET2x2)
         return;
 
 
@@ -240,13 +240,13 @@ void LImageSprites::FlipVertical()
     for (int y=0;y<21;y++)
       for (int x=0;x<23;x++)
             setPixel( x*i+8 ,y*j+8, tmp[24*y + 23-x]);
-*/
+
 
 }
 
 void LImageSprites::FlipHorizontal()
 {
-    /*
+
     if (m_currentMode==CHARSET2x2)
         return;
 
@@ -262,10 +262,10 @@ void LImageSprites::FlipHorizontal()
     for (int y=0;y<21;y++)
       for (int x=0;x<24;x++)
             setPixel( x*i ,y*j+8, tmp[24*(20-y) +x]);
-*/
+
 
 }
-
+*/
 void LImageSprites::CopyPasteChar(int type)
 {
     //if (m_currentMode==CHARSET1x1)

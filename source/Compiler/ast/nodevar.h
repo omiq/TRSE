@@ -28,28 +28,43 @@
 #include "source/Compiler/ast/node.h"
 #include "source/Compiler/ast/nodenumber.h"
 #include "source/Compiler/ast/nodevartype.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
+/* 
+    A Node representing a variable. 
+    m_left: undefined 
+    m_right: undefined
+    m_op: ?
+    m_expr : index, for instance var[idx*2]  then m_expr will be a nodebinop (idx*2)
+*/
 class NodeVar : public Node {
 private:
 public:
     QString value;
     QSharedPointer<Node> m_expr = nullptr;
-    //QSharedPointer<NodeVarType> m_type;
     bool m_fake16bit = false;
     QSharedPointer<Node> m_subNode = nullptr;
     bool m_ignoreRecordExpr = false;
     bool m_ignoreLookup = false;
-    TokenType::Type m_writeType = TokenType::NADA;
+    bool m_scaleApplied = false; // used for class array index scaling in parser
+    bool m_hasGlobalFlag = false;
+    TokenType::Type m_classvariableType = TokenType::NADA;
+    bool m_isArrayInClass = false;
     NodeVar(Token t);
 
     NodeVar(Token t, QSharedPointer<Node> expr);
+    NodeType getNodeType() override {
+        return VARIABLE;
+    }
 
     bool m_isGlobal = false;
-    void ReplaceInline(Assembler* as,QMap<QString, QSharedPointer<Node> >& inp) override;
+    void ReplaceInline(Assembler* as,QHash<QString, QSharedPointer<Node> >& inp) override;
 
+    void ReplaceVariable(Assembler* as, QString name, QSharedPointer<Node> node) override;
 
-    TokenType::Type getOrgType(Assembler *as);
+    TokenType::Type getClassvariableType()  override { return m_classvariableType; }
+
+    TokenType::Type getOrgType(Assembler *as) override;
 
     TokenType::Type getType(Assembler* as) override;
     QString getTypeText(Assembler* as) override;
@@ -57,18 +72,25 @@ public:
 
     bool isPointer(Assembler* as) override;
     bool isPurePointer(Assembler* as) override;
+    bool isBool(Assembler* as) override;
 
+    bool containsVariables() override {return true;}
 
     bool DataEquals(QSharedPointer<Node> other) override;
     bool isWord(Assembler* as) override;
     bool isLong(Assembler* as) override;
     bool isByte(Assembler* as) override;
+    bool isStringList(Assembler* as) override;
+
     bool containsPointer(Assembler* as) override;
     bool isRecord(Assembler* as) override;
     bool isRecord(QSharedPointer<SymbolTable> s, QString& str) override;
     bool isClass(Assembler* as) override;
     bool isRecordData(Assembler* as) override;
     bool isPureObject = false;
+    bool isStackVariable() override;
+    int getStackShift() override;
+
     virtual bool isReference() override { return m_op.m_isReference; }
 
     void forceWord() override {
@@ -89,7 +111,7 @@ public:
 
     bool isPureVariable() override {
 
-        return m_expr==nullptr; // only return true if there are no array expressions
+        return m_expr==nullptr && !isStackVariable(); // only return true if there are no array expressions
     }
     bool is8bitValue(Assembler* as) override {
         return getType(as)==TokenType::BYTE
@@ -99,33 +121,35 @@ public:
                 ;
     }
 
-    bool isArrayIndex() override { return m_expr!=nullptr; }
+    bool hasArrayIndex() override { return m_expr!=nullptr || isStackVariable(); }
 
     bool typeIsArray(Assembler* as) override;
-    QString getValue8bit(Assembler* as, bool isHi) override;
+    QString getValue8bit(Assembler* as, int isHi) override;
 
 
 
     QString getValue(Assembler* as) override;
     QString getLiteral(Assembler* as) override {
         return getValue(as);
-        //if (m_forceAddress) return "#" + value;
-        //return value;
     }
 
     bool isAddress() override;
 
     bool isSigned(Assembler* as) override;
-/*    void LoadVariable(AbstractASTDispatcher* dispatcher) override;
-    void LoadPointer(Assembler* as);
+    QSharedPointer<Node> getIndex() override { return m_expr; }
+    bool hasFlag(Assembler* as, QString flag) override
+    {
+        QSharedPointer<Symbol> s = as->m_symTab->Lookup(getValue(as), m_op.m_lineNumber);
+        return s->m_flags.contains(flag);
+    }
 
-    void StoreVariable(AbstractASTDispatcher* dispatcher) override;
-*/
+
     void ExecuteSym(QSharedPointer<SymbolTable> symTab) override;
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeVar>(sharedFromThis()));
     }
 
     void VerifyReferences(Assembler* as) override;
+    virtual QString rawValue() override { return value;}
 
 };

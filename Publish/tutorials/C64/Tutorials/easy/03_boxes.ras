@@ -1,4 +1,5 @@
 program Boxes;
+@use "screen/screen"
 var  
 	saddr: array[screen_height] of integer; // Screen address table
 	caddr: array[screen_height] of integer; // Color adress table
@@ -20,14 +21,14 @@ var
 	
 begin
 	// Set screen background/border color
-	screen_bg_col:=black;
-	screen_fg_col:=black;
-	
-    clearscreen(key_space, screen_char_loc);
-    clearscreen(black, screen_col_loc);
+	Screen::border:=black;
+	Screen::background:=black;
+
+    clearscreen(key_space, #screen_char_loc);
+    clearscreen(black, #screen_col_loc);
 	// Sets up the address tables for the screen & color memory    
-	createaddresstable(#saddr,screen_char_loc,screen_width,screen_height);
-	createaddresstable(#caddr,screen_col_loc,screen_width,screen_height);
+	createaddresstable(#saddr,#screen_char_loc,screen_width,screen_height);
+	createaddresstable(#caddr,#screen_col_loc,screen_width,screen_height);
 
 	// dx and dy are initialized to 1
 	dx:=1;

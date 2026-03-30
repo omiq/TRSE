@@ -24,14 +24,23 @@ public:
 
     void SaveCharset(QString filename, QImage& img, int w, int h, int div);
     void AddScreen(QByteArray& data, QImage& img, int w, int h, char base, int div);
+    void AddCGAScreen(QByteArray& data, QImage& img, int w, int h, char col, int div);
+    void AddCGA16Screen(QByteArray& data, LImage& img, int w, int h, char col, int div);
     void AddToDataX(QByteArray& data, MultiColorImage& img,int x, int y, int w, int h);
+    void AddToVZ200Data(QByteArray& data, LImage& img,int x, int y, int w, int h);
+    void AddTo4PixelData(QByteArray& data, LImage& img,int x, int y, int w, int h, bool inv);
+    void AddTo4PixelCGAData(QByteArray& data, LImage& img,int x, int y, int w, int h, bool inv);
+    void AddTo8PixelData(QByteArray& data, LImage& img,int x, int y, int w, int h, bool inv);
+    void AddTo4PixelDataTVC(QByteArray& data, LImage& img,int x, int y, int w, int h);
+    void AddSpecialC64bitmapModeToData(QByteArray& data, LImage& img,int x, int y, int w, int h);
     void AddToDataBBCMode5(QByteArray& data, LImage* img,int x, int y, int w, int h);
     void AddToDataVGA(QByteArray& data, LImageQImage& img,int x, int y, int w, int h);
-    void AddBitplaneToData(QByteArray& data, MultiColorImage& img,int x, int y, int w, int h, int bpl);
+    void AddBitplaneToData(QByteArray& data, MultiColorImage& img,int x, int y, int w, int h, int bpl, int shift);
     void AddAmstradCPCToData(QByteArray& data, LImage* img,int x, int y, int w, int h);
     void AddAtariBitplaneToData(QByteArray& data, MultiColorImage& img,int x, int y, int w, int h);
     void AddSingleAtariBitplaneToData(QByteArray& data, MultiColorImage& img,int x, int y, int w, int h, int bpl_select);
 
+    void AddToRGBAData(QByteArray &data, QImage& img, int xp, int yp, int w, int h);
     int CompareSprites(QByteArray& d1,QByteArray& d2, int sprite1, int sprite2);
 
     void CompressScreenAndCharset(QVector<int>& screen, QByteArray& charset, QVector<int> &sOut, QByteArray& cOut, int sw, int sh, int charSize, int noTargetChar,int bmask);
@@ -40,6 +49,17 @@ public:
     static void OptimizeScreenAndCharsetGB(QVector<int>& screen, QByteArray& charset, QVector<int> &sOut, QByteArray& cOut, int sw, int sh, int charSize, double compression,int type, LColorList& lst, int bmask);
 
 //    static void FrameConverter(QString dir, QString outFile, QVector<int> cols);
+
+    static void SaveSinusScrollerData(MultiColorImage*, int height, int startaddr, QString fname);
+    static void SaveSinusScrollerData2(MultiColorImage*, int height, int startaddr, QString fname);
+    static void SaveSinusScrollerData_OLD(MultiColorImage*, int height, int startaddr, QString fname);
+
+
+    static int BitplaneCharsetSpritePacker(QByteArray& inData, QByteArray &outData, QVector<int> &arrangement, int x, int y, int w, int h, int compression, int noBitplanes);
+
+
+    void CompileCGA16Sprites(QVector<int>& ba, int w, int h, int frames, int type, QString name, QString background, QString dir);
+
 
 
     void SaveCompressedSpriteData(QByteArray& data, QString dataFile, QString tableFile, int address, int compressionLevel);
@@ -63,6 +83,12 @@ public:
     void AddBinaryScreen(QByteArray& data, QImage& img);
 
     void SaveCompressedTRM(QByteArray& data, QString file, int compression);
+
+    static void GenerateShiftedCharset(QString inFile, QString outFile, int x0, int y0, int x1, int y1, int nw);
+    static void GenerateRotatedCharset(QString inFile, QString outFile, int start, int end, int dir);
+
+    static void GenerateUnrolledAsm1(QString name, QString outFile, QString inFile, int src, int dst,int width,int height,int shift, int shift2, int shift3);
+
 };
 
 

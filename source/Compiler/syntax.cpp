@@ -32,6 +32,7 @@ Syntax::Syntax()
 
 void Syntax::Init(AbstractSystem::System s, QSharedPointer<CIniFile> m_ini, QSharedPointer<CIniFile> m_proj)
 {
+
     m_currentSystem = QSharedPointer<AbstractSystem>(FactorySystem::Create(s,m_ini, m_proj));
 /*    if (s==AbstractSystem::BBCM) {
         m_startAddress = 0x02000;
@@ -50,13 +51,27 @@ void Syntax::Init(AbstractSystem::System s, QSharedPointer<CIniFile> m_ini, QSha
 }
 
 
+void Syntax::Reload()
+{
+    SetupReservedWords(reservedWords,"r",false);
+    SetupReservedWords(reservedWordsFjong,"rf",true);
+    SetupBuiltinFunctions(builtInFunctions, m_currentSystem->m_system,"m",false);
+    SetupBuiltinFunctions(builtinFunctionsFjong, m_currentSystem->m_system,"f",true);
+    SetupKeys();
+    SetupIllegalVariables();
+
+}
+
+
 void Syntax::SetupReservedWords(QVector<Token>& list, QString id, bool ignoreSystem)
 {
     list.clear();
+    if (m_currentSystem==nullptr)
+        return;
     QString currentSystem = AbstractSystem::StringFromSystem(m_currentSystem->m_system).toLower();
     for (QString s: m_syntaxData.split('\n')) {
         s= s.simplified();
-        if (s.count()==0) continue;
+        if (s.length()==0) continue;
         if (s.startsWith("#")) continue;
         s=s.replace(" ", "");
 
@@ -65,8 +80,9 @@ void Syntax::SetupReservedWords(QVector<Token>& list, QString id, bool ignoreSys
             continue;
         QString word = data[1].toLower();
         QString system = data[2].toLower();
-
-        if (system.contains(currentSystem) || ignoreSystem) {
+//        if (id=="p")
+  //      qDebug() << "Adding: "<<word << system;
+        if (ignoreSystem || Syntax::s.m_currentSystem->systemIsOfType(system.split(","))) {
             if (data.count()>3) {
                 if (data[3].trimmed()=="f")
                     m_reservedWordsRegularFont[word.toUpper()] = true;
@@ -84,7 +100,7 @@ void Syntax::SetupIllegalVariables()
     QString currentSystem = AbstractSystem::StringFromSystem(m_currentSystem->m_system).toLower();
     for (QString s: m_syntaxData.split('\n')) {
         s= s.simplified();
-        if (s.count()==0) continue;
+        if (s.length()==0) continue;
         if (s.startsWith("#")) continue;
         s=s.replace(" ", "");
 
@@ -93,7 +109,7 @@ void Syntax::SetupIllegalVariables()
             continue;
         QString system = data[1].toLower();
 
-        if (system.contains(currentSystem)) {
+        if (Syntax::s.m_currentSystem->systemIsOfType(system.split(","))) {
             m_illegaVariableNames<<(data[2].split(","));
         }
 
@@ -101,7 +117,7 @@ void Syntax::SetupIllegalVariables()
 
 }
 
-void Syntax::SetupBuiltinFunctions(QMap<QString, BuiltInFunction>& lst, AbstractSystem::System s, QString id, bool ignoreSystem)
+void Syntax::SetupBuiltinFunctions(QHash<QString, BuiltInFunction>& lst, AbstractSystem::System s, QString id, bool ignoreSystem)
 {
     lst.clear();
 
@@ -109,7 +125,7 @@ void Syntax::SetupBuiltinFunctions(QMap<QString, BuiltInFunction>& lst, Abstract
 
     for (QString s: m_syntaxData.split('\n')) {
         s= s.simplified();
-        if (s.count()==0) continue;
+        if (s.length()==0) continue;
         if (s.startsWith("#")) continue;
         s=s.replace(" ", "");
 
@@ -120,6 +136,13 @@ void Syntax::SetupBuiltinFunctions(QMap<QString, BuiltInFunction>& lst, Abstract
         QString method = data[1].toLower();
         QString system="";
         QStringList params;
+//        qDebug() << data;
+        if (!ignoreSystem && data.count()!=4) {
+            qDebug() << "Syntax::SetupBuiltinFunction reporting ERROR in syntax.txt";
+            qDebug() << s;
+            exit(1);
+        }
+
         if (!ignoreSystem) {
            system = data[2].toLower();
            params = data[3].toLower().split(",");
@@ -153,7 +176,7 @@ void Syntax::SetupBuiltinFunctions(QMap<QString, BuiltInFunction>& lst, Abstract
                 paramList << BuiltInFunction::Type::IGNOREPARAM;
 
         }
-        if (system.contains(currentSystem) || ignoreSystem) {
+        if (ignoreSystem || Syntax::s.m_currentSystem->systemIsOfType(system.split(","))) {
             lst[method] = BuiltInFunction(method, paramList);
         }
 
@@ -234,6 +257,7 @@ void Syntax::LoadSyntaxData()
 
 }
 
+
 bool Syntax::isNumeric(QString s) {
     bool ok;
     int dec = s.toInt(&ok, 10);
@@ -249,11 +273,19 @@ bool Syntax::isDigit(QString s) {
 bool Syntax::isDigitHex(QString s) {
     // Check if HEX
     return digitAll.contains(s);
-
 }
 
 bool Syntax::isAlnum(QString s) {
     return alnum.contains(s.toLower());
+}
+
+bool Syntax::StringIsAlnum(QString s)
+{
+    for (QChar c : s) {
+        if (!isAlnum(c))
+            return false;
+    }
+    return true;
 }
 
 bool Syntax::isString(QString s) {

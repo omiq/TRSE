@@ -22,8 +22,8 @@ public:
 
     QByteArray ToQByteArray(int mask) override;
 
-    void Clear() override {
-        m_data.clear();
+    void Clear(int val=0) override {
+        m_data.fill(val);
     }
 
     LMetaChunkItem(QByteArray& a, int index) {
@@ -101,12 +101,20 @@ public:
 
    void SetPalette(int pal) override;
 
+   QStringList getPaletteNames() override;
+
+
 
    unsigned int getPixel(int x, int y) override;
 
    virtual bool isNes() override {
        if (m_charset!=nullptr)
            return m_charset->isNes();
+       return false;
+   }
+   virtual bool isSnes() override {
+       if (m_charset!=nullptr)
+           return m_charset->isSnes();
        return false;
    }
 
@@ -146,6 +154,7 @@ public:
    virtual int getContainerCount() override {return m_items.count();}
 
    CharsetImage* getCharset() override { return (CharsetImage*)m_charset; }
+
 
 
     unsigned int getCharPixel(int pos,  int pal,int x, int y) override;

@@ -21,11 +21,23 @@
 
 #include "data.h"
 
+// Extra level of indirection to allow the preprocessor to expand the macros
+// before they are converted to strings
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
+#define MAJOR 0
+#define FEATURE 18
+#define NIGHTLY 469
+
+#define VERSION STR(MAJOR) "." STR(FEATURE) "." STR(NIGHTLY)
+
 Data Data::data;
+#include <QDebug>
 
 Data::Data()
 {
-    version = "0.12.7";
+    version = VERSION;
 }
 
 void Data::Redraw()
@@ -35,7 +47,6 @@ void Data::Redraw()
 
 void Data::UpdatePens()
 {
-//    redrawOutput = true;
     emit EmitPenChanged();
 
 }

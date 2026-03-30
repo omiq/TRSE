@@ -1,0 +1,212 @@
+unit Screen;
+var
+	ix,iy : integer;
+	ii,i,j,k,l,m : byte;
+	src,dst,p : ^byte;
+	cmd : array[16] of byte;
+
+
+	const cursor_home : byte = 30;
+
+	const black : byte = 0;
+	const red : byte = 1;
+	const green : byte = 2;
+	const yellow : byte = 3;
+	const blue : byte = 4;
+	const purple : byte = 5;
+	const cyan : byte = 6;
+	const light_gray : byte = 7;
+	const dark_gray : byte = 8;
+	const light_red : byte = 9;
+	const light_green : byte = 10;
+	const light_yellow : byte = 11;
+	const light_blue : byte = 12;
+	const light_purple : byte = 13;
+	const light_cyan : byte = 14;
+	const white : byte = 15;
+	
+	
+	const mode_640_480_16 : byte = 0;
+	const mode_640_480_4 : byte = 1;
+	const mode_640_480_2 : byte = 2;
+	const mode_640_240_64 : byte = 3;
+	const mode_640_240_16 : byte = 4;
+	const mode_640_240_4 : byte = 5;
+	const mode_640_240_2 : byte = 6;
+	const mode_320_240_64 : byte = 8;
+	const mode_320_240_16 : byte = 9;
+	const mode_320_240_8 : byte = 10;
+	const mode_320_240_2 : byte = 11;
+	const mode_320_200_64 : byte = 12;
+	const mode_320_200_16 : byte = 13;
+	const mode_320_200_4 : byte = 14;
+	const mode_320_200_2 : byte = 15;
+	
+/**
+
+	Sets graphics mode [i]
+
+**/	
+procedure SetMode( i : global byte) inline;
+begin
+	asm("
+	ld a, 22
+	rst.lil 10h
+	ld a, [Screen_i]
+	rst.lil 10h
+	
+	");
+end;
+
+
+procedure out(i : global byte pure_variable) inline;
+begin
+	asm("
+	ld a, ([Screen_i])
+	rst.lil 10h
+	
+	");
+end;
+
+
+procedure out(i : global byte pure_number) inline;
+begin
+	asm("
+	ld a, [Screen_i]
+	rst.lil	10h
+	
+	");
+end;
+
+procedure out(i : global byte);
+begin
+	asm("
+;	ld a, (Screen_i)
+	rst.lil	10h
+	
+	");
+end;
+
+
+
+procedure LoadSingleChar(src: global ^byte, m : global byte);
+begin
+	out(23);
+	out(m);
+	out(src[0]);
+	out(src[1]);
+	out(src[2]);
+	out(src[3]);
+	out(src[4]);
+	out(src[5]);
+	out(src[6]);
+	out(src[7]);
+end;
+
+procedure LoadCharset(p: global ^byte, k,l : global byte);
+begin
+	
+	for ii:=0 to k do 
+	begin
+		Screen::LoadSingleChar(p, ii+l);
+		p+=8;	
+	end;
+	
+end;
+
+
+
+procedure PrintString(src : global ^byte);
+begin
+	asm("
+	ld hl,(Screen_src)
+	ld bc, 0
+	xor a
+	rst.lil 18h
+	
+	");
+
+end;
+
+procedure DisableCursor() inline;
+begin
+	out(23);
+	out(1);
+	out(0);
+end;
+procedure EnableCursor() inline;
+begin
+	out(23);
+	out(1);
+	out(1);
+end;
+
+procedure SetTextCol(i : global byte);
+begin
+	out(17);
+	out(i);
+end;
+
+procedure SetPCol(i : global byte);
+begin
+	
+	out(18);	
+	out(1);	
+	out(i);	
+
+end;
+
+procedure Plot(ix,iy : global integer,k : global byte);
+begin
+	out(25);
+	out(k);
+	k:=ix;
+	out(k);
+	k:=ix>>8;
+	out(k);
+	k:=iy;
+	out(k);
+	k:=iy>>8;
+	out(k);
+
+end;
+/**
+	Loads a TRSE-exported image from 'p' into id 'j' 
+
+**/
+procedure LoadBitmap(p : global ^byte, ix:global integer , j: global byte);
+begin
+	p[7] := j;
+	asm("
+	ld hl,[Screen_p]
+    ld bc, [Screen_ix]        
+    rst.lil $18    	
+	");
+
+end;
+
+procedure DrawBitmap(j : global byte, ix,iy : integer);
+begin
+	out(23);
+	out(27);
+	out(0);
+	out(j);
+	out(23);
+	out(27); 
+	out(3); // draw
+
+	
+	out(lo(ix));
+	out(hi(ix));
+	out(lo(iy));
+	out(hi(iy));
+
+end;
+
+
+procedure ClearScreen();
+begin
+	Screen::PrintString(string(12));
+end;
+
+end.

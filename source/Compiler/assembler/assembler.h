@@ -41,6 +41,8 @@ class MemoryBlock {
     Type m_type = CODE;
     bool m_isOverlapping = false;
     int m_shift = 0;
+
+
     QVector<int> m_zeropages;
     QString m_name;
     int m_currentLineNumber;
@@ -74,7 +76,7 @@ public:
     QString m_current;
     static int m_labelCount;
 
-    QMap<QString, bool> sNumbersUsed;
+    QHash<QString, bool> sNumbersUsed;
     void push();
     void pop();
 };
@@ -97,6 +99,10 @@ public:
     QStringList m_source;
     QString m_pos;
 
+    QStringList getSource();
+
+
+
     void Append(QString str, int level)
     {
         QString s ="";
@@ -115,35 +121,47 @@ public:
     QStringList m_source;
     QVector<QSharedPointer<Appendix>> m_appendix;
     QSharedPointer<Appendix> m_currentBlock = nullptr;
+    QSharedPointer<Appendix> m_tempVarsBlock = nullptr;
     QSharedPointer<Appendix> m_mainBlock = nullptr;
     QVector<QSharedPointer<Appendix>> m_blockStack;
     QVector<Appendix> m_extraBlocks;
     QSharedPointer<Appendix> m_chipMem;
     QSharedPointer<Appendix> m_hram;
     QSharedPointer<Appendix> m_wram, m_sprram, m_ram;
-    QMap<QString,QSharedPointer<Appendix>> m_banks;
-    QMap<QString, QString> m_lastRegister; // Last registers set
+    QHash<QString,QSharedPointer<Appendix>> m_banks;
+    QHash<QString, QString> m_lastRegister; // Last registers set
+    QString m_insertEndBlock = "";
+
+
+
+
 
     QSharedPointer<PostOptimiser> m_optimiser = nullptr;
 
+    bool m_disableComments = false;
     bool m_countCycles = false;
     int m_noBanks = 0;
     static int m_prevCycles;
 
+    QVector<int> m_removeLines;
 
+
+    void StartExistingBlock(QSharedPointer<Appendix> block);
+    void EndCurrentBlock();
 
     QString m_currentBlockName="";
 
     QVector<MemoryBlock> m_userWrittenBlocks;
     QStringList m_startInsertAssembler;
+    QStringList m_endInsertAssembler;
     QString m_zeropageScreenMemory="$fe";
     QString m_zeropageColorMemory="$fc";
-    QMap<QString, QString> m_replaceValues;
+    QHash<QString, QString> m_replaceValues;
 
     RegisterStack m_regAcc;
     RegisterStack m_regMem;
     Stack m_varStack;
-
+    bool m_isTheRealEnd = false;
     QString m_lblFailed, m_lblSuccess;
     QString m_curDir;
     int m_currentBreakpoint = 0;
@@ -154,10 +172,13 @@ public:
     QVector<QString> m_tempZeroPointers; // org temp zp input
     QVector<QString> m_zpStack; // temp zp stack
 
-    QMap<QString, QString> m_defines;
+    QHash<QString, QString> m_defines;
     // Labels for hi/lo integers
     QString ilo = "_i_lo";
     QString ihi = "_i_hi";
+
+
+
 
 
 
@@ -168,8 +189,8 @@ public:
     virtual void EndMemoryBlock();
 
     QString m_term;
-    QMap<QString, Stack> m_stack;
-    QMap<QString, LabelStack> m_labelStack;
+    QHash<QString, Stack> m_stack;
+    QHash<QString, LabelStack> m_labelStack;
     QSharedPointer<SymbolTable> m_symTab;
     QString m_projectDir;
     QVector<QSharedPointer<MemoryBlock>> blocks, userBlocks;
@@ -182,11 +203,16 @@ public:
 
     void SortAppendix();
 
-    QMap<int, int> m_cycles, m_blockCycles;
-    QMap<int, int> m_cyclesOut, m_blockCyclesOut;
-    QMap<int,int> m_addressesOut, m_addresses;
+    // Override call (label) etc
+    virtual QString jumpLabel(QString lbl) {return lbl; }
 
-    QMap<int, int> m_blockIndent;
+    QHash<int, int> m_cycles, m_blockCycles;
+    QHash<int, int> m_cyclesOut, m_blockCyclesOut;
+    QHash<int,int> m_addressesOut, m_addresses;
+
+    int m_currentRamAddress = 0;
+
+    QHash<int, int> m_blockIndent;
 
     QVector<int> m_cycleCounter;
     QVector<int> m_blockCounter;
@@ -206,6 +232,8 @@ public:
 
     }
 
+    QStringList getSource();
+
     virtual int getLineCount();
     int CountCycles(QString s);
     virtual int CountInstructionCycle(QStringList s) {return 0;}
@@ -224,28 +252,35 @@ public:
 
     QString getLabel(QString s);
     QString m_hash = "#";
-    QString NewLabel(QString s);
+    virtual QString NewLabel(QString s);
 
-    void PopLabel(QString s);
+    virtual void PopLabel(QString s);
     QString byte = "dc.b";
     QString word = "dc.w";
     QString llong = "dc.l";
     QString ppointer = "dc.w";
+
+    QString getLabelEnding(QString name);
+
+    QString DeclareWRamVar(QString name, QString t);
 
     Assembler();
     virtual ~Assembler();
     void Save(QString filename);
     void Nl();
     virtual void Write(QString str, int level=0);
-
+    bool m_isOrgasm = false;
 
 
 
     virtual QString GetOrg(int pos ) = 0;
+    virtual QString GetOrg();
+    int offPageStack = 0;
+
 
     virtual void Program(QString name, QString vicParam) {};
     virtual void EndProgram() {}
-    virtual void VarDeclHeader() {}
+  //  virtual void VarDeclHeader() {}
     virtual void DeclareVariable(QString name, QString type, QString initVal, QString position){}
     virtual void DeclareString(QString name, QStringList initVal, QStringList flags) {}
     virtual void DeclareCString(QString name, QStringList initVal, QStringList flags) {}
@@ -255,13 +290,16 @@ public:
 //    virtual void AssignVariable(QString var) = 0;
 //    virtual void EndAssignVariable(QString var) {}
     virtual void ApplyTerm() {}
+    QString DeclareSingleString(QString str, QString mark, QString markByte);
     virtual void Number(QString n) {}
     virtual QString  String(QStringList s, bool term) { return "";}
     virtual void BinOP(TokenType::Type t, bool clearFlag=true){}
+    virtual void BinOP16(TokenType::Type t, bool clearFlag=true){}
+ //   virtual void BinOP(TokenType::Type t, bool clearFlag=true){ BinOP(t,false,true);}
 //    virtual void Poke(bool start) = 0;
 //    virtual void Peek(bool start) {}
     virtual void Term(QString s, bool write=false);
-    virtual void Comment(QString s) {    Asm("; "+ s) ;}
+    virtual void Comment(QString s);
     void Term();
   //  virtual void Writeln() = 0;
   //  virtual void EndWriteln() = 0;
@@ -273,20 +311,37 @@ public:
     virtual void LoadVariable(QString var) {}
 
     virtual void Connect();
-    virtual QString StoreInTempVar(QString name, QString type="byte")  { return name;}
+    virtual QString StoreInTempVar(QString name, QString type="byte", bool actuallyStore=true);
     virtual void PopTempVar() {}
 //    virtual void StartForLoop(QString a, QString b) {}
 //    virtual void EndForLoop(QString endVal) {}
 
-    void Asm(QString s, QString comment="");
+    virtual void Asm(QString s, QString comment="");
     virtual void Label(QString s);
     virtual void Optimise(CIniFile& ini) {}
 
-    virtual void IncludeFile(QString pfile);
+    virtual void IncludeFile(QString pfile, bool isInsert =false, bool isHeader = false);
 
 
     virtual bool DeclareRecord(QString name, QString type, int count, QStringList data, QString pos);
     virtual bool DeclareClass(QString name, QString type, int count, QStringList data, QString pos);
+
+
+    virtual void RemoveLines();
+
+    virtual void RemoveLinesDebug();
+
+    virtual void RemoveUnusedLabels();
+
+
+    QString getLine(int i);
+
+    QString getNextLine(int i, int &j);
+
+    bool nextLineIsLabel(int i);
+
+    QString getToken(QString s, int t);
+
 
     void WriteConstants();
 

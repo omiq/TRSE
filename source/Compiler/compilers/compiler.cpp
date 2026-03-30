@@ -32,9 +32,9 @@ Compiler::Compiler(QSharedPointer<CIniFile> ini, QSharedPointer<CIniFile> pIni)
 }
 
 Compiler::~Compiler() {
-  //  qDebug() << "~COMPILER DESTROYED "<<this;
-    //    Destroy();
 }
+
+
 
 
 
@@ -46,14 +46,26 @@ void Compiler::Parse(QString text, QStringList lst, QString fname)
     m_parser.m_lexer = m_lexer;
     ErrorHandler::e.m_displayWarnings = m_ini->getdouble("display_warnings")==1;
 
+    connect(&m_parser, SIGNAL(emitRequestSystemChange(QString)), this, SLOT( AcceptRequestSystemChange(QString)));
+    Data::data.genLabel = 0;
+//   SymbolTable::m_forwardedSymbols.clear();
+//    SymbolTable::m_forwardedVariables.clear();
 
     m_tree = nullptr;
     m_parser.m_preprocessorDefines[m_projectIni->getString("system").toUpper()]="1";
     m_parser.m_preprocessorDefines[m_ini->getString("assembler").toUpper()]="1";
+    if (m_projectIni->getString("qemu").startsWith("qemu")) {
+        m_parser.m_preprocessorDefines["QEMU"] = "1";
+    }
+
+    Syntax::s.m_currentSystem->m_systemParams["ignoresystemheaders"] = "0";
     m_parser.m_isTRU = m_isTRU;
     Parser::s_usedTRUs.clear(); // None TRU's are marked
     Parser::s_usedTRUNames.clear(); // None TRU's are marked
     Parser::m_tpus.clear();
+
+    SymbolTable::pass = 0;
+    SymbolTable::s_ignoreUnusedSymbolWarning.clear();
     // MAIN parser
     try {
         m_tree = m_parser.Parse( m_projectIni->getdouble("remove_unused_symbols")==1.0 &&
@@ -66,9 +78,11 @@ void Compiler::Parse(QString text, QStringList lst, QString fname)
     } catch (const FatalErrorException& e) {
         HandleError(e, "Error during parsing");
     }
-
     if (m_parser.m_symTab!=nullptr)
         m_parser.m_symTab->SetCurrentProcedure("");
+
+//    if (m_tree!=nullptr)
+  //      m_tree->Optimize();
 }
 
 
@@ -86,9 +100,13 @@ bool Compiler::Build(QSharedPointer<AbstractSystem> system, QString project_dir)
     try {
         // Set up assembler and dispatcher for the current system
         InitAssemblerAnddispatcher(system);
+        m_assembler->m_disableComments = m_projectIni->getdouble("disable_compiler_comments")==1;
         m_assembler->m_curDir = project_dir;
-        if (system->m_processor==AbstractSystem::MOS6502)
-            m_dispatcher->m_outputLineNumbers =  m_ini->getdouble("display_addresses")==1.0;
+
+//        m_codeGen->m_rasSource = m_lexer->m_lines;
+        if (system->m_processor==AbstractSystem::MOS6502 && m_ini->getdouble("display_addresses")!=1.0){
+            m_codeGen->dontOutputLineNumbers();
+        }
 
 
     } catch (const FatalErrorException& e) {
@@ -99,29 +117,46 @@ bool Compiler::Build(QSharedPointer<AbstractSystem> system, QString project_dir)
     if (m_assembler==nullptr)
         return false;
 
+    // COPY SYMBOL TABLE
+    m_assembler->m_symTab->m_forwardedVariables = m_parser.m_symTab->m_forwardedVariables;
+
+    for (QString s: m_parser.m_symTab->m_forwardedVariables) {
+        m_assembler->m_symTab->m_forwardedSymbols[s] = m_parser.m_symTab->m_symbols[s];
+    }
+//    qDebug() << "COMPILER.CPP "<<m_parser.m_symTab->m_forwardedVariables;
+
+//    m_assembler->m_symTab->m_forwardedSymbols = m_parser.m_symTab->m_forwardedSymbols;
     m_assembler->m_projectDir = project_dir;
     // Copy symbol table stuff, like records
     m_assembler->m_symTab->m_useLocals = m_parser.m_symTab->m_useLocals;
     m_assembler->m_symTab->m_records = m_parser.m_symTab->m_records;
-    m_assembler->m_symTab->m_constants = m_parser.m_symTab->m_constants;
+    m_assembler->m_symTab->m_constants = m_parser.m_symTab->m_constants; // Write init assembler code
+    m_assembler->m_symTab->m_units = Parser::s_usedTRUNames;
 
     for (QSharedPointer<SymbolTable>  st : m_parser.m_symTab->m_records)
         m_assembler->m_symTab->Define(QSharedPointer<Symbol>(new Symbol(st->m_name, "RECORD")));
 
-    connect(m_dispatcher.get(), SIGNAL(EmitTick(QString)), this, SLOT( AcceptDispatcherTick(QString)));
+    connect(m_codeGen.get(), SIGNAL(EmitTick(QString)), this, SLOT( AcceptDispatcherTick(QString)));
+    SymbolTable::pass = 1;
+
+
+//    qDebug() <<m_assembler->m_symTab->m_symbols.keys().contains("song");
 
     emit EmitTick("<br>Building []");
     if (m_tree!=nullptr)
         try {
         qSharedPointerDynamicCast<NodeProgram>(m_tree)->m_initJumps = m_parser.m_initJumps;
-        m_dispatcher->as = m_assembler.get();
+        m_codeGen->setAssembler(m_assembler.get());
         // Visit that AST node tree baby!
         Data::data.compilerState = Data::DISPATCHER;
 //        qDebug() << "Compiler.cpp DISPATCHER starts";
-        m_tree->Accept(m_dispatcher.get());
+        Node::setAssembler(m_assembler.get());
+        //m_tree->ExecuteSym(m_assembler->m_symTab);
+        //qDebug() << m_assembler->m_symTab->m_symbols.keys();
+        m_tree->Accept(m_codeGen.get());
 
     } catch (const FatalErrorException& e) {
-        HandleError(e,"Error during build (dispatcher) :");
+        HandleError(e,"Error during build (codegen) :");
         return false;
     }
     emit EmitTick("&100"); // Emit 100%
@@ -131,12 +166,13 @@ bool Compiler::Build(QSharedPointer<AbstractSystem> system, QString project_dir)
         m_assembler->blocks.append(mb);
 
 
-    disconnect(m_dispatcher.get(), SIGNAL(EmitTick(QString)), this, SLOT( AcceptDispatcherTick(QString)));
+    disconnect(m_codeGen.get(), SIGNAL(EmitTick(QString)), this, SLOT( AcceptDispatcherTick(QString)));
+    disconnect(&m_parser, SIGNAL(emitRequestSystemChange(QString)), this, SLOT( AcceptRequestSystemChange(QString)));
 //    emit EmitTick("<br>Connecting and optimising");
 
     Connect();
 //    qDebug() << "Start address "<< Util::numToHex(system->m_startAddress);
-
+    m_assembler->m_source<<m_assembler->m_endInsertAssembler;
     CleanupBlockLinenumbers();
 
     if (m_assembler->m_optimiser!=nullptr && m_ini->getdouble("post_optimize")==1.0) {
@@ -155,13 +191,13 @@ bool Compiler::Build(QSharedPointer<AbstractSystem> system, QString project_dir)
 
 void Compiler::CleanupBlockLinenumbers()
 {
-    QMap<int, int> blocks;
+    QHash<int, int> blocks;
 
     for (int i: m_assembler->m_blockIndent.keys()) {
 
         int count = m_assembler->m_blockIndent[i];
         int nl = i;
-        for (FilePart& fp : m_parser.m_lexer->m_includeFiles) {
+        for (FilePart& fp : m_parser.m_lexer->getIncludeFiles()) {
             // Modify bi filepart
             if (nl>fp.m_startLine && nl<fp.m_endLine) {
                 blocks[fp.m_startLine]+=count;
@@ -178,6 +214,109 @@ void Compiler::CleanupBlockLinenumbers()
     }
 
     m_assembler->m_blockIndent = blocks;
+
+}
+
+bool Compiler::SetupMemoryAnalyzer(QString filename, Orgasm *orgAsm)
+{
+//    qDebug() << "SETUPMEMORYANALYZER";
+    if (orgAsm == nullptr)
+        return false;
+    //   Orgasm orgAsm;
+
+    if (m_assembler==nullptr)
+        return false;
+    int i = 1;
+
+  //  if (is6502)
+    for (QString s : orgAsm->m_symbolsList){
+        if (s.toLower().startsWith("startblock")) {
+
+            int start = orgAsm->m_symbols[s];
+            QString search = s.toLower().replace("startblock","endblock");
+            int end = start;
+            for (QString s2 : orgAsm->m_symbolsList){
+                if (s2.toLower() == search) {
+                    end = orgAsm->m_symbols[s2];
+                    //                    qDebug() << "Found:" <<search<<Util::numToHex(end);
+                    break;
+                }
+            }
+//                     qDebug() << "RANGE " << Util::numToHex(start) << Util::numToHex(end) <<s<<Util::numToHex(orgAsm->m_symbols[s]);
+            if (start!=end) {
+                if (m_assembler!=nullptr) {
+                    QString name = "Code block "+QString::number(i++);
+                    for (auto bl : m_assembler->userBlocks)
+                        if (bl->m_start == start)
+                            if (bl->m_name!="")
+                                name = bl->m_name;
+                    //                qDebug() << "Adding cod eblock with name : "<<name;
+                    bool ok = true;
+                    for (auto b: m_assembler->blocks) {
+                        if (b->m_start==start)// && b->m_end==end)
+                            ok = false;
+                    }
+                    if (ok) {
+                        m_assembler->blocks.append(QSharedPointer<MemoryBlock>(new MemoryBlock(start, end, MemoryBlock::CODE, name)));
+                    }
+
+                }
+            }
+        }
+    }
+
+//    if (!isZ80)
+    for (QSharedPointer<MemoryBlock> mb : m_assembler->blocks) {
+        if (mb->m_type==MemoryBlock::USER)
+            continue;
+        if (mb->m_type==MemoryBlock::MUSIC)
+            continue;
+        if (mb->m_type==MemoryBlock::CODE) // Already taken care of
+             continue;
+
+        QString str = Util::numToHex(mb->m_start);
+        str = str.toLower().remove("$");
+        int end = mb->m_start;
+        QString curEnd = ("endblock"+str);
+
+
+        for (QString s : orgAsm->m_symbols.keys())  {
+            QString chk = s;
+            if (chk.toLower()==curEnd) {
+  //              qDebug() << "Found real end:" <<chk.toLower();
+                end = orgAsm->m_symbols[s];
+                mb->m_end = end;
+                break;
+            }
+        }
+
+
+
+    }
+
+    std::sort(m_assembler->blocks.begin(), m_assembler->blocks.end(),
+              [](const auto& a, const auto& b) { return a->m_start < b->m_start; });
+
+
+    // Check for overlaps:
+    for (int i=0;i<m_assembler->blocks.count();i++) {
+        auto x = m_assembler->blocks[i];
+        for (int j=i+1;j<m_assembler->blocks.count();j++) {
+            auto y = m_assembler->blocks[j];
+            //            x1 <= y2 && y1 <= x2
+            if (x->m_start<y->m_end && y->m_start<x->m_end) {
+                //   qDebug() << "OVERLAP " << Util::numToHex(x->m_start)<<Util::numToHex(x->m_end) << " vs " << Util::numToHex(y->m_start)<<Util::numToHex(y->m_end);
+                x->m_isOverlapping = true;
+                y->m_isOverlapping = true;
+                y->m_shift = x->m_shift+1;
+                ErrorHandler::e.Warning("Overlapping memory regions: '"+x->m_name + "' and '"+y->m_name+"' at "+Util::numToHex(y->m_start)+" to " +Util::numToHex(x->m_end)+". See the memory analyzer for details.");
+
+            }
+        }
+    }
+
+    return orgAsm->m_success;
+
 
 }
 
@@ -223,13 +362,13 @@ void Compiler::WarningUnusedVariables()
         QString lstStr= "";
         for (QString s: unusedVariables)
             lstStr+= s+ ",";
-        lstStr.remove(lstStr.count()-1,1); // remove last ","
+        lstStr.remove(lstStr.length()-1,1); // remove last ","
         ErrorHandler::e.Warning("Unused variables : " +lstStr);
     }
 
 }
 
-void Compiler::ApplyOptions(QMap<QString, QStringList> &opt) {
+void Compiler::ApplyOptions(QHash<QString, QStringList> &opt) {
     for (auto& s: opt.keys()) {
         if (s.toLower()=="define") {
             QStringList lst = opt[s];
@@ -247,4 +386,9 @@ void Compiler::ApplyOptions(QMap<QString, QStringList> &opt) {
 void Compiler::AcceptDispatcherTick(QString val)
 {
     emit EmitTick(val);
+}
+
+void Compiler::AcceptRequestSystemChange(QString val)
+{
+    emit emitRequestSystemChange(val);
 }

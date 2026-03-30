@@ -13,8 +13,19 @@ public:
 
 
 
-    virtual void Assemble(QString& text, QString file, QString currentDir, QSharedPointer<SymbolTable>  symTab);
-    virtual void PostProcess(QString& text, QString file, QString currentDir);
+    virtual void Assemble(QString& text, QString file, QString currentDir, QSharedPointer<SymbolTable>  symTab) override;
+    virtual void PostProcess(QString& text, QString file, QString currentDir) override;
+
+    virtual QString getEmulatorName() override {
+        return m_settingsIni->getString("gameboy_emulator");
+    }
+    bool isZ80() override {
+        return false;
+    }
+    void applyEmulatorParameters(QStringList& params, QString debugFile, QString filename, CIniFile* pini) override {
+        params<< filename+".gb";
+    }
+
 };
 
 #endif // SYSTEMM6800_H

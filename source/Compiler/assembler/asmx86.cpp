@@ -1,5 +1,7 @@
 #include "asmx86.h"
 #include "source/Compiler/optimiser/postoptimizerx86.h"
+#include <QRegularExpression>
+
 
 AsmX86::AsmX86()
 {
@@ -20,6 +22,8 @@ void AsmX86::Connect() {
     }
     newSource << " ; Temp vars section";
     newSource<< m_tempVars;
+    if (m_tempVarsBlock!=nullptr)
+        newSource << m_tempVarsBlock->m_source;
     newSource << " ; Temp vars section ends";
     for (int i=m_varDeclEndsLineNumber;i<m_source.count(); i++) {
         newSource<<m_source[i];
@@ -48,7 +52,8 @@ void AsmX86::Connect() {
 void AsmX86::Program(QString name, QString vicParam)
 {
     m_source+=m_startInsertAssembler;
-    Asm("[ORG "+Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress) + "]");
+//    if (Syntax::s.m_currentSystem->m_programStartAddress!=0)
+        Asm("[ORG "+Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress) + "]");
     m_hash = "";
 /*    Asm("jmp save_ds_register");
     Write("ds_register_saved: dw 0",0);
@@ -65,8 +70,15 @@ void AsmX86::EndProgram()
 
 void AsmX86::Write(QString str, int level)
 {
-    QString s = str.replace("$","0x");
-    Assembler::Write(s,level);
+    QRegularExpression regexp("\\$\\b[0-9a-fA-F]+\\b");
+    if (str.contains(regexp))
+        str = str.replace("$","0x");
+//    QString s = str.replace(regexp,"0x");
+  //  if (s.contains("$"))
+//        qDebug() << s;
+//if (s!=str)     qDebug() <<s;
+    //QString s = str.replace("$","0x");
+    Assembler::Write(str,level);
 }
 
 void AsmX86::DeclareArray(QString name, QString type, int count, QStringList data, QString pos)
@@ -83,9 +95,12 @@ void AsmX86::DeclareArray(QString name, QString type, int count, QStringList dat
         t = word;
     if (type.toLower()=="byte")
         t = byte;
+    if (type.toLower()=="pointer" || type.toLower()=="long")
+        t = llong;
 
     if (type.toLower()=="string")
         t = byte;
+
 // array  resb  251*256  ;251 ROWS X 256 COLUMNS.
 
      if (data.count()==0 && pos!="") {
@@ -154,7 +169,7 @@ void AsmX86::DeclareVariable(QString name, QString type, QString initval, QStrin
 
     if (type.toLower()=="integer")
         t = word;
-    if (type.toLower()=="byte") {
+    if (type.toLower()=="byte"|| type.toLower()=="boolean") {
         t = byte;
     }
 
@@ -230,16 +245,7 @@ QString AsmX86::String(QStringList lst, bool term)
     QString mark = "db";
 
     for (QString s:lst) {
-        bool ok=false;
-        uchar val = s.toInt(&ok);
-        if (!ok)
-            res=res+"\t"+mark+"\t" +"\"" + s + "\"\n";
-
-        else res=res + "\t"+mark+"\t"+QString::number(val) + "\n";
-
-        /*        if (s!=lst.last())
-                    res=res + "\n";
-        */
+        res+=DeclareSingleString(s,mark,mark);
 
     }
     if (term)

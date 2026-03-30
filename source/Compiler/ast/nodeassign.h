@@ -30,36 +30,35 @@
 #include "source/Compiler/ast/node.h"
 #include "source/Compiler/ast/nodevar.h"
 #include "source/Compiler/ast/nodestring.h"
-#include "source/Compiler/ast/nodevararray.h"
 #include "source/Compiler/ast/nodebinop.h"
 
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
-//class NodeBinop;
 
+/* 
+    Node for an Assignment (a:=b)
+    m_left: The variable or expression assigned to. (Should be a NodeVar)
+    m_right: The variable or expression to be assigned.
+    m_op: The := token
+*/
 class NodeAssign : public Node {
 public:
-//    QSharedPointer<Node> m_arrayIndex = nullptr;
 
 
     NodeAssign(QSharedPointer<Node> left, Token t, QSharedPointer<Node> r);
 
-
+    bool m_isProcedureParameterAssign = false;
 
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeAssign>(sharedFromThis()));
     }
-/*    void parseConstants(QSharedPointer<SymbolTable>  symTab) override {
-        if (m_arrayIndex!=nullptr)
-            m_arrayIndex->parseConstants(symTab);
-        if (m_left!=nullptr)
-            m_left->parseConstants(symTab);
-        if (m_right!=nullptr)
-            m_right->parseConstants(symTab);
-    }
-*/
+
+    bool isDead();
+
+    virtual bool Optimize();
+
 };
 
 #endif // NODEASSIGN_H

@@ -299,12 +299,14 @@ E = Unused?
     void InsertPattern(int pos);
     void DeletePattern(int pos);
 
+
     QVector<QByteArray> getCurrentPattern();
     void Save(QString filename);
     void Export(QString filename, int type);
     void ExportVIC20(QString filename);
     void ExportBeep(QString filename);
     void ExportVIC20C(QString filename);
+    void ExportVZ(QString filename);
     void Load(QString filename);
     void LoadPSF(QString filename);
 

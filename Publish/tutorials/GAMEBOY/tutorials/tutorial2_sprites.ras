@@ -28,7 +28,6 @@ program Tutorial2_Sprites;
 var  
 	// Bank to place sprites
 	const spriteBank : byte = 2;
-	// A temporary address to store the screen
 	
 	sprites_index : incbin("images/sprites_index.bin") bank(spriteBank);
 	sprites_data : incbin("images/sprites_packed.bin") bank(spriteBank);
@@ -36,10 +35,10 @@ var
 	// 1 sprite takes up 4 bytes, the grl sprite is 3x2x4 bytes starting at $C000 (Sprite ram)
 	sprGirl : array[3*2*4] of byte sprram;
 
-	time,x,y,pos  : byte;
+	time,x,y,pos, doFlip  : byte;
 
 	// Generate a sine table
-    sine : array[256] of byte = BuildTable("Math.sin(i/256.0*Math.PI*2.0)*0x7f+0x7F");
+    sine : array[256] of byte = BuildSineTable(255);
 
 
 procedure UpdateSprite();
@@ -47,14 +46,16 @@ begin
 
 	// Initialize sprite: address of internal table at $C000 (sprGirl), indices, position in sprite data, width, flipping
 
+	doFlip := 0;
 	if (64+time<128) then
-		initspritefromdata(#sprGirl,#sprites_index,pos,6 ,2, sprite_flip_x)
-	else
-		initspritefromdata(#sprGirl,#sprites_index,pos,6 ,2, 0);
+		doFlip := sprite_flip_x;
+		
+	Screens::InitSpriteFromData(#sprGirl, #sprites_index,pos,6 ,2, doFlip);
+		
 	// Set some sprite X value		
 	x:=sine[time]/2+16;
 	// Set sprite position			
-	setsprite(#sprGirl,x,y, 2,30);
+	Screens::SetSprite(#sprGirl,x,y, 2,3);
 	
 	// Advance to next sprite		
 	if (time&15=0) then

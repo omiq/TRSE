@@ -25,6 +25,7 @@ echo "open_files =, main.ras" >> C64/Disk_loader_project/disk_loader_project.trs
 echo "open_files =, part3.ras" >> C64/TutorialGame_Introduction/Introductiongame.trse
 echo "open_files =, intro.ras" >> C64/4kDreams/4kDreams.trse
 echo "open_files =, main.ras" >> C64/16kb_cartridge_project/crt_project.trse
+echo "open_files =, main.ras" >> C64/disk_demo_project/disk_demo_project.trse
 
 echo "open_files =, easy/01_hello_world.ras" >> MEGA65/Tutorials/Mega65_Tutorials.trsee
 echo "open_files =, example05_single_sprite.ras" >> MEGA65/Raytracer/DemoEffects_raytracer.trse
@@ -41,6 +42,7 @@ echo "open_files =, example1.ras" >> OK64/Tutorials/OK64.trse
 echo "open_files =, kos.ras" >> OK64/KOS/kos.trse
 
 echo "open_files =, graveintentions.ras" >> CrossPlat/GraveIntentions/GraveIntentions.trse
+echo "open_files =, small_game.ras" >> C128/small_game/small_game.trse
 
 echo "open_files =, 01_hello_world.ras" >> PET/examples/examples.trse
 echo "open_files =, main.ras" >> OK64/OkComputer/ok_computer.trse
@@ -60,3 +62,12 @@ echo "open_files =, tut1.ras" >> AMSTRADCPC/tutorials/amstrad_tutorials.trse
 echo "open_files =, main.ras" >> AMSTRADCPC/Morketid/morketid.trse
 echo "open_files =, tutorial1_helloworld.ras" >> ATARI800/Tutorials/Tutorials.trse
 
+echo "open_files =, tutorial1.ras" >> VZ200/tutorials/main_vz200_tutorials.trse
+echo "open_files =, 01_tiles.ras" >> SNES/tutorials/snes_tutorials.trse
+
+echo "open_files =, millipede.ras" >> VZ200/millipede/millipede.trse
+
+echo "open_files =, main.ras" >> GAMEBOY/mrtibbles/mrtibbles.trse
+
+echo "open_files =, info.rtf" >> C64/demoeffects/c64_demoeffects.trse
+echo "open_files =, tutorial1_putpixel.ras" >> TRS80COCO/tutorials/trs80coco_tutorials.trse

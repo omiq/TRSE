@@ -21,7 +21,7 @@
 
 #include "token.h"
 
-QString TokenType::types[no_types] = {
+QStringList TokenType::types = {
             "NONE", "INTEGER", "PLUS", "MINUS", "MUL", "DIV", "LPAREN",
             "RPAREN", "TEOF", "ID", "ASSIGN", "BEGIN",
             "END", "SEMI", "DOT", "VAR", "REAL",
@@ -38,7 +38,7 @@ QString TokenType::types[no_types] = {
             "WRAM", "HRAM", "ALIGNED", "BANK", "SPRRAM","INLINE", "BUILDTABLE", "USES", "FUNCTION", "COMPRESSED",
             "PURE", "PURE_VARIABLE", "PURE_NUMBER", "NO_TERM", "INVERT","MACRO", "REFERENCE", "SIGNED",
             "BREAK", "CONTINUE", "RETURN", "ASSIGNOP", "RAM", "TYPE", "BOOLEAN", "CLASS", "PUBLIC", "PRIVATE",
-            "SIZEOF"
+            "SIZEOF", "BUILDTABLE2D", "PERHAPS","MAYBE", "BUILDSINETABLE", "STACK","LPOINTER","NOT","BITNOT", "FORWARD", "VOLATILE", "ASSEMBLER"
 
 };
 
@@ -51,7 +51,6 @@ Token::Token()
 {
     m_lineNumber = Pmm::Data::d.lineNumber;
     m_currentLineText = Pmm::Data::d.currentLineText;
-
 }
 
 QString Token::getNumAsHexString()
@@ -96,6 +95,10 @@ TokenType::Type Token::getBinopTokenTypeFromString(QString c) {
         return TokenType::BITOR;
     if (c=="^")
         return TokenType::XOR;
+    if (c=="<<")
+        return TokenType::SHL;
+    if (c==">>")
+        return TokenType::SHR;
 
     return TokenType::NADA;
 

@@ -1,0 +1,204 @@
+unit ForLoop;
+var
+
+// regular for loop
+procedure Test1();
+begin
+	Vars::text := "T1:";
+	for Vars::v1:=0 to 240 do 
+	begin
+		
+	end;
+	if (Vars::v1=240) then Common::PASS() else Common::FAIL();
+end;
+
+@if SUPPORTS_FORI = "1"
+// regular fori loop
+procedure Test2();
+begin
+	Vars::text := "T2:";
+	fori Vars::v1:=0 to 240 do 
+	begin
+		
+	end;
+	if (Vars::v1=241) then Common::PASS() else Common::FAIL();
+end;
+@endif
+
+// regular for loop integer
+procedure Test3();
+begin
+	Vars::text := "T3:";
+	for Vars::i1:=0 to 1000 do 
+	begin
+		
+	end;
+	if (Vars::i1=1000) then Common::PASS() else Common::FAIL();
+end;
+@if SUPPORTS_FORI = "1"
+
+// regular for loop integer
+procedure Test4();
+begin
+	Vars::text := "T4:";
+	fori Vars::i1:=0 to 1000 do 
+	begin
+		
+	end;
+	if (Vars::i1=1001) then Common::PASS() else Common::FAIL();
+end;
+@endif
+
+// step byte
+procedure Test5();
+begin
+	Vars::text := "T5:";
+	Vars::v2 := 0;
+	for Vars::v1:=0 to 240 step 4 do 
+	begin
+		Vars::v2+=1;
+	end;
+	if (Vars::v2=(240/4)) then Common::PASS() else Common::FAIL();
+end;
+
+// step word
+procedure Test6();
+begin
+	Vars::text := "T5:";
+	Vars::v2 := 0;
+	for Vars::i1:=0 to 1000 step 4 do 
+	begin
+		Vars::v2+=1;
+	end;
+	if (Vars::v2=250) then Common::PASS() else Common::FAIL();
+end;
+
+// step word
+procedure Test7();
+begin
+	Vars::text := "T6:";
+	Vars::v2 := 1;
+	for Vars::v1:=0 to 20 step Vars::v2 do 
+	begin
+		Vars::v2+=1;
+	end;
+	if (Vars::v2=6) then Common::PASS() else Common::FAIL();
+end;
+
+
+
+
+// to value
+procedure Test8();
+begin
+	Vars::text := "T7:";
+	Vars::v2 := 0;
+	Vars::v3:=3;
+	@ifndef X86
+	Vars::p1:=#Vars::addr;
+	@endif
+	@ifdef X86
+	Vars::p1 := ptr($3000,0);
+	@endif
+	Vars::p1[Vars::v3]:=20;
+	for Vars::v1:=0 to Vars::p1[Vars::v3] step 2 do 
+	begin
+		Vars::v2+=1;
+	end;
+	if (Vars::v2=10) then Common::PASS() else Common::FAIL();
+end;
+
+
+
+// test break
+procedure TestBreak();
+begin
+	Vars::text := "TB:";
+	Vars::v2 := 0;
+	for Vars::v1:=0 to 20 do 
+	begin
+		if (Vars::v1=5) then break;
+		Vars::v2+=1;
+	end;
+	if (Vars::v2=5) then Common::PASS() else Common::FAIL();
+end;
+
+// test break
+procedure TestContinue();
+begin
+	Vars::text := "TC:";
+	Vars::v2 := 0;
+	for Vars::v1:=0 to 20 do 
+	begin
+		if (Vars::v1>=5) then 
+			continue;
+			
+		Vars::v2+=1;
+	end;
+	if (Vars::v2=5) then Common::PASS() else Common::FAIL();
+end;
+
+procedure NegativeStep1();
+begin
+	Vars::text := "N1:";
+	for Vars::v1:=20 to 0 step -2 do 
+	begin
+	end;
+	if (Vars::v1=0) then Common::PASS() else Common::FAIL();
+end;
+
+@if SUPPORTS_FORI = "1"
+procedure NegativeStep2();
+begin
+	Vars::text := "N2:"; 
+	fori Vars::v1:=20 to 2 step -2 do 
+	begin
+	end;
+	if (Vars::v1=0) then Common::PASS() else Common::FAIL();
+end;
+
+// negative to 0 is problematic
+procedure NegativeStep3();
+begin
+	Vars::text := "N3:"; 
+	fori Vars::v1:=20 to 0 step -2 do 
+	begin
+	end;
+	if (Vars::v1=254) then Common::PASS() else Common::FAIL();
+end;
+
+@endif
+//--------------------------------------------------------------------------------------------
+/* MAIN PROGRAM */
+procedure Exec();
+begin
+	Common::Initialise("FOR LOOP");
+	
+	NegativeStep1();
+@if SUPPORTS_FORI = "1"
+	NegativeStep2();  
+	NegativeStep3();
+@endif
+	Test1();
+@if SUPPORTS_FORI = "1"
+	Test2();
+@endif
+	Test3();
+@if SUPPORTS_FORI = "1"
+	Test4();
+@endif
+	Test5();
+	Test6();
+	Test7();
+	@ifndef X86
+	@ifndef CPU_M68000
+	Test8();
+	@endif
+	@endif
+	
+	TestBreak();
+	TestContinue();
+	Common::WaitABit();
+end;
+
+end.

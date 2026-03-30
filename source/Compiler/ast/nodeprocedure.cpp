@@ -28,6 +28,17 @@ NodeProcedure::NodeProcedure(QSharedPointer<NodeProcedureDecl> proc, QVector<QSh
     m_op = t;
 }
 
+void NodeProcedure::ReplaceVariable(Assembler *as, QString name, QSharedPointer<Node> node) {
+    int i=0;
+    for (auto p:m_parameters) {
+        p->ReplaceVariable(as,name,node);
+        if (p->isPureVariable() && p->getValue(as)==name)
+            m_parameters[i] = node;
+
+        i++;
+    }
+}
+
 bool NodeProcedure::isAddress() {
     return m_op.m_isReference;
 }
@@ -50,10 +61,12 @@ QString NodeProcedure::getValue(Assembler *as)
 
 }
 
-QString NodeProcedure::getValue8bit(Assembler *as, bool isHi)
+QString NodeProcedure::getValue8bit(Assembler *as,  int isHi)
 {
     QString v = "<";
-    if (isHi) v=">";
+    if (isHi==1) v=">";
+    if (isHi==2) v="^";
+
     if (m_op.m_isReference)
         return v+"#" + m_procedure->m_procName;
     else
@@ -61,9 +74,49 @@ QString NodeProcedure::getValue8bit(Assembler *as, bool isHi)
 
 }
 
-void NodeProcedure::ReplaceInline(Assembler* as,QMap<QString, QSharedPointer<Node> > &inp)
+bool NodeProcedure::isWord(Assembler *as)
+{
+    if (m_procedure->m_returnType!=nullptr)
+        return m_procedure->m_returnType->getType(as)==TokenType::INTEGER;
+
+    return false;
+}
+
+bool NodeProcedure::isLong(Assembler *as)
+{
+    if (m_procedure->m_returnType!=nullptr)
+        return m_procedure->m_returnType->getType(as)==TokenType::LONG;
+
+    return false;
+
+}
+
+bool NodeProcedure::isByte(Assembler *as)
+{
+    if (m_procedure->m_returnType!=nullptr)
+        return m_procedure->m_returnType->getType(as)==TokenType::BYTE;
+
+    return true;
+
+}
+
+bool NodeProcedure::isBool(Assembler *as)
+{
+    if (m_procedure->m_returnType!=nullptr)
+        return m_procedure->m_returnType->getType(as)==TokenType::BOOLEAN;
+
+    return true;
+
+}
+
+void NodeProcedure::ReplaceInline(Assembler* as,QHash<QString, QSharedPointer<Node> > &inp)
 {
     m_procedure->ReplaceInline(as,inp);
+}
+
+void NodeProcedure::ResetInlineAssembler()
+{
+    m_procedure->ResetInlineAssembler();
 }
 
 bool NodeProcedure::isPureNumeric() {

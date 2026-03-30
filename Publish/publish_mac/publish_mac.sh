@@ -3,9 +3,9 @@ rm -rf trse
 mkdir trse
 if [ "$1" = "nightly" ]
 then
-  cp -r ../../trse.app trse/
+    cp -r ../../trse.app trse/
 else
-  cp -r ../../Release/trse.app trse/
+    cp -r ../../Release/trse.app trse/
 fi
 
 cp -r Contents trse/trse.app
@@ -19,10 +19,11 @@ cp -r ../project_templates trse/trse.app/
 cd trse/trse.app
 if [ "$1" = "nightly" ]
 then
-  macdeployqt .
+    echo "nada"
+    macdeployqt . -codesign="$2"
 else
   rm *.ini
-  ~/Qt/6.0.1/clang_64/bin/macdeployqt .
+  ~/Qt/6.7.2/macos/bin/macdeployqt . -codesign="$1"
 fi
 cd ../../
 

@@ -27,7 +27,7 @@
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QObject>
-#include <QMap>
+#include <QHash>
 #include <QCompleter>
 #include <QStringListModel>
 #include "source/Compiler/symboltable.h"
@@ -77,6 +77,7 @@ public:
     enum FileType {RAS, TRU, INC, ASM, FJO};
     FileType m_fileType = RAS;
     bool m_autoComplete = true;
+    bool m_autoIndent = true;
 
 
     // Handle indenting automatically if enabled in settings
@@ -92,8 +93,11 @@ public:
     void ToggleComments();
     void InitCompleter(QSharedPointer<SymbolTable>  m_symTab, Parser* parser);
 
-    QMap<int,int> m_cycles, m_blockCycles;
-    QMap<int,int> m_addresses;
+    QHash<int,int> m_cycles, m_blockCycles;
+    QHash<int,int> m_addresses;
+
+
+    void mousePressEvent(QMouseEvent *e) override;
 
     void RepaintCycles() {
         cycleNumberArea->repaint();
@@ -103,6 +107,9 @@ public:
 
 protected slots:
     void onTextChanged();
+
+signals:
+    void emitLookupWord();
 
 
 protected:
@@ -144,11 +151,9 @@ protected:
     QCompleter *c = nullptr;
 
 
-
-
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 };
-
 
 class LineNumberArea : public QWidget
 {
@@ -210,6 +215,7 @@ protected:
 protected:
     CodeEditor *codeEditor;
 };
+
 
 
 #endif

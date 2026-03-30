@@ -28,12 +28,18 @@
 #include "source/Compiler/symboltable.h"
 #include "source/Compiler/errorhandler.h"
 #include "source/Compiler/ast/node.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
-
+#include "source/Compiler/codegen/abstractcodegen.h"
+/* 
+   A Node representing a string. 
+    m_left: undefined 
+    m_right: undefined
+    m_op: the String's token. 
+*/
 class NodeString : public Node {
 public:
     QStringList m_val;
     bool m_isCString = false;
+    bool m_hasBeenDefined = false;
     NodeString(Token op, QStringList val, bool isCString):Node() {
         m_op = op;
         m_val = val;
@@ -42,7 +48,7 @@ public:
 
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override {
     }
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeString>(sharedFromThis()));
     }
 

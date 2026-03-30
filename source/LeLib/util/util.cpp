@@ -21,6 +21,7 @@
 
 #include "util.h"
 #include <QDebug>
+#include "source/LeLib/data.h"
 //#include <QtGlobal>
 
 QString Util::path = "";
@@ -31,11 +32,28 @@ int Util::hexType = 0;
 
 
 
+char **Util::StringListToChar(QStringList lst)
+{
+    char** argv = new char*[lst.size()];
+    int i=0;
+    for (QString s:lst) {
+        argv[i] = new char[512];
+
+        QByteArray nonTemporayByteArray = s.toLatin1();
+        const char *data = nonTemporayByteArray.constData();
+        for (int j=0;j<s.length();j++)
+            argv[i][j] = data[j];
+        argv[i][s.length()]=0;
+        i++;
+    }
+    return argv;
+}
+
 QString Util::toString(QStringList lst) {
     QString ret="";
     for (QString& s:lst)
         ret+=s+",";
-    ret.remove(ret.count()-1,1);
+    ret.remove(ret.length()-1,1);
     return ret;
 }
 
@@ -58,8 +76,8 @@ QString Util::BinopString(QString a) {
     a=a.simplified().trimmed();
 
     if (a.contains("'")) {
-      for (QChar c:str)
-          a = a.replace("'"+QString(c)+"'",Util::numToHex(c.toLatin1()));
+        for (QChar c:str)
+            a = a.replace("'"+QString(c)+"'",Util::numToHex(c.toLatin1()));
     }
 
 
@@ -80,9 +98,9 @@ QString Util::BinopString(QString a) {
     for (int i=0;i<str.length();i++)
         q=q.replace(str[i],"");
 
-//    qDebug() << q;
-//    qDebug() << lst;
-//    exit(1);
+    //    qDebug() << q;
+    //    qDebug() << lst;
+    //    exit(1);
     long val = 0;
     bool ok=Util::NumberFromStringHex(lst[0],val);
     if (!ok)
@@ -90,7 +108,7 @@ QString Util::BinopString(QString a) {
 
     for (int i=0;i<q.length();i++) {
         long v;
-//        ok = false;
+        //        ok = false;
         ok = Util::NumberFromStringHex(lst[i+1],v);
         if (!ok)
             return pa+a+pb;
@@ -99,7 +117,7 @@ QString Util::BinopString(QString a) {
         if (q[i]=='-')
             val-=v;
     }
-//    qDebug() << "BinopString  DONE ";
+    //    qDebug() << "BinopString  DONE ";
 
     return pa + Util::numToHex(val) + pb;
 
@@ -144,13 +162,14 @@ bool Util::NumberFromStringHex(QString s, long &num) {
         type = 2;
         s = s.replace(">","");
     }
-    if (s.startsWith("$"))
+
+    if (s.startsWith("$") || s.startsWith("-$"))
         val = s.remove("$").toLong(&ok, 16);
     else
-        if (s.toLower().startsWith("0x"))
+        if (s.toLower().startsWith("0x") || s.toLower().startsWith("-0x"))
             val = s.remove("0x").toLong(&ok, 16);
         else
-            if (s.toLower().startsWith("%"))
+            if (s.toLower().startsWith("%") || s.toLower().startsWith("-%"))
                 val= s.remove("%").toLong(&ok, 2);
             else
                 val = s.toInt(&ok, 10);
@@ -182,6 +201,7 @@ QString Util::findFileInDirectories(QString fileName, QStringList dirs)
     }
     return "";
 }
+
 
 
 
@@ -274,7 +294,7 @@ QString Util::GetSystemPrefix()
     dir = QApplication::applicationDirPath()+"/../";
 #endif
 #ifdef __APPLE__
-//    dir = Util::path;
+    //    dir = Util::path;
     dir = QApplication::applicationDirPath()+"/../../";
 #endif
     return dir;
@@ -308,8 +328,34 @@ int Util::VerifyHexAddress(QString s)
 QString Util::numToHex(long v)
 {
     QString o = QString::number(v,16);
-    if (o.count()==1) o="0"+o;
+    if (o.length()==1) o="0"+o;
     return "$" +o;
+}
+
+QString Util::numToOct(long v)
+{
+    QString o = QString::number(v,8);
+    if (o.length()==1) o="0"+o;
+    return "" +o;
+
+}
+
+QString Util::Util::numToHex0(long v)
+{
+    QString o = QString::number(v,16);
+    if (o.length()==1) o="0"+o;
+    return "0x" +o;
+}
+
+uchar Util::CountBits(uchar c)
+{
+    uchar cnt=0;
+    for (int i=0;i<8;i++) {
+        uchar s = 1<<i;
+        if ((c&s)==s)
+            cnt+=1;
+    }
+    return cnt;
 }
 
 QByteArray Util::toQByteArray(QVector<int> &data)
@@ -360,6 +406,35 @@ void Util::WriteInt16(QByteArray &ba, int val)
     ba.append((val)&0xFF);
 
 }
+void Util::WriteInt16LH(QByteArray &ba, int val)
+{
+    ba.append((val)&0xFF);
+    ba.append((val>>8)&0xFF);
+
+}
+
+QStringList Util::splitStringSafely(QString str)
+{
+    bool insideString = false;
+    QString internalDelimiter = "#;&ÆÆ";
+    QString res = "";
+    for (int i=0;i<str.length();i++) {
+        QString c = QString(str[i]);
+        if (c=="\"")
+            insideString=!insideString;
+
+        if (c=="," && !insideString) {
+            c = internalDelimiter;
+        }
+//        qDebug() << c << insideString;
+        res+=c;
+    }
+  //  qDebug() << "RES : " <<res;
+    return res.split(internalDelimiter);
+
+
+}
+
 
 QStringList Util::fixStringListSplitWithCommaThatContainsStrings(QStringList lst)
 {
@@ -369,14 +444,25 @@ QStringList Util::fixStringListSplitWithCommaThatContainsStrings(QStringList lst
     for (auto s: lst) {
         bool add = true;
         cur += s;
-        if (s.startsWith("\"")) {
-            isInString = true;
+        qDebug() << cur  << isInString;
+        if (s=="\"" && !isInString) {
             add = false;
-        }
+            isInString=!isInString;
 
-        if (s.endsWith("\"")) {
-            isInString = false;
-            add = true;
+        }
+        else
+        {
+            if (s.startsWith("\"")) {
+                isInString = true;
+                add = false;
+            }
+
+            if (s.endsWith("\"")) {
+                isInString = false;
+                add = true;
+//                if (s=="\"")
+  //                  cur+=",";
+            }
         }
         if (isInString) cur+=",";
         if (add) {
@@ -413,7 +499,7 @@ bool Util::QStringIsSimilar(QString a, QString b, qreal percentage, int n, Qt::C
     a=QString(" ").repeated(n-1)+a+QString(" ").repeated(n-1);
     b=QString(" ").repeated(n-1)+b+QString(" ").repeated(n-1);
     QString part;
-    for (int i=0;i<a.count()-(n-1);i++)
+    for (int i=0;i<a.length()-(n-1);i++)
     {
         part=a.mid(i,n);
         if (b.contains(part,caseSense)) hits++;
@@ -425,9 +511,9 @@ bool Util::QStringIsSimilar(QString a, QString b, qreal percentage, int n, Qt::C
 QStringList Util::FindFilesOfType(QString dir, QString type)
 {
     QStringList l;
-    QDirIterator it(dir, QStringList() << "*."+type, QDir::Files, QDirIterator::Subdirectories);
+    QDirIterator it(dir, QStringList() << type, QDir::Files, QDirIterator::Subdirectories);
     while (it.hasNext())
-        l << it.next().toLower().remove(dir.toLower());
+        l << it.next().remove(dir);
     return l;
 }
 
@@ -440,6 +526,10 @@ void Util::CopyFile(QString i, QString o) {
     QFile::setPermissions(i, QFileDevice::ReadOwner|QFileDevice::WriteOwner);
 }
 
+void Util::CopyFileMSVCBug(QString i, QString o) {
+    CopyFile(i,o);
+}
+
 void Util::CopyFileBytes(QString i, QString o) {
     if (QFile::exists(o)) {
         QFile ff(o);
@@ -447,6 +537,14 @@ void Util::CopyFileBytes(QString i, QString o) {
     }
     QByteArray a = loadBinaryFile(i);
     SaveByteArray(a,o);
+}
+
+void Util::CopyFilesInDirectory(QString fileType, QString src, QString dst)
+{
+    auto files = Util::FindFilesOfType(src,fileType);
+    for (auto& f: files)
+        Util::CopyFile(src+"/"+f,dst+"/"+f);
+
 }
 
 bool Util::CopyRecursively(QString sourceFolder, QString destFolder)
@@ -484,6 +582,15 @@ bool Util::CopyRecursively(QString sourceFolder, QString destFolder)
     return true;
 }
 
+uchar Util::MultiCharMask(uchar val)
+{
+    uchar c = 0;
+    for (int i=0;i<4;i++) {
+        if (((val>>(i*2))&0b11)!=0) c|=(0b11<<(i*2));
+    }
+    return c;
+}
+
 void Util::ConvertFileWithLoadAddress(QString input, QString output, int address)
 {
     QFile f(input);
@@ -497,6 +604,8 @@ void Util::ConvertFileWithLoadAddress(QString input, QString output, int address
     }
     //    qDebug() << a.size() << input;
     //  exit(1);
+    if ((((char)a[0])==(char)((address>>8)&0xFF)) && (((char)a[1])==((char)(address)&0xFF)))
+        return;
     a.insert(0,(address>>8)&0xFF);
     a.insert(0,(address)&0xFF);
 
@@ -530,6 +639,24 @@ QVector3D Util::abss(QVector3D a)
     return QVector3D(abs(a.x()), abs(a.y()), abs(a.z()));
 }
 
+QVector3D Util::fromQString(QString val)
+{
+    QStringList l = val.split(",");
+    QVector3D v;
+    if (l.size()>0)
+        v.setX(l[0].toFloat());
+    if (l.size()>1)
+        v.setY(l[1].toFloat());
+    if (l.size()>2)
+        v.setZ(l[2].toFloat());
+    return v;
+}
+
+QString Util::fromVec(QVector3D val)
+{
+    return QString::number(val.x())+","+QString::number(val.y())+","+QString::number(val.z());
+}
+
 QVector3D Util::maxx(QVector3D a, QVector3D b)
 {
     return QVector3D(std::max(a.x(),b.x()), std::max(a.y(),b.y()), std::max(a.z(),b.z()));
@@ -551,14 +678,22 @@ int Util::C64StringToInt(QString f) {
 bool Util::SameSide(const QVector3D &p1, const QVector3D &p2, const QVector3D &a, const QVector3D &b) {
     QVector3D cp1 = QVector3D::crossProduct(b-a, p1-a);
     QVector3D cp2 = QVector3D::crossProduct(b-a, p2-a);
-    return QVector3D::dotProduct (cp1, cp2) >= 0;
+    return QVector3D::dotProduct (cp1, cp2) >= -0.0;
     //        else return false
 }
 
+bool Util::PointInTriangle(const QVector3D &p, const QVector3D &a, const QVector3D &b, const QVector3D &c) {
+    if (SameSide(p,a, b,c) &&
+            SameSide(p,b, a,c) &&
+            SameSide(p,c, a,b)) return true;
+
+    return false;
+}
+
 QString Util::fixFolder(QString folderName) {
-    if (folderName[folderName.count()-1]=='\\')
+    if (folderName[folderName.length()-1]=='\\')
         return folderName;
-    if (folderName[folderName.count()-1]=='/')
+    if (folderName[folderName.length()-1]=='/')
         return folderName;
     return folderName + "/";
 }
@@ -591,19 +726,19 @@ QString Util::findFileInDirectory(QString search, QString dir, QString extension
 
 QString Util::listFiles(QDir directory, QString searchFile)
 {
-        QDir dir(directory);
-        QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
-        foreach(QFileInfo finfo, list) {
-                if (finfo.isDir()) {
-                        QString s = listFiles(QDir(finfo.absoluteFilePath()), searchFile);
-                        if (s!="")
-                            return s;
-                }
-                if (finfo.fileName().toLower()==searchFile.toLower())
-                    return finfo.absoluteFilePath();
-
+    QDir dir(directory);
+    QFileInfoList list = dir.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot);
+    foreach(QFileInfo finfo, list) {
+        if (finfo.isDir()) {
+            QString s = listFiles(QDir(finfo.absoluteFilePath()), searchFile);
+            if (s!="")
+                return s;
         }
-        return "";
+        if (finfo.fileName().toLower()==searchFile.toLower())
+            return finfo.absoluteFilePath();
+
+    }
+    return "";
 }
 
 float Util::floatRandom(const float &min, const float &max) {
@@ -611,6 +746,24 @@ float Util::floatRandom(const float &min, const float &max) {
     std::uniform_real_distribution<float> distribution(min, max);
     return distribution(generator);
 }
+
+QStringList Util::QStringToDataList(QStringList& t) {
+    QStringList lst;
+    for (QString& c : t) {
+        if (c.startsWith("*&NUM")) {
+            QString d = c.remove("*&NUM");
+            lst.append(c);
+        }
+        else {
+            for (QChar& ch : c) {
+                bool ok =true;
+                lst.append("$"+QString::number(ch.toLatin1(),16));
+            }
+        }
+    }
+    return lst;
+}
+
 
 wchar_t *Util::QStringToWchar(QString t) {
     wchar_t* arr = new wchar_t[t.size()+1];
@@ -620,6 +773,13 @@ wchar_t *Util::QStringToWchar(QString t) {
 }
 
 void Util::SaveByteArray(QByteArray &data, QString file) {
+
+    QFileInfo info(file);
+    QString d = info.dir().absolutePath();
+    QDir dir(d);
+    if (!dir.exists())
+        dir.mkpath(d);
+
     QFile f(file);
     f.open(QFile::WriteOnly);
     f.write(data);
@@ -642,10 +802,18 @@ QString Util::fromStringList(QStringList lst)
 }
 
 
-long Util::NumberFromStringHex(QString s) {
+long Util::NumberFromStringHex(QString s, bool& isOk) {
+    long val = 0;
+    isOk = NumberFromStringHex(s,val);
+    return val;
+}
+
+long Util::NumberFromStringHex(QString s)
+{
     long val = 0;
     bool ok = NumberFromStringHex(s,val);
     return val;
+
 }
 
 QString Util::findFileInSubDirectories(QString search, QString dir, QString extension)
@@ -686,18 +854,22 @@ bool Util::isNumber(QString s)
         base = 16;
         s = s.remove("$");
     }
+    else
     if (s.startsWith("0x")) {
         base = 16;
         s = s.remove("0x");
     }
+    else
     if (s.startsWith("#")) {
         base = 16;
         s = s.remove("#");
     }
+    else
     if (s.startsWith("%")) {
         base = 2;
         s = s.remove("%");
     }
+    else
     if (s.startsWith("0b")) {
         base = 2;
         s = s.remove("0b");
@@ -775,6 +947,14 @@ QString Util::loadTextFile(QString filename) {
 
 void Util::SaveTextFile(QString fname, QString text)
 {
+    QFileInfo info(fname);
+    QString d = info.dir().absolutePath();
+    QDir dir(d);
+    if (!dir.exists())
+        dir.mkpath(d);
+
+
+
     if (QFile::exists(fname)) {
         QFile::remove(fname);
     }
@@ -850,11 +1030,35 @@ void Util::setInt16(QByteArray &ba, int pos, int val)
     ba[pos+1] = (val>>8)&0xFF;
     ba[pos] = (val)&0xFF;
 }
+void Util::setInt16Rev(QByteArray &ba, int pos, int val)
+{
+    ba[pos] = (val)&0xFF;
+    ba[pos+1] = (val>>8)&0xFF;
+}
 
+void Util::appendInt16(QByteArray &ba, int val, bool isRev)
+{
+    if (isRev) {
+        ba.append((val>>8)&0xFF);
+        ba.append((val)&0xFF);
+        return;
+    }
+    ba.append((val)&0xFF);
+    ba.append((val>>8)&0xFF);
+
+}
 void Util::appendInt16(QByteArray &ba, int val)
 {
     ba.append((val)&0xFF);
     ba.append((val>>8)&0xFF);
+
+}
+
+void Util::appendInt16Rev(QByteArray &ba, int val)
+{
+
+    ba.append((val>>8)&0xFF);
+    ba.append((val)&0xFF);
 
 }
 
@@ -885,20 +1089,35 @@ QPoint Util::mapToWindow(QWidget *from, QPoint pt) {
     return pt;
 }
 
-QPixmap Util::CreateColorIcon(QColor col, int s) {
+QPixmap Util::CreateColorIcon(QColor col, int s, int index) {
     QImage img(s,s,QImage::Format_RGB32);
-
     QColor c2(col.red()/2, col.green()/2, col.blue()/2);
     for (int y=0;y<s;y++)
         for (int x=0;x<s;x++) {
-            //            if (s-1-y>x)
-
-            //              img.setPixelColor(x,y, m_list[col].color);
-            //        else
             if (y==0 || y==s-1 ||x==0 || x==s-1)
                 img.setPixelColor(x,y, c2);
             else
                 img.setPixelColor(x,y, col);
+
+
+            if (Data::data.displayAux) {
+                if (index>8) {
+/*                    if (y>1 && y<s/2-2 && x>s/2-2 && x<s-2)
+                        img.setPixelColor(x,y,Data::data.aux1);
+
+                    if (y>s/2 && y<s-2 && x>s/2-2 && x<s-2)
+                        img.setPixelColor(x,y,Data::data.aux2);
+*/
+
+                    if (x>s/3 && x<2*s/3)
+                        img.setPixelColor(x,y,Data::data.aux1);
+
+                    if (x>=2*s/3 && x<s)
+                        img.setPixelColor(x,y,Data::data.aux2);
+
+
+                }
+            }
 
 
         }
@@ -906,7 +1125,7 @@ QPixmap Util::CreateColorIcon(QColor col, int s) {
 
 }
 
-QMap<QString, long> Util::sm_fileSizes;
+QHash<QString, long> Util::sm_fileSizes;
 
 
 bool Util::fileChanged(QString filename)
@@ -935,11 +1154,24 @@ int Util::CountFilesInAllDirectories(QString dir, QStringList fileTypes)
     {
         QString s = it.next();
         for (QString& ft: fileTypes)
-          if (s.toLower().endsWith("."+ft))
-              cnt+=1;
+            if (s.toLower().endsWith("."+ft))
+                cnt+=1;
         if (fileTypes.count()==0) cnt++;
     }
     return cnt;
+}
+
+QString Util::IntToHexString(int val)
+{
+    QString s = QString::number(val);
+    QString line = ".byte   ";
+    for (int i=0;i<s.length();i++) {
+        int val = QString(s[i]).toInt() + 0x30;
+        line = line + Util::numToHex(val) + ",";
+    }
+    line = line.remove(line.length()-1,1);
+    return line;
+
 }
 
 

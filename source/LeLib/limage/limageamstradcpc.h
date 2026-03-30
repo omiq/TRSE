@@ -15,7 +15,7 @@ public:
 
 
 
-    static uchar AmstradCrazySwap(uchar c);
+    static uchar AmstradMode0BitPattern(uchar c);
 
 
     QVector<int> m_data;
@@ -27,11 +27,15 @@ public:
     int m_mode;
     virtual void InitPens() override;
 
-    void setPixel(int x, int y, unsigned int color) override;
+//    void setPixel(int x, int y, unsigned int color) override;
 
-    void ToQImage(LColorList& lst, QImage& img, float zoom, QPointF center) override;
+    void ToQImage(LColorList& lst, QImage& img, double zoom, QPointF center) override;
 
 //    void OrdererdDither(QImage &img, LColorList &colors, QVector3D strength, QPoint size, float gamma=1.0) override;
+    void CPCExport0(QFile &file, int xpos, int ypos, int width, int height) override;
+    void CPCExportTile0(QFile &file, int start, int end, int width, int height) override;
+
+    void CPCExportPal(QFile &ofile) override;
 
     void ExportBin(QFile& ofile) override;
     void LoadBin(QFile& file) override;

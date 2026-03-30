@@ -26,19 +26,42 @@ NodeAssign::NodeAssign(QSharedPointer<Node> left, Token t, QSharedPointer<Node> 
     m_right = r;
     m_op = t;
     m_left = left;
-   // qDebug() << "NodeAssign " <<TokenType::getType(m_left->getType(nullptr)) << (qSharedPointerDynamicCast<NodeVar>m_left)->getValue(as);
-    if (m_left->getType(nullptr)==TokenType::INTEGER) {// || m_left->getType(nullptr)==TokenType::POINTER) {
- //       qDebug() << "::NodeAssign INTEGER";
-//        m_right->setForceType(TokenType::INTEGER);
-//        m_right->setForceType(m_left->getType(nullptr));
-    }
+
 
 }
 
 
 void NodeAssign::ExecuteSym(QSharedPointer<SymbolTable>  symTab) {
+    return;
     QString varName = qSharedPointerDynamicCast<NodeVar>(m_left)->value;
     QSharedPointer<Symbol> varSymbol = symTab->Lookup(varName, m_op.m_lineNumber);
     m_right->ExecuteSym(symTab);
 
+}
+
+bool NodeAssign::isDead() {
+    if ((!m_left) || (!m_right))
+        return false;
+
+    if (m_left->rawValue() == m_right->rawValue() && m_right->rawValue()!="") {
+        qDebug() << m_left->rawValue() << m_right->rawValue();
+        if (m_left->getIndex()!=nullptr) {
+            if (m_right->getIndex()!=nullptr)
+                if (m_left->getIndex()->rawValue() == m_right->getIndex()->rawValue() && m_right->getIndex()->rawValue()!="")
+                    // i[j] := i[j];
+                    return true;
+        }
+        else
+            // i := i
+            if (m_right->getIndex()==nullptr) {
+                return true;
+            }
+
+    }
+    return false;
+}
+
+bool NodeAssign::Optimize() {
+    if (isDead()) return true;
+    return false;
 }

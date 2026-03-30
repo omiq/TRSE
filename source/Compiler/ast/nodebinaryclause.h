@@ -23,9 +23,21 @@
 #define NODEBINARYCLAUSE_H
 
 #include "node.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
+/* 
+    Binary clause node: (a = b), (c != 2*d), (e>5), (a>b and c!=d) etc
+    m_left: left expression. Can be recursive.
+    m_right: right expression. Can be recursive.
+    m_op: Comparator operator (GREATER, LESS, EQUALS, NOTEQUALS, AND, OR) etc)
 
+    if the comparator is OR or AND, then the binary clause is a *compound clause*, meaning
+    that the left/right nodes are sub-binary clause nodes. Example:
+
+    if (a>b) then ... <- simple binary clause, NOT a compound, a "leaf" node.
+    if (a>b and c<d) <- compound binary clause (not a leaf), but m_left/m_right is a leaf node "c<d" and "a>b"
+
+*/
 class NodeBinaryClause : public Node
 {
 public:
@@ -38,9 +50,12 @@ public:
 
     bool cannotBeSimplified(Assembler* as);
 
+    NodeType getNodeType() override {
+        return BINARYCLAUSE;
+    }
 
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeBinaryClause>(sharedFromThis()));
     }
 
@@ -57,6 +72,7 @@ public:
     }
 
     bool isWord(Assembler *as) override;
+    bool isLong(Assembler *as) override;
 
 
 };

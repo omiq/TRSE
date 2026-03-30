@@ -21,6 +21,13 @@
 
 #include "nodeblock.h"
 
+void NodeBlock::FindPotentialSymbolsInAsmCode(QStringList &lst) {
+    if (m_compoundStatement!=nullptr)
+        m_compoundStatement->FindPotentialSymbolsInAsmCode(lst);
+    for (auto d : m_decl)
+        d->FindPotentialSymbolsInAsmCode(lst);
+}
+
 void NodeBlock::SetParameter(QString name, PVar var) {
     QSharedPointer<Symbol> s = m_symTab->Lookup(name, m_op.m_lineNumber);
     //        if (s==nullptr)
@@ -29,10 +36,16 @@ void NodeBlock::SetParameter(QString name, PVar var) {
     s->m_value = QSharedPointer<PVar>(new PVar(var));
 }
 
-void NodeBlock::ReplaceInline(Assembler* as,QMap<QString, QSharedPointer<Node> > &inp)
+void NodeBlock::ReplaceInline(Assembler* as,QHash<QString, QSharedPointer<Node> > &inp)
 {
     if (m_compoundStatement!=nullptr)
         m_compoundStatement->ReplaceInline(as,inp);
+}
+
+void NodeBlock::ReplaceInlineAssemblerVariables(Assembler *as, QString var, QString val)
+{
+    if (m_compoundStatement!=nullptr)
+        m_compoundStatement->ReplaceInlineAssemblerVariables(as,var,val);
 }
 
 
@@ -60,7 +73,20 @@ void NodeBlock::ExecuteSym(QSharedPointer<SymbolTable> symTab) {
 
     for (QSharedPointer<Node> n: m_decl)
     {
+
         n->ExecuteSym(m_symTab);
     }
     m_compoundStatement->ExecuteSym(m_symTab);
+}
+
+void NodeBlock::ResetInlineAssembler()
+{
+    if (m_compoundStatement!=nullptr)
+        m_compoundStatement->ResetInlineAssembler();
+}
+
+bool NodeBlock::Optimize() {
+    if (m_compoundStatement!=nullptr)
+        m_compoundStatement->Optimize();
+    return false;
 }

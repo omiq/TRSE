@@ -3,7 +3,7 @@ unit Screen;
 var
 	const VIC_BASE: integer = $D000;
 	addr : integer;
-	bank, val,y,x,j : byte;
+	bbank, val,y,x,j : byte;
 	zp:^byte;
 	spritePointerAddress: integer at $D06C;
 
@@ -25,13 +25,13 @@ begin
 end;
 
 /**
-Sets the character data address at the 16-bit location given in parameter 1 with bank from parameter 2.
+Sets the character data address at the 16-bit location given in parameter 1 with bbank from parameter 2.
 **/
-procedure SetCharsetLocation(addr: global integer; bank:global byte);
+procedure SetCharsetLocation(addr: global integer; bbank:global byte);
 begin
 	poke(VIC_BASE + ^$68, 0, lo(addr));
     poke(VIC_BASE + ^$69, 0, hi(addr));
-    poke(VIC_BASE + ^$6A, 0, bank);
+    poke(VIC_BASE + ^$6A, 0, bbank);
 end;
 
 /**
@@ -62,23 +62,23 @@ begin
 end;
 
 /**
-Sets the screen location address at the 16-bit location given in parameter 1 with bank from parameter 2.
+Sets the screen location address at the 16-bit location given in parameter 1 with bbank from parameter 2.
 **/
-procedure SetScreenLocation(addr: global integer; bank:global byte);
+procedure SetScreenLocation(addr: global integer; bbank:global byte);
 begin
 	poke(VIC_BASE + ^$60, 0, lo(addr));
     poke(VIC_BASE + ^$61, 0, hi(addr));
-    poke(VIC_BASE + ^$62, 0, bank);
+    poke(VIC_BASE + ^$62, 0, bbank);
 end;
 
 /**
-Sets the current screen bank on the VIC4
+Sets the current screen bbank on the VIC4
 **/
 
-procedure SetBank(bank : global byte);
+procedure SetBank(bbank : global byte);
 begin
 	asm("
-        ldy Screen_bank
+        ldy Screen_bbank
 		lda #$00
         tax 
 ;        tay 
@@ -116,7 +116,7 @@ The VIC4 is hidden by default on the mega65. Use this method to make it visible 
 procedure EnableVIC4();
 begin
 	asm("
-		lda #$47    //Enable VIC IV
+		lda #$47  
         sta $d02f
         lda #$53
         sta $d02f
@@ -161,6 +161,19 @@ begin
 
 
 end;
-
-
+/**
+Enables Super-extended attribute mode (SEAM)
+**/
+procedure EnableSeamMode();
+begin
+	Set40ColumnMode();
+	asm("
+	    lda #$5
+        sta $d054
+        lda #$50
+        sta $d058
+        lda #$00
+        sta $d059
+	");
+end;
 end.

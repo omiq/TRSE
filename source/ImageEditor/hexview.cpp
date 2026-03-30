@@ -207,7 +207,7 @@ void HexView::paintEvent(QPaintEvent *event)
         for (int xPosAscii = m_posAscii, i=0; ((lineIdx - firstLineIdx) * BYTES_PER_LINE + i) < data.size() && (i < BYTES_PER_LINE); i++, xPosAscii += m_charWidth)
         {
             int pos = (lineIdx - firstLineIdx) * BYTES_PER_LINE + i;
-            if (pos>=data.count())
+            if (pos>=data.length())
                 break;
 
             char ch = data[pos];
@@ -250,7 +250,7 @@ void HexView::paintEvent(QPaintEvent *event)
 
             for (int b=0;b<8;b++) {
                 int pos = (lineIdx - firstLineIdx) * BYTES_PER_LINE + b +i*8;
-                if (pos<data.count()) {
+                if (pos<data.length()) {
                     uchar v = data[pos];
 
                     for (int x=0;x<8;x++) {
@@ -474,7 +474,7 @@ void HexView::keyPressEvent(QKeyEvent *event)
 
     QString t = event->text();
 
-    if(event->key() == Qt::Key_Delete)
+    if(event->key() == Qt::Key_Delete || event->key() == Qt::Key_Question)
     {
         m_pdata->m_data.remove(m_selectBegin / 2, (m_selectEnd - m_selectBegin) / 2 + 1);
         m_isChanged = true;
@@ -652,7 +652,7 @@ QByteArray DataStorageArray::getData(std::size_t position, std::size_t length)
 
 std::size_t DataStorageArray::size()
 {
-    return m_data.count();
+    return m_data.length();
 }
 
 

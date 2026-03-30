@@ -1,4 +1,5 @@
 #include "systemspectrum.h"
+#include "source/Compiler/syntax.h"
 
 void SystemSpectrum::Assemble(QString &text, QString filename, QString currentDir, QSharedPointer<SymbolTable> symTab)
 {
@@ -8,19 +9,7 @@ void SystemSpectrum::Assemble(QString &text, QString filename, QString currentDi
 
 
     output+="<br>";
-/*    QString assembler = m_settingsIni->getString("pasmo");
-    if (!QFile::exists(assembler)) {
-        text  += "<br><font color=\"#FF6040\">Please set up a link to the PASMO assembler directory in the TRSE settings panel.</font>";
-        m_buildSuccess = false;
-        return;
-    }
 
-    if (QFile::exists(filename+".tap"))
-        QFile::remove(filename+".tap");
-    QProcess process;
-    QStringList params;
-    StartProcess(assembler, QStringList() << "-1" << "--tapbas" << filename+".asm" <<filename+".tap", output);
-*/
     PerformAssembling(filename,text,currentDir,symTab);
 
     if (!QFile::exists(filename+".bin")) {
@@ -43,5 +32,17 @@ void SystemSpectrum::Assemble(QString &text, QString filename, QString currentDi
 
 void SystemSpectrum::PostProcess(QString &text, QString file, QString currentDir)
 {
+
+}
+
+void SystemSpectrum::applyEmulatorParameters(QStringList &params, QString debugFile, QString filename, CIniFile *pini) {
+    QString emu = getEmulatorName();
+    if (emu.toLower().contains("retro")) {
+        QString addr = QString::number(Syntax::s.m_currentSystem->m_programStartAddress,16);
+        int model = pini->getdouble("spectrum_model");
+        QStringList models = QStringList() <<"zx16k" << "zx48k"<<"zx128k";
+        params<<"-b="+models[model]<<"-j=0x"+addr<<"-l=0x"+addr;
+        params << filename+".bin";
+    }
 
 }

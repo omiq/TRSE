@@ -1,30 +1,91 @@
 unit Screen;
-@use "system/file"
 @use "system/memory"
 var
-	i,j,k,noBuffers : integer;
-	f : File::File;
+	i,j,k,noBuffers,x,y,w,h : integer;
+	fp : pointer;
+	tp : pointer of byte;
 	color,red,green,blue : byte;
-	const VGA : integer = $A000;
+	const VGA : address = $A000;
+	const CGA : address = $B800;
 	buffer1, buffer2, buffer3, buffer4, buffer5 : pointer;
 	@donotremove source	
 	@donotremove dest
 	source,dest:pointer of integer;
-		
+	ytab_cga : array[201] of integer = buildtable("Math.floor(i/2)*80 + 8192*((i)%2)");
+
+	CGA_cols : array[4] of byte=(cga_color0, cga_color1, cga_color2, cga_color3);
+	port:integer;
+	val, reg:byte;
+	
+	zp:pointer;
+	
+	const CRTCa : integer = $3D8;/* 6845 mode control register */
+	const CRTCb : integer = $3D4; /* 6845 index register */
+	const STATUS_REGISTER : integer = $3DA; /* Input Status Register */
+
+
+procedure SetBGColor(_bx: byte);
+begin
+	asm("
+		mov ah,0bh
+		mov bh,0
+		int 10h
+	");
+end;
 
 
 procedure InitVGABuffers(noBuffers:global integer);
 begin
 	if (noBuffers>0) then
-		buffer1 := Memory::GetMem($FFF);
+		buffer1 := Memory::GetBlockMem($FFF);
 	if (noBuffers>1) then
-		buffer2 := Memory::GetMem($FFF);
+		buffer2 := Memory::GetBlockMem($FFF);
 	if (noBuffers>2) then
-		buffer3 := Memory::GetMem($FFF);
+		buffer3 := Memory::GetBlockMem($FFF);
 	if (noBuffers>3) then
-		buffer4 := Memory::GetMem($FFF);
+		buffer4 := Memory::GetBlockMem($FFF);
 	if (noBuffers>4) then
-		buffer5 := Memory::GetMem($FFF);
+		buffer5 := Memory::GetBlockMem($FFF);
+end;
+
+procedure InitCGABuffers(noBuffers:global integer);
+begin
+/*	if (noBuffers>0) then
+		buffer1 := Memory::GetBlockMem($3E8);
+	if (noBuffers>1) then
+		buffer2 := Memory::GetBlockMem($3E8);
+	if (noBuffers>2) then
+		buffer3 := Memory::GetBlockMem($3E8);
+	if (noBuffers>3) then
+		buffer4 := Memory::GetBlockMem($3E8);
+	if (noBuffers>4) then
+		buffer5 := Memory::GetBlockMem($3E8);*/
+//	buffer1:=Memory::GetBlockMem(1000*noBuffers);
+	buffer1:=ptr($2000,0);
+	buffer2:=buffer1+16000;
+	buffer3:=buffer2+16000;
+	buffer4:=buffer3+16000;
+	buffer5:=buffer4+16000;
+end;
+
+procedure ReleaseCGABuffers();
+begin
+	Memory::Release(buffer1);
+end;
+
+
+procedure InitVGABuffersNo21(noBuffers:global integer);
+begin
+	if (noBuffers>0) then
+		buffer1 := ptr($2000,0);
+	if (noBuffers>1) then
+		buffer2 := ptr($3000,0);
+	if (noBuffers>2) then
+		buffer3 := ptr($4000,0);
+	if (noBuffers>3) then
+		buffer4 := ptr($5000,0);
+	if (noBuffers>4) then
+		buffer5 := ptr($6000,0);
 end;
 
  procedure SetColor(color,red,green,blue:global byte);
@@ -47,24 +108,8 @@ end;
 end;
 
 
-procedure SetPaletteFromFile(fp:pointer);
-@donotremove colbuf
-var
-	colbuf :array[256*30] of byte;
-	tp : pointer of byte;
+procedure SetPalette(tp:global pointer);
 begin
-	tp := #colbuf;
-/*	handle := File::Open(fp);
-	File::Read(handle, $300, #colbuf);
-	File::Close(handle);
-*/
-	f.Open(fp,File::R);
-	f.Read($300,#colbuf);
-	f.Close();	
-	for i:=0 to $300 do 
-	begin
-		tp[i]:=tp[i]/4;
-	end;		
 	j:=0;
 	for i:=0 to $100 do
 	begin
@@ -73,6 +118,8 @@ begin
 	end;
 
 end;
+
+
 
 	
 
@@ -113,6 +160,10 @@ begin
 end;
 
 
+/**
+
+ Sets the graphics mode. 13 is VGA 320x200.
+**/
 procedure SetMode(i : global integer);
 begin
 	asm("
@@ -124,15 +175,15 @@ end;
 procedure PrintChar(ch : byte);
 begin
 	asm
-			mov	al,[Screen_ch]
-			mov	ah,0x0E
-			int	10h
+		mov	al,[Screen_ch]
+		mov	ah,0x0E
+		int	10h
 	
 	end;
 end;
 
 
-procedure Print(zp:pointer);
+procedure Print(zp:global pointer);
 begin
 	while (zp^<>0) do
 	begin
@@ -181,6 +232,7 @@ end;
 end;
 
 
+
 procedure PrintInt(i:global integer);
 begin
 	asm
@@ -188,6 +240,26 @@ begin
 	end;
 	PrintAx();
 	
+end;
+
+
+	
+procedure write_crtc(port:global integer; reg, val:global byte);
+begin
+     outportb(port, reg);
+     outportb(port+1,val);
+end;
+
+
+procedure DrawBoxCGA(zp:global pointer, x,y,w,h,i : global integer);
+begin
+	zp+=ytab_cga[y] + x;
+	for j:=0 to h do
+	begin
+		fillw(zp,i,w);
+		zp+=80;
+	
+	end;
 end;
 
 end.

@@ -11,7 +11,7 @@ var
 */
 
 // Compression 30 seems to fit nicely here, with 247 chars exported
-@exportcompressed "resources/images/skull.flf" "resources/images/skull.bin" 0 0 40 25 30
+@exportcompressed "resources/images/skull.flf" "resources/images/skull.bin" 0 0 40 25  30
 
    image_screen : incbin("resources/images/skull_screen.bin", $3000);
    image_charset : incbin("resources/images/skull_charset.bin",$2000);
@@ -36,18 +36,18 @@ begin
 	zp:=#screenLoc;;
 	p1:=#image_screen + 12*40;
 	p2:=#image_screen;
-	for i:=0 to 50 do
+	for i:=0 to screen_height*2 do
 	begin
 		//fill(zp,1,20); // first 		
-		memcpy(p2,0,zp,40); // first image
-		zp:=zp+40;
+		memcpy(p2,0,zp,screen_width); // first image
+		zp:=zp+screen_width;
 	
 		
-		memcpy(p1,0,zp,40); // cneter
-		zp:=zp+40;
+		memcpy(p1,0,zp,screen_width); // cneter
+		zp:=zp+screen_width;
 		
-		p2:=p2+40;
-		p1:=p1+40;		
+		p2:=p2+screen_width;
+		p1:=p1+screen_width;		
 
 		if (i=24 or i=24+25) then p2:=#image_screen;				
 		if (i=12 or i=12+25) then p1:=#image_screen;				
@@ -108,6 +108,9 @@ begin
 	closeirq();
 end;
 
+
+
+
 begin
 	SetupScreen();
 	setcharsetlocation($2000);
@@ -121,6 +124,7 @@ begin
 	disableciainterrupts();
 	setmemoryconfig(1,0,0);
 	Prepare();
+	
 	StartRasterchain(Raster(), 250,0);
 
 

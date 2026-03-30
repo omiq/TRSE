@@ -117,13 +117,6 @@
            </widget>
            <widget class="QWidget" name="layoutWidget">
             <layout class="QGridLayout" name="gridLayout_8">
-             <item row="0" column="1">
-              <widget class="QPushButton" name="btnBuild_3">
-               <property name="text">
-                <string>Build (c-b)</string>
-               </property>
-              </widget>
-             </item>
              <item row="1" column="1">
               <widget class="QPushButton" name="btnMemoryAnalyze">
                <property name="toolTip">
@@ -134,14 +127,7 @@
                </property>
               </widget>
              </item>
-             <item row="0" column="0">
-              <widget class="QPushButton" name="btnSave_3">
-               <property name="text">
-                <string>Save (c-s)</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
+             <item row="3" column="0">
               <widget class="QPushButton" name="btnBuildAll">
                <property name="toolTip">
                 <string>Builds all files according to the build instruction script. Check the &quot;project settings&quot; for details.</string>
@@ -151,24 +137,21 @@
                </property>
               </widget>
              </item>
-             <item row="3" column="1">
+             <item row="0" column="1">
+              <widget class="QPushButton" name="btnBuild_3">
+               <property name="text">
+                <string>Build (c-b)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
               <widget class="QPushButton" name="btnShowcases">
                <property name="text">
                 <string>TRSE Showcases</string>
                </property>
               </widget>
              </item>
-             <item row="2" column="1">
-              <widget class="QPushButton" name="btnProjectDir">
-               <property name="toolTip">
-                <string>Opens up an explorer window to the current project folder</string>
-               </property>
-               <property name="text">
-                <string>Project directory</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="0">
+             <item row="4" column="0">
               <widget class="QPushButton" name="btnClearProject">
                <property name="toolTip">
                 <string>Deletes all .asm .sym .prg files in the current project</string>
@@ -185,6 +168,33 @@
                </property>
                <property name="text">
                 <string>Run (c-r)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QPushButton" name="btnSave_3">
+               <property name="text">
+                <string>Save (c-s)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QPushButton" name="btnProjectDir">
+               <property name="toolTip">
+                <string>Opens up an explorer window to the current project folder</string>
+               </property>
+               <property name="text">
+                <string>Project directory</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QPushButton" name="btnSizeAnalyser">
+               <property name="toolTip">
+                <string>Opens up a memory map analyzer window</string>
+               </property>
+               <property name="text">
+                <string>Size analyser (c-y)</string>
                </property>
               </widget>
              </item>
@@ -303,6 +313,9 @@
        <property name="currentIndex">
         <number>0</number>
        </property>
+       <property name="movable">
+        <bool>true</bool>
+       </property>
        <widget class="QWidget" name="tab_3">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -313,11 +326,11 @@
         <attribute name="title">
          <string>Turbo Rascal Solution</string>
         </attribute>
-        <layout class="QGridLayout" name="gridLayout_4" rowstretch="4,1,12,0" columnstretch="0">
+        <layout class="QGridLayout" name="gridLayout_4" rowstretch="0,0" columnstretch="0">
          <item row="0" column="0">
           <layout class="QVBoxLayout" name="verticalLayout_2">
            <item>
-            <layout class="QGridLayout" name="gridLayout_3" columnstretch="5,12,4">
+            <layout class="QGridLayout" name="gridLayout_3" columnstretch="5,12,3">
              <item row="0" column="1">
               <widget class="LGLSlideshow" name="glslider" native="true"/>
              </item>
@@ -325,14 +338,14 @@
               <widget class="QLabel" name="label_4">
                <property name="minimumSize">
                 <size>
-                 <width>180</width>
-                 <height>180</height>
+                 <width>128</width>
+                 <height>128</height>
                 </size>
                </property>
                <property name="maximumSize">
                 <size>
-                 <width>180</width>
-                 <height>180</height>
+                 <width>128</width>
+                 <height>128</height>
                 </size>
                </property>
                <property name="text">
@@ -357,150 +370,98 @@
            </item>
           </layout>
          </item>
-         <item row="2" column="0">
-          <layout class="QGridLayout" name="gridLayout_2" columnstretch="4,9">
-           <item row="1" column="0">
-            <layout class="QVBoxLayout" name="verticalLayout_3">
-             <item>
-              <widget class="QLabel" name="label_2">
-               <property name="font">
-                <font>
-                 <pointsize>14</pointsize>
-                </font>
-               </property>
-               <property name="text">
-                <string>Recent projects</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QComboBox" name="cmbSelectSystemRecent"/>
-             </item>
-             <item>
-              <widget class="QListWidget" name="lstRecentProjects">
-               <property name="font">
-                <font>
-                 <pointsize>14</pointsize>
-                </font>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item row="1" column="1">
-            <layout class="QVBoxLayout" name="verticalLayout_6">
-             <item>
-              <layout class="QGridLayout" name="gridLayout_6" columnstretch="5,7">
-               <item row="0" column="0">
-                <widget class="QLabel" name="label">
-                 <property name="font">
-                  <font>
-                   <pointsize>14</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Tutorials / sample projects</string>
-                 </property>
-                </widget>
-               </item>
+         <item row="1" column="0">
+          <widget class="QTabWidget" name="tabWidget">
+           <property name="currentIndex">
+            <number>0</number>
+           </property>
+           <widget class="QWidget" name="tab">
+            <attribute name="title">
+             <string>Sample projects and tutorials</string>
+            </attribute>
+            <layout class="QGridLayout" name="gridLayout_7">
+             <item row="0" column="0">
+              <layout class="QGridLayout" name="gridLayout_2" columnstretch="4,12">
                <item row="1" column="0">
-                <widget class="QComboBox" name="cmbSelectSystem"/>
-               </item>
-               <item row="2" column="0">
-                <layout class="QVBoxLayout" name="verticalLayout_4">
+                <layout class="QVBoxLayout" name="verticalLayout_3" stretch="0,0">
                  <item>
-                  <widget class="QListWidget" name="lstSampleProjects"/>
+                  <widget class="QComboBox" name="cmbSelectSystemRecent"/>
+                 </item>
+                 <item>
+                  <widget class="QListWidget" name="lstRecentProjects">
+                   <property name="font">
+                    <font>
+                     <pointsize>14</pointsize>
+                    </font>
+                   </property>
+                  </widget>
                  </item>
                 </layout>
                </item>
-               <item row="2" column="1">
-                <widget class="QTextBrowser" name="txtTutorials"/>
-               </item>
-               <item row="0" column="1">
-                <widget class="QLabel" name="lblBrag1">
-                 <property name="font">
-                  <font>
-                   <pointsize>14</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
                <item row="1" column="1">
-                <widget class="QLabel" name="lblBrag2">
-                 <property name="font">
-                  <font>
-                   <pointsize>14</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
+                <layout class="QVBoxLayout" name="verticalLayout_6">
+                 <item>
+                  <layout class="QGridLayout" name="gridLayout_6" rowstretch="0,0,0" columnstretch="0">
+                   <item row="2" column="0">
+                    <widget class="QScrollArea" name="scrollArea">
+                     <property name="widgetResizable">
+                      <bool>true</bool>
+                     </property>
+                     <widget class="QWidget" name="scrollAreaWidgetContents">
+                      <property name="geometry">
+                       <rect>
+                        <x>0</x>
+                        <y>0</y>
+                        <width>553</width>
+                        <height>358</height>
+                       </rect>
+                      </property>
+                     </widget>
+                    </widget>
+                   </item>
+                   <item row="0" column="0">
+                    <layout class="QHBoxLayout" name="horizontalLayout_4" stretch="1,5">
+                     <item>
+                      <widget class="QLabel" name="label">
+                       <property name="text">
+                        <string>Select system:</string>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QComboBox" name="cmbSelectSystem"/>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </item>
+                </layout>
                </item>
               </layout>
              </item>
             </layout>
-           </item>
-          </layout>
-         </item>
-         <item row="3" column="0">
-          <widget class="QTextBrowser" name="txtChangelog">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>16777215</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="html">
-            <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
-&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+           </widget>
+           <widget class="QWidget" name="NewsAndUpdates">
+            <attribute name="title">
+             <string>News and updates</string>
+            </attribute>
+            <layout class="QGridLayout" name="gridLayout_9">
+             <item row="0" column="0">
+              <widget class="QTextBrowser" name="txtNews">
+               <property name="html">
+                <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
 p, li { white-space: pre-wrap; }
+hr { height: 1px; border-width: 0; }
+li.unchecked::marker { content: &quot;\2610&quot;; }
+li.checked::marker { content: &quot;\2612&quot;; }
 &lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'.AppleSystemUIFont'; font-size:13pt; font-weight:400; font-style:normal;&quot;&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Noto Sans'; font-size:16pt; font-weight:600;&quot;&gt;Welcome to &lt;/span&gt;&lt;span style=&quot; font-family:'Noto Sans'; font-size:20pt; font-weight:600;&quot;&gt;TRSE&lt;/span&gt;&lt;span style=&quot; font-family:'Noto Sans'; font-size:12pt;&quot;&gt; &lt;/span&gt;&lt;span style=&quot; font-family:'Noto Sans'; font-size:16pt;&quot;&gt;version @version!&lt;/span&gt;&lt;/p&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Noto Sans'; font-size:10pt;&quot;&gt;Build @build&lt;/span&gt;&lt;/p&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Ubuntu'; font-size:10pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-family:'Noto Sans'; font-size:9pt; font-weight:600;&quot;&gt;Changelog from 0.11&lt;/span&gt;&lt;/p&gt;
-&lt;ul style=&quot;margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 1;&quot;&gt;&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Systems&lt;/li&gt;
-&lt;ul style=&quot;margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 2;&quot;&gt;&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Basic Amstrad CPC with 4 tutorials and TRU&lt;/li&gt;&lt;/ul&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Tutorials/help&lt;/li&gt;&lt;/ul&gt;
-&lt;ul style=&quot;margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 2;&quot;&gt;&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Amiga tutorials updated to use a new image with custom palette&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Lots of new C64 tutorials&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Tutorials on compression (c64, vic20, atari, amiga, amstrad cpc)&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;TRU files &lt;/li&gt;&lt;/ul&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Noto Sans'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;ul style=&quot;margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 1;&quot;&gt;&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Editor&lt;/li&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:2; text-indent:0px; font-family:'Noto Sans'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;ul style=&quot;margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 2;&quot;&gt;&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Image editor partly rewritten, now uses a PEN system&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Bugfixes and optimizations&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Front page rewritten + shaders&lt;/li&gt;&lt;/ul&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:12px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Compiler&lt;/li&gt;&lt;/ul&gt;
-&lt;ul style=&quot;margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 2;&quot;&gt;&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Smaller bugfixes&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Optimizations: compares are much more optimized and faster&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Built-in lZ4/LZ77 compresssion/decompression system for the 6502, M68K and Z80 systems&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Extra post-optimizers&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;On the 6502: Arrays of length divisible by 8 had an extra &amp;quot;dc&amp;quot; in the definition. Fixed. &lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;multiple &amp;quot;var&amp;quot; blocks can be defined after procedure declarations etc&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;macos compiler should be ~twice as fast (due to forgotten optimization flags)&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;br /&gt;&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Huge bugfix: multiple AND integer conditionals failure fix (if I&amp;gt;200 and I&amp;lt;500) where I is an integer would fail &lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;@ifdef, @endif blocks can now change the behavior of other preprocessor definitions - so you can have @define and @include etc *within* @ifdef/@endif&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Much better Z80 compiler&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;6502 compiler has more optimizations&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;M68K LZ77 compression &amp;amp;  resource packer system! Super easy, check out the new Atarai/Amiga tutorials&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Constants in TRUs now gets prefixed with the TRU name&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;@Defines are passed to TRUs (allowing for custom definition of arrays etc)&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;@Macro feature with javascript parsing!&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;Added built-in zeropage &amp;quot;colormemory&amp;quot; for C64/VIC20&lt;/li&gt;
-&lt;li style=&quot; font-family:'Noto Sans'; font-size:9pt;&quot; style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;CString/string now has the ability to turn off null-terminated strings by using the &amp;quot;no_term&amp;quot; keyword &lt;/li&gt;&lt;/ul&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Noto Sans'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;
-&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Noto Sans'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-           </property>
+&lt;p style=&quot; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;News and updates from TRSE!&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
           </widget>
          </item>
         </layout>
@@ -516,7 +477,7 @@ p, li { white-space: pre-wrap; }
      <x>0</x>
      <y>0</y>
      <width>1380</width>
-     <height>21</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -541,6 +502,7 @@ p, li { white-space: pre-wrap; }
     <addaction name="actionOpen_project_location"/>
     <addaction name="actionSave"/>
     <addaction name="actionSave_As"/>
+    <addaction name="actionSave_All"/>
     <addaction name="action_Rename_current_file"/>
     <addaction name="actionDelete_file"/>
     <addaction name="actionClose_current_project"/>
@@ -553,7 +515,6 @@ p, li { white-space: pre-wrap; }
     <addaction name="actionSearch_in_symbols_c_g"/>
     <addaction name="actionLook_up_symbol_F2"/>
     <addaction name="actionLook_up_assembly_line_under_cursor_F3"/>
-    <addaction name="actionReplace"/>
     <addaction name="action_Comment_Uncomment"/>
     <addaction name="actionAuto_ident"/>
     <addaction name="actionProject_Settings"/>
@@ -829,6 +790,16 @@ p, li { white-space: pre-wrap; }
   <action name="action_include_source_file">
    <property name="text">
     <string>Include file (.inc)</string>
+   </property>
+  </action>
+  <action name="actionSave_All">
+   <property name="text">
+    <string>S&amp;ave All</string>
+   </property>
+  </action>
+  <action name="actionChip_8_emulator">
+   <property name="text">
+    <string>Chip-8 emulator</string>
    </property>
   </action>
  </widget>

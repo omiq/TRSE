@@ -3,7 +3,8 @@
 #include "source/OrgAsm/zorgasm.h"
 void SystemZ80::Assemble(QString &text, QString filename, QString currentDir, QSharedPointer<SymbolTable> symTab)
 {
-    AssembleZOrgasm(text,filename,currentDir,symTab);
+    QString output;
+    AssembleZOrgasm(output,text,filename,currentDir,symTab);
 
 }
 
@@ -11,49 +12,6 @@ void SystemZ80::PostProcess(QString &text, QString file, QString currentDir)
 {
 }
 
-void SystemZ80::AssembleZOrgasm(QString &text, QString filename, QString currentDir, QSharedPointer<SymbolTable> symTab)
-{
-    QString output;
-
-
-    if (m_orgAsm !=nullptr)
-        delete m_orgAsm;
-
-
-    m_orgAsm = new ZOrgasm();
-
-    m_orgAsm->m_cpuFlavor = Orgasm::CPUFLAVOR_Z80;
-
-    emit EmitTick("<br></font><font color=\"yellow\">Assembling with OrgAsm ");
-    connect(m_orgAsm, SIGNAL(EmitTick(QString)), this, SLOT( AcceptDispatcherTick(QString)));
-/*    if (symTab!=nullptr)
-        m_orgAsm->SetupConstants(symTab);
-*/
-    if (symTab!=nullptr)
-        m_orgAsm->m_extraSymbols = symTab->m_extraAtSymbols;
-
-    m_orgAsm->Assemble(filename+".asm", filename+".bin");
-
-    disconnect(m_orgAsm, SIGNAL(EmitTick(QString)), this, SLOT( AcceptDispatcherTick(QString)));
-    output = m_orgAsm->m_output;
-    if (m_orgAsm->m_hasOverlappingError) {
-        output = m_orgAsm->error.msg;
-        output +="<br><br>Line "+QString::number(m_orgAsm->error.oline.m_lineNumber+1)+ " in " +"<font color=\"orange\">"+filename+" :</font> "" : " +m_orgAsm->error.oline.m_orgLine;
-        m_orgOutput = output;
-        text="<font color=\"#FF6040\">Fatal error during OrgAsm assembly!</font><br>";
-        text+=output;
-        m_buildSuccess = false;
-        return;
-
-    }
-
-    m_addresses = m_orgAsm->m_lineAddress;
-    if (m_projectIni->getdouble("output_debug_symbols")==1.0)
-        m_orgAsm->SaveSymbolsList(filename+".sym");
-
-    text+=output;
-
-}
 
 void SystemZ80::PerformAssembling(QString filename, QString &text,QString currentDir, QSharedPointer<SymbolTable> symTab)
 {
@@ -63,8 +21,14 @@ void SystemZ80::PerformAssembling(QString filename, QString &text,QString curren
 
 
     QString assembler = m_settingsIni->getString("pasmo");
+/*    if (m_system==AGON) {
+        assembler = m_settingsIni->getString("ez80asm");
+        useOrgasm = false;
+
+
+    }*/
     if (!useOrgasm && !QFile::exists(assembler)) {
-        text  += "<br><font color=\"#FF6040\">Please set up a link to the PASMO assembler directory in the TRSE settings panel.</font>";
+        text  += "<br><font color=\"#FF6040\">Please set up a link to the assembler (pasmo/ez80asm etc) directory in the TRSE settings panel.</font>";
         m_buildSuccess = false;
         return;
     }
@@ -74,16 +38,88 @@ void SystemZ80::PerformAssembling(QString filename, QString &text,QString curren
 
 
     if (useOrgasm) {
-        AssembleZOrgasm(text,filename,currentDir,symTab);
-        QProcess process;
-        StartProcess(assembler, QStringList() << filename+".asm" <<filename+"_pasmo.bin", text);
+        QString output="";
+        AssembleZOrgasm(output,text,filename,currentDir,symTab);
+  //      QProcess process;
+//        StartProcess(assembler, QStringList() << filename+".asm" <<filename+"_pasmo.bin", text);
 
     }
     else {
         QProcess process;
-        StartProcess(assembler, QStringList() << filename+".asm" <<filename+".bin", text);
+        StartProcess(assembler, QStringList() << filename+".asm" <<filename+".bin", text,true,currentDir);
+
     }
 
+
+
+}
+
+void SystemZ80::PackProgram(QString filename, int start, int actualStarto, QString&text,  QString currentDir, QSharedPointer<SymbolTable> symTab, QString asmFile)
+{
+    QString fn = filename+".bin";
+    int maxx = 0xF8FF;
+    int actualStart  = 0;
+    int size = QFileInfo(fn).size();
+    if (size>maxx) {
+        text += "<br><font color=\"red\">Error compressing file: file is too large : </font>"+Util::numToHex(size)+" > " + Util::numToHex(maxx);
+        m_buildSuccess = false;
+        if (QFile::exists(fn+"_c"))
+            QFile::remove(fn+"_c");
+        return;
+
+    }
+    QFile::remove(fn+".bin_c");
+
+    CompressLZ4(fn);
+
+    fn = filename+".bin_c";
+//        QByteArray ba = Util::loadBinaryFile(fn);
+    size = QFileInfo(fn).size();
+    text += "<br>Compressed file : <b>" + QString::number(size) +" bytes ( "+Util::numToHex(size) + ") </b>";
+/*        while (ba.size()<(maxx-start))
+        ba.append((char)0);
+*/
+    if (size>(maxx-start)) {
+                text += "<br><font color=\"red\">Error compressing file: compressed file is too large : </font>"+Util::numToHex(size)+" > " + Util::numToHex(maxx-start);
+                m_buildSuccess = false;
+                if (QFile::exists(fn+"_c"))
+                    QFile::remove(fn+"_c");
+
+                return;
+
+            }
+
+//        Util::SaveByteArray(ba,fn);
+    // Make sure there are padding before
+    actualStart = actualStarto - size;
+    text += "<br><font color=\"yellow\">Start address : " +Util::numToHex(actualStart) + " to " + Util::numToHex(actualStart+size) + ".</font><br>";
+    if (m_system == AMSTRADCPC)
+    if (actualStart<0x4100) {
+        text += "<br><font color=\"red\">Error compressingfile: compressed file is too large : </font>"+Util::numToHex(size)+" > " + Util::numToHex(0xb780-0x4100);
+        m_buildSuccess = false;
+        if (QFile::exists(fn+"_c"))
+            QFile::remove(fn+"_c");
+
+        return;
+
+
+    }
+    QString code = Util::loadTextFile(asmFile);
+    code = code.replace("@START", Util::numToHex(actualStart));
+    code = code.replace("@FILE", fn);
+//        code = code.replace("@UNPACKCODE", "$F000");
+    QString codeFile = QFileInfo(fn).dir().path()+QDir::separator() + "_unpack";
+    Util::SaveTextFile(codeFile+".asm", code);
+    QFile::remove(filename+".bin");
+//        QString temp;
+    auto keep = m_orgAsm;
+    PerformAssembling(codeFile,text,currentDir,symTab);
+    m_orgAsm = keep; // keep for memory analyzer
+    Util::CopyFile(codeFile+".bin",filename+".bin");
+    QFile::remove(codeFile+".bin");
+//    QFile::remove(codeFile+".asm");
+
+//        StartProcess(assembler, QStringList() << codeFile <<filename+".bin", output);
 
 
 }

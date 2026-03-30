@@ -30,32 +30,40 @@
 #include "source/Compiler/ast/node.h"
 #include "source/Compiler/ast/nodebinaryclause.h"
 #include <QVector>
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
+/* 
+    Node representing a full conditional statement + block, ie
+    if (a>b and c!=d*2) then
+    begin
+        ...
+    end
+    else
+    begin
+        ..
+    end;
 
+
+    m_left: unused
+    m_right: unused
+    m_block : the main block if the conditional is true
+    m_elseBlock : the block if the conditional fails
+    m_binaryClause : the actual binary clause (a>b and c!=d*2)
+*/
 class NodeConditional : public Node {
 public:
 
-//    QVector<QSharedPointer<Node>> m_a, m_b;
 
     QSharedPointer<Node> m_block = nullptr;
     QSharedPointer<Node> m_binaryClause = nullptr;
-/*    QVector<Token> m_compares;
-    QVector<Token> m_conditionals;*/
+
     QSharedPointer<Node> m_elseBlock = nullptr;
     bool m_isWhileLoop;
 
 
-/*    NodeConditional(QVector<Token> op, QVector<QSharedPointer<Node>> a, QVector<QSharedPointer<Node>> b, QSharedPointer<Node> block, bool isWhile, QVector<Token> conditionals, QSharedPointer<Node> elseBlock=nullptr) {
-        m_a = a;
-        m_b = b;
-        m_block = block;
-        m_compares = op;
-        m_isWhileLoop = isWhile;
-        m_elseBlock = elseBlock;
-        m_conditionals = conditionals;
-    }*/
+
     NodeConditional(Token op, int forcePage, QSharedPointer<Node> clause, QSharedPointer<Node> block, bool isWhile, QSharedPointer<Node> elseBlock=nullptr);
 
+    void ReplaceVariable(Assembler *as, QString name, QSharedPointer<Node> node) override;
 
     void parseConstants(QSharedPointer<SymbolTable>  symTab) override {
         if (m_block!=nullptr)
@@ -67,10 +75,14 @@ public:
     }
 
 
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override {
+        if (m_block!=nullptr)
+            m_block->FindPotentialSymbolsInAsmCode(lst);
+        if (m_elseBlock!=nullptr)
+            m_elseBlock->FindPotentialSymbolsInAsmCode(lst);
+    }
 
-/*    void ConditionalTryFail(Assembler* , QString labelFail, int i);
-    void ConditionalTrySuccess(Assembler* , QString labelFail, int i);
-*/
+
 
 
 
@@ -80,9 +92,11 @@ public:
        m_block->ExecuteSym(symTab);
     }
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeConditional>(sharedFromThis()));
     }
+
+    virtual bool Optimize() override;
 
 };
 

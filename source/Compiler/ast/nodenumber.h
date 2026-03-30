@@ -27,40 +27,50 @@
 #include "source/Compiler/pvar.h"
 #include "source/Compiler/symboltable.h"
 #include "source/Compiler/errorhandler.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 #include "source/Compiler/ast/node.h"
 
-
+/* 
+    A node representing an immediate number.
+    m_left: undefined
+    m_right: undefined
+    m_op: undefined
+*/
 class NodeNumber : public Node {
 public:
-    double m_val;
+    long m_val;
     NodeNumber(Token op, long val);
     QString m_strVal = "";
     void ExecuteSym(QSharedPointer<SymbolTable> symTab) override {
     }
 
+    NodeType getNodeType() override {
+        return NUMBER;
+    }
     bool isAddress() override;
     bool isPureNumeric() override;
+    bool isPureNumericOrAddress() override;
     bool is8bitValue(Assembler* as) override;
 
     bool isWord(Assembler* as) override;
 
     QString getValue(Assembler* as) override;
-    virtual bool isReference() override { return m_op.m_isReference; }
+    virtual bool isReference() override;
 
-    QString getValue8bit(Assembler* as, bool isHi) override;
+    QString getValue8bit(Assembler* as, int isHi) override;
 
     void forceWord() override {
         m_op.m_type = TokenType::INTEGER_CONST;
     }
 
-    //void LoadVariable(AbstractASTDispatcher* dispatcher) override;
+    //void LoadVariable(AbstractCodeGen* dispatcher) override;
 
     int numValue() override { return m_val;}
 
     QString getAddress() override {
         return HexValue();
     }
+    bool containsVariables() override {return false;}
 
     QString getLiteral(Assembler* as) override {
         return HexValue();
@@ -79,7 +89,7 @@ public:
     bool isMinusOne() override;
 
     bool isOne() override;
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeNumber>(sharedFromThis()));
     }
 

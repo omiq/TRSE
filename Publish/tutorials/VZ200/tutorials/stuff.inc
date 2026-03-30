@@ -1,0 +1,325 @@
+procedure stuff_0();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$03
+ ld [ix+0],a
+ ld a,$fc
+ ld [ix+1],a
+ ld a,$ff
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$0f
+ ld [ix+0],a
+ ld a,$7f
+ ld [ix+1],a
+ ld a,$f7
+ ld [ix+2],a
+ ld a,$c0
+ ld [ix+3],a
+  add ix,de
+ ld a,$0f
+ ld [ix+0],a
+ ld a,$d7
+ ld [ix+1],a
+ ld a,$57
+ ld [ix+2],a
+ ld a,$c0
+ ld [ix+3],a
+  add ix,de
+ ld a,$0f
+ ld [ix+0],a
+ ld a,$ff
+ ld [ix+1],a
+ ld a,$fc
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$ee
+ ld [ix+1],a
+ ld a,$c0
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+procedure stuff_1();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$ff
+ ld [ix+1],a
+ ld a,$3f
+ ld [ix+2],a
+ ld a,$c0
+ ld [ix+3],a
+  add ix,de
+ ld a,$03
+ ld [ix+0],a
+ ld a,$df
+ ld [ix+1],a
+ ld a,$fd
+ ld [ix+2],a
+ ld a,$f0
+ ld [ix+3],a
+  add ix,de
+ ld a,$03
+ ld [ix+0],a
+ ld a,$f5
+ ld [ix+1],a
+ ld a,$d5
+ ld [ix+2],a
+ ld a,$f0
+ ld [ix+3],a
+  add ix,de
+ ld a,$03
+ ld [ix+0],a
+ ld a,$ff
+ ld [ix+1],a
+ ld a,$ff
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$3b
+ ld [ix+1],a
+ ld a,$b0
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+procedure stuff_2();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$3f
+ ld [ix+1],a
+ ld a,$cf
+ ld [ix+2],a
+ ld a,$f0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$f7
+ ld [ix+1],a
+ ld a,$ff
+ ld [ix+2],a
+ ld a,$7c
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$fd
+ ld [ix+1],a
+ ld a,$75
+ ld [ix+2],a
+ ld a,$7c
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$ff
+ ld [ix+1],a
+ ld a,$ff
+ ld [ix+2],a
+ ld a,$c0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$0e
+ ld [ix+1],a
+ ld a,$ec
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+procedure stuff_3();
+begin
+asm ("
+  ld de, $20
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$0f
+ ld [ix+1],a
+ ld a,$f3
+ ld [ix+2],a
+ ld a,$fc
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$3d
+ ld [ix+1],a
+ ld a,$ff
+ ld [ix+2],a
+ ld a,$df
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$3f
+ ld [ix+1],a
+ ld a,$5d
+ ld [ix+2],a
+ ld a,$5f
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$3f
+ ld [ix+1],a
+ ld a,$ff
+ ld [ix+2],a
+ ld a,$f0
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$03
+ ld [ix+1],a
+ ld a,$bb
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+ ld a,$00
+ ld [ix+0],a
+ ld a,$00
+ ld [ix+1],a
+ ld a,$00
+ ld [ix+2],a
+ ld a,$00
+ ld [ix+3],a
+  add ix,de
+");
+end;
+var stuff_pi : integer;
+@donotremove stuff_dst 
+procedure stuff(stuff_src,stuff_dst : pointer; stuffpx,stuffpy : byte);
+begin
+  stuff_pi:=stuff_dst + stuffpy<<5 + stuffpx>>2;
+asm("  ld ix, [stuff_pi]
+");
+ stuffpx:=stuffpx&3;
+ if (stuffpx=0) then stuff_0();
+ if (stuffpx=1) then stuff_1();
+ if (stuffpx=2) then stuff_2();
+ if (stuffpx=3) then stuff_3();
+end;

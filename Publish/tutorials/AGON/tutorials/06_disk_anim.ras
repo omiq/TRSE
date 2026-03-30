@@ -1,0 +1,76 @@
+program Bitmap_image;
+
+
+@requirefile "data/disksprite1.bin" "Please run (ctrl+R) the fjong/disk.fjo file before compiling this program"
+
+@use "system/screen"
+
+// Include all the images as incbins
+
+@macro "include_images" 1
+
+	i = 1;
+	for (i=1;i<p0;i++) {
+		writeln('image'+i+' : incbin("data/disksprite'+i+'.bin");');
+	}
+
+@endmacro
+
+// Load all bitmaps
+
+@macro "load_images" 1
+
+	i = 1;
+	for (i=1;i<p0;i++) {
+		writeln('	Screen::LoadBitmap(#image'+i+', sizeof(#image'+i+'), '+(i-1)+');');
+	}
+
+
+@endmacro
+
+var  
+	//64 frames (1-65)
+	@include_images(65)
+	zp:^byte;
+
+	sinx : array[256] of integer = buildsinetable(560);
+	siny : array[256] of byte = buildsinetable(200);
+	time,frame,t2,i,f,t3 : byte;
+	delta : byte = 64;
+	x,y : integer;
+
+	const img1 : byte = 0; // ID
+
+begin
+	Screen::SetMode(Screen::mode_640_240_64);
+	Screen::DisableCursor();	
+	// Load 64 frames (1-65) into bitmap data
+	@load_images(65);
+	while(true) do
+	begin
+		t2:=time;
+		t3:=time;
+		f:=frame;
+		
+		Screen::ClearScreen();
+		for i:=0 to 24 offpage do
+		begin
+			x:=sinx[t2]+32;
+			y:=siny[t3+delta];
+			Screen::DrawBitmap(f&63, x,y);
+			f+=3;
+			t2+=9;
+			t3+=11;
+		end;
+		time+=1;
+		
+		if (time&3=0) then
+			delta+=1;
+			
+		if (time&3=0) then frame+=1;
+		
+		for x:=0 to 350 do
+			wait(119);
+			
+	end;
+end.

@@ -24,6 +24,8 @@
 
 #include <QJSEngine>
 #include <QProcess>
+#include <QDate>
+#include <QMap>
 #include "source/Compiler/ast/ast.h"
 #include "source/Compiler/lexer.h"
 #include <QRegularExpression>
@@ -43,7 +45,6 @@
 #include "source/Compiler/ast/nodeconditional.h"
 #include "source/Compiler/ast/nodeforloop.h"
 #include "source/Compiler/ast/nodebuiltinmethod.h"
-#include "source/Compiler/ast/nodewhileloop.h"
 #include "source/Compiler/ast/nodeasm.h"
 #include "source/Compiler/ast/node.h"
 #include "source/Compiler/ast/nodebinaryclause.h"
@@ -59,6 +60,9 @@
 #include "source/LeLib/limage/compression.h"
 #include "source/LeLib/util/SimplexNoise.h"
 #include "source/LeLib/ttrfile.h"
+
+#include "source/Compiler/ast/nodefactory.h"
+
 //#include "source/Compiler/sourcebuilder.h"
 
 class ParserBlock {
@@ -82,96 +86,52 @@ public:
     }
 };
 
+/*
+ *
+ *
+ *
+ *
+ *
+ *  Main parser class!
+ *  Parses .ras file to the Abstract Syntax Tree (Abstract Machine).
+ *
+ *  Main methods:
+ *   - Parse. Returns the root of the AST
+ *
+ *
+ *
+ *
+ */
+
 
 class Parser : public QObject {
     Q_OBJECT
 public:
-    int m_tick = 0;
-    QVector<int> div2s = QVector<int>() <<2 <<4<<8<<16<<32<<64<<128<<256<<512<<1024;
-    QVector<ParserBlock> m_parserBlocks;
-    static QStringList s_usedTRUs, s_usedTRUNames;
-    QMap<QString, LMacro> m_macros;
-    QString m_procPrefix = "";
-    int m_prevPercent = -1;
-//    int m_currentParserBlock=-1;
 
-    bool m_hasBeenApplied = false;
-    //bool m_breakSubvar = false;
-    QSharedPointer<Node> m_currentProcedureCall;
-    QString m_addInitialReferenceToProcedureCall = "";
-
-    QString m_currentClass ="";
-
-    QString m_vicMemoryConfig;
-    QString m_currentDir, m_currentFileShort;
-    QStringList m_removedProcedures;
-    QVector<QStringList> m_obsoleteWarnings;
-    QStringList m_monitorCommands;
-    QMap<QString, QSharedPointer<Node>> m_procedures;
-    QMap<QString, QString> m_preprocessorDefines;
-    QStringList m_diskFiles;
-    QStringList m_warningsGiven;
-    QStringList m_doNotRemoveMethods;
-    QString m_initAssembler = "";
-    // Preprocessor stuff
-    QVector<QString> m_lastKey;
-    QVector<bool> m_lastIfdef;
-
-
-    QVector<QSharedPointer<Node>> m_proceduresOnly;
-    QVector<QSharedPointer<Node>> m_mergedProcedures;
-    QVector<QString> m_ignoreMethods;
     QSharedPointer<Lexer> m_lexer;
-    Token m_currentToken, m_lastStartBlockToken;
-    QString m_inCurrentProcedure="main";
-    bool m_isTRU = false;
-    int PASS_PREPRE = 0;
-    int PASS_PRE = 1;
-    int PASS_FIRST = 10;
-    int PASS_CODE = 2;
-    int PASS_OTHER = 4;
-
-    int m_pass = 0, m_acc=0;
-    bool m_ignoreAll = false;
-    bool m_isRecord = false;
-    bool m_removeUnusedDecls = false;
-    QStringList  m_initJumps;
-    QMap<TokenType::Type, QString> m_typeFlags;
+    QStringList m_diskFiles;
+    QStringList m_parserAppendix;
     QSharedPointer<SymbolTable>  m_symTab = nullptr;
+    QString m_initAssembler = "";
+    QString m_endAssembler = "";
+    QString m_override = "_override_";
+    bool m_containsMacros = false;
+    QMap<QString, QSharedPointer<Node>> m_procedures;
+    QHash<QString, QString> m_preprocessorDefines;
+    static QStringList s_usedTRUs, s_usedTRUNames;
     QSharedPointer<CIniFile> m_projectIni, m_settingsIni;
-    QSharedPointer<Node> m_tree = nullptr;
-    QVector<QSharedPointer<Node>>* m_currentStatementList = nullptr;
-    QMap<QString, QSharedPointer<Node>> m_types;
-
-    bool m_doNotPrefix = false;
-    QStringList m_doNotPrefixSymbols;
-
-    QString WashVariableName(QString v);
-    QString VerifyVariableName(QString v);
-
-
-
-    /*
-     * Small Node Factory
-     *
-     * */
-    QSharedPointer<NodeNumber> CreateNumber(int i);
-    QSharedPointer<NodeVar> CreateVariable(QString v);
-    QSharedPointer<Node> CreateBinop(TokenType::Type t, QSharedPointer<Node> left, QSharedPointer<Node> right);
-    QSharedPointer<NodeAssign> CreateAssign(QSharedPointer<Node> left, QSharedPointer<Node> right);
-
-
-
-
-    QSharedPointer<Symbol> getSymbol(QSharedPointer<Node> var);
-
-    QVector<QString> m_ignoreBuiltinFunctionTPU;
+    QString m_currentDir, m_currentFileShort;
+    bool m_isTRU = false;
     static QVector<QSharedPointer<Parser>> m_tpus;
+    QString m_vicMemoryConfig;
+    QStringList m_initJumps;
+    QVector<QSharedPointer<MemoryBlock>> m_userBlocks;
+    bool isInBuiltInMethod = false;
+    QString m_overrideOutputTarget="";
+    QVector<QSharedPointer<Node>> m_proceduresOnly;
 
 
-    QStringList getFlags();
-
-
+    QSharedPointer<Node> Parse(bool removeUnusedDecls, QString param, QString globalDefines, bool useLocals);
     Parser();
     Parser(QSharedPointer<Lexer> l, QSharedPointer<CIniFile> projectFile) {
         m_lexer = l;
@@ -180,8 +140,90 @@ public:
     ~Parser() {
         Delete();
     }
-    QVector<QSharedPointer<MemoryBlock>> m_userBlocks;
+    QStringList m_additionalEmulatorParams;
+
+
+private:
+    int m_tick = 0;
+    QVector<int> div2s = QVector<int>() <<2 <<4<<8<<16<<32<<64<<128<<256<<512<<1024;
+    QVector<ParserBlock> m_parserBlocks;
+    QMap<QString, LMacro> m_macros;
+    QString m_procPrefix = "";
+    int m_prevPercent = -1;
+    int m_pass = 0, m_acc=0;
+    bool m_isClassReference = false;
+//    int m_currentParserBlock=-1;
+
+    bool m_hasBeenApplied = false;
+    bool m_inProcedureVariableDecl = false;
+    //bool m_breakSubvar = false;
+    QSharedPointer<Node> m_currentProcedureCall;
+    QString m_addInitialReferenceToProcedureCall = "";
+    QHash<QString, int> m_fileSizes;
+
+
+    QStringList m_removedProcedures;
+    QVector<QStringList> m_obsoleteWarnings;
+    QStringList m_monitorCommands;
+    QStringList m_warningsGiven;
+    QStringList m_doNotRemoveMethods;
+    // Preprocessor stuff
+    QVector<QString> m_lastKey;
+    QVector<bool> m_lastIfdef;
+
+    QString m_keepPrefix; // prefix outside class definition
+    void DefineSymbol(QSharedPointer<Symbol> s, bool isRecord);
+
+    QSharedPointer<Node> ManageClassProcedureCalls(QSharedPointer<Node> left);
+    QVector<QSharedPointer<Node>> m_extraDecls;
+    QVector<QSharedPointer<Node>> m_mergedProcedures;
+    QVector<QString> m_ignoreMethods;
+    Token m_currentToken, m_lastStartBlockToken;
+    QString m_inCurrentProcedure="main";
+    bool m_isFirstPerhaps = true;
+    int m_perhapsShift = 0;
+    int PASS_PREPRE = 0;
+    int PASS_PRE = 1;
+    int PASS_FIRST = 10;
+    bool m_ignoreMacros = false;
+    int PASS_MACROS = 8;
+    int PASS_CODE = 2;
+    int PASS_OTHER = 4;
+
+
+    bool m_ignoreAll = false;
+    bool m_isInConditional = false;
+    bool m_isRecord = false;
+    bool m_removeUnusedDecls = false;
+    bool m_abort = false;
+    QHash<TokenType::Type, QString> m_typeFlags;
+    QSharedPointer<Node> m_tree = nullptr;
+    QVector<QSharedPointer<Node>>* m_currentStatementList = nullptr;
+    QHash<QString, QSharedPointer<Node>> m_types;
+    QVector<QSharedPointer<Symbol>> m_localSyms;
+    bool m_doNotPrefix = false;
+    QStringList m_doNotPrefixSymbols;
+
+    QString WashVariableName(QString v);
+    QString VerifyVariableName(QString v);
+
+
+
+
+
+
+
+    QSharedPointer<Symbol> getSymbol(QSharedPointer<Node> var);
+
+    QVector<QString> m_ignoreBuiltinFunctionTPU;
+
+
+    QStringList getFlags();
+
+
     QJSEngine m_jsEngine;
+
+    int m_splitCounter = 0;
 
     void Delete();
 
@@ -195,6 +237,7 @@ public:
     void RemoveComments();
     bool PreprocessIncludeFiles();
     void PreprocessAll();
+    void PreprocessMacros();
     void PreprocessSingle();
     void PreprocessReplace();
     void PreprocessIfDefs(bool ifdef);
@@ -211,12 +254,12 @@ public:
 
     void RemoveUnusedProcedures();
     void RemoveUnusedSymbols(QSharedPointer<NodeProgram> root);
-    QSharedPointer<Node> Parse(bool removeUnusedDecls, QString param, QString globalDefines, bool useLocals);
     void VarDeclarations(QVector<QSharedPointer<Node>>& decl, QString blokName);
     void ProcDeclarations(QVector<QSharedPointer<Node>>& decl, QString blokName);
 
     QSharedPointer<Node> ApplyClassVariable(QSharedPointer<Node> var);
 
+    QSharedPointer<NodeProcedureDecl> FindCorrectOverridenProcedure(QString procName, QVector<QSharedPointer<Node>> params);
     QSharedPointer<Node> Variable(bool isSubVar=false);
     QSharedPointer<Node> SubVariable(QString parent,QSharedPointer<Node> parentExpr);
     QSharedPointer<Node> Empty();
@@ -245,6 +288,11 @@ public:
 
 //    void AppendComment(QSharedPointer<Node> n);
 
+    QString CompareAndWashOverloadedProcedure(QString procName, QVector<QSharedPointer<Node>> decls);
+
+    int CompareDeclerations(QVector<QSharedPointer<Node>> a, QVector<QSharedPointer<Node>> b);
+    int CompareDeclerationsVsParameters(QVector<QSharedPointer<Node>> a, QVector<QSharedPointer<Node>> b);
+
     QVector<QSharedPointer<Node>> ConstDeclaration();
     QSharedPointer<Node> TypeDeclaration();
     //QSharedPointer<Node> LogicalClause();
@@ -261,13 +309,15 @@ public:
     QVector<QSharedPointer<Node>> VariableDeclarations(QString blockName, bool isProcedureParams = false);
     QSharedPointer<Node> TypeSpec(bool isInProcedure, QStringList varNames);
     QSharedPointer<Node> BuiltinFunction();
-    QSharedPointer<Node> Constant();
+//    QSharedPointer<Node> Constant();
     QSharedPointer<Node> InlineAssembler();
     QSharedPointer<Node> AssignStatementBetweenObjects(QSharedPointer<Node> left,QSharedPointer<Node> right);
-    QStringList m_parserAppendix;
+
+    void VerifyNotInClassAssignTypespec();
 
 
     void HandleExportPalette();
+    void HandleExportSubregion();
     void HandleSetCompressionWeights();
     void HandleMacro();
     void HandleExecute();
@@ -275,29 +325,41 @@ public:
     void HandleCallMacro(QString name, bool ignore);
     void HandleExportCompressed();
     void HandleExport();
+    void HandleBin2Inc();
+    void HandlePathTool();
+    void HandleConvertJDH8();
+    void HandleExportShiftedCharset();
+    void HandleExportRotatedCharset();
     void HandleCompress();
     void HandleExportParallaxData();
     void HandleExportBW();
     void HandleBuildPaw();
     void HandleExportPrg2Bin();
+    void HandleCPCExport0();
+    void HandleCPCExportTile0();
+    void HandleCPCExportPal();
     void HandlePBMExport();
     void HandleVBMExport();
     void HandleVBMExportColor();
     void HandleVBMExportChunk();
+    void HandleVBMCompileChunk();
     void HandleExportFrame();
     void HandleSpriteCompiler();
     void HandleSpritePacker();
     void HandleProjectSettingsPreprocessors();
     void HandleAKGCompiler();
+    void HandleKrillsLoader();
     void HandleUseTPU(QString fileName);
     void Eat();
     void HandleImportChar();
     QStringList BuildTable(int cnt, TokenType::Type type);
+    QStringList BuildSineTable(int cnt, TokenType::Type type);
+    QStringList BuildTable2D(int cnt, TokenType::Type type);
 
     int getParsedNumberOrConstant();
 
     int findSymbolLineNumber(QString symbol);
-
+    void GenerateUnrolledAsm1();
 
 
     void InitBuiltinFunctions();
@@ -307,7 +369,7 @@ public:
 
 signals:
     void EmitTick(QString val);
-
+    void emitRequestSystemChange(QString system);
 };
 
 

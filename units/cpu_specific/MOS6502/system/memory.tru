@@ -1,0 +1,165 @@
+unit Memory;
+var
+	@donotremove p
+	@donotremove 2
+	@donotremove v
+	@donotremove v2
+	p,p2 : ^byte;
+	v,v2,i,v3,v4 : byte;
+	i1,i2 : integer;
+
+procedure Poke( i1: global integer pure_number, v: global byte pure_number) inline;
+begin
+	asm("
+		lda #[Memory_v]
+		sta [Memory_i1]
+	");
+end;
+
+
+procedure Poke( i1: global integer pure_number, v: global byte pure_variable) inline;
+begin
+	asm("
+		lda [Memory_v]
+		sta [Memory_i1]
+	");
+end;
+
+procedure Poke( p: global pointer pure , v: global byte pure_variable) inline;
+begin
+	asm("
+		lda [Memory_v]
+		ldy #0
+		sta ([Memory_p]),y
+	");
+end;
+
+procedure Poke( p: global pointer pure , v: global byte pure_number) inline;
+begin
+	asm("
+		lda #[Memory_v]
+		ldy #0
+		sta ([Memory_p]),y
+	");
+end;
+
+/**
+	Sets a value at memory address.<p>
+	Usage:
+	<code>
+poke($400, $54); // puts value $54 at address $400
+	</code> 
+
+**/
+
+
+procedure Poke( p: global pointer, v: global byte);
+begin
+	p[0]:=v;
+end;
+
+procedure Copy( i1 : global integer pure, i2 : global integer pure, v: global byte pure ) inline;
+begin
+	asm("
+		ldx #0
+{label0}:
+		lda [Memory_i1],x
+		sta [Memory_i2],x
+		inx
+		cpx #[Memory_v]
+		bne {label0}
+	");
+end;
+
+procedure Copy( p : global pointer pure, p2 : global pointer pure, v: global byte pure ) inline;
+begin
+	asm("
+		ldy #0
+{label0}:
+		lda ([Memory_p]),y
+		sta ([Memory_p2]),y
+		iny
+		cpy #[Memory_v]
+		bne {label0}
+	");
+end;
+
+/**
+	Copies v bytes of data from p1 to p2. Note that the count must be a byte, ie <256. use "0" for 256 bytes. <p>
+	Usage:
+	<code>
+Memory::Copy($400, $4400, 128); // copies 128 bytes from $400 to $4400
+	</code> 
+
+**/
+
+
+procedure Copy( p : global pointer, p2 : global pointer, v: global byte);
+begin
+	asm("
+		ldy #0
+memcpy_cpy_1:
+		lda (Memory_p),y
+		sta (Memory_p2),y
+		iny
+		cpy Memory_v
+		bne memcpy_cpy_1
+	");
+end;
+
+
+procedure Fill( i1: global integer pure_number, v,v2: global byte pure_number) inline;
+begin
+	asm("
+	lda #[Memory_v]
+	ldy #0
+{label0}:
+	sta [Memory_i1],y
+	iny
+	cpy #[Memory_v2]
+	bne {label0}
+	");	
+end;
+
+procedure Fill( i1: global integer pure_number, v: global byte pure_variable, v2: global byte pure_variable) inline;
+begin
+	asm("
+	lda [Memory_v]
+	ldy #0
+{label0}:
+	sta [Memory_i1],y
+	iny
+	cpy [Memory_v2]
+	bne {label0}
+	");	
+end;
+
+
+procedure Fill( p: global pointer, v,v2: global byte);
+begin
+	asm("
+	lda Memory_v
+	ldy #0
+memory_fill_loop:
+	sta (Memory_p),y
+	iny
+	cpy Memory_v2
+	bne memory_fill_loop
+	");	
+end;
+
+/**
+	
+	fills p3*256 bytes of memory
+
+**/
+procedure FillChunks(p : global pointer; v3, v4 : global byte);
+begin
+	for i:=0 to v4 do
+	begin
+		Fill(p,v3,0);
+		asm(" inc Memory_p+1");
+	end;
+	
+end;
+end.

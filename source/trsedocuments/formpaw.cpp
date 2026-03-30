@@ -22,13 +22,17 @@
 #include "formpaw.h"
 #include <QProcess>
 #include "ui_formpaw.h"
-//#include <omp.h
-
+#ifdef USE_OMP
+#include <omp.h>
+#endif
 FormPaw::FormPaw(QWidget *parent) :
     TRSEDocument(parent),
     ui(new Ui::FormPaw)
 {
     ui->setupUi(this);
+    auto labels = QStringList() << "Filename on d64/d81" <<"File on disk"<<"Load address"<<"Is crunched (no=0, 1=tinycrunch)";
+    ui->tabData->setHorizontalHeaderLabels(labels);
+    ui->tabData->horizontalHeader()->show();
     ui->tabData->setColumnWidth(0, 200);
     ui->tabData->setColumnWidth(1, 500);
     ui->tabData->setColumnWidth(2, 160);
@@ -64,8 +68,8 @@ void FormPaw::FillToIni()
         if (ui->tabData->item(r,3)!=nullptr)
             useTiny =  ui->tabData->item(r,3)->text();
         data_tinycrunch << useTiny;
-           data<< Util::numToHex(Util::VerifyHexAddress(ui->tabData->item(r,2)->text()));
 
+        data<< Util::numToHex(Util::VerifyHexAddress(ui->tabData->item(r,2)->text()));
         PawFile pf(m_projectIniFile->getString("project_path")+"/"+ui->tabData->item(r,1)->text(),
                    m_projectIniFile->getString("project_path")+"/"+  m_pawData->getString("output_dir")+"/" + ui->tabData->item(r,0)->text() + "_c.bin",
 
@@ -414,12 +418,11 @@ void PawThread::run()
     QString tt = m_iniFile->getString("tinycrunch");
 
 
-
     //for (PawFile& pf: *m_files)
-//#pragma omp parallel
+#pragma omp parallel for
     for (int i=0;i<m_files->count();i++)
     {
-        //qDebug() << "THREAD " << omp_get_thread_num();
+//        qDebug() << "THREAD " << omp_get_thread_num();
         PawFile& pf = (*m_files)[i];
             QProcess processCompress;
             QString adr = pf.address;
@@ -429,13 +432,37 @@ void PawThread::run()
                 params << isExomizer3;
 
             if (pf.tinyCrunch) {
-                params = QStringList() << tt << "--inPlace" << pf.inFile << pf.cFile;
-                output+="Compressing :"+ pf.inFile + "\n";
-                emit EmitTextUpdate();
+                bool hasAddressFile = false;
+                params = QStringList() << tt << "--inPlace";
+                if (!pf.inFile.toLower().endsWith(".prg")) {
+//                    params<<"-s" << pf.address;
+                    Util::ConvertFileWithLoadAddress(pf.inFile,pf.inFile+"_a",Util::NumberFromStringHex(pf.address));
+                    params << pf.inFile+"_a" << pf.cFile;
+                    hasAddressFile = true;
 
+                }
+                else
+                    params << pf.inFile << pf.cFile;
+
+                if (QFile::exists(pf.cFile))
+                    QFile::remove(pf.cFile);
+                //output+="Compressing :"+ pf.inFile + "\n";
+                //emit EmitTextUpdate();
+                //qDebug() << params;
                 //ui->leOutput->setText(output);
 
-                processCompress.start("python", params  );
+                if (m_iniFile->getdouble("use_python")==1)
+                    processCompress.start("python", params  );
+                else
+                    processCompress.start("python3", params  );
+                processCompress.waitForFinished();
+                if (QFile::exists(pf.inFile+"_a"))
+                    QFile::remove(pf.inFile+"_a");
+
+                if (!QFile::exists(pf.cFile)) {
+                    output+="\nOh no, tinycrunch failed since Python wasn't found! Did you make sure to install python, and select the correct executable (python3/python) type from the TRSE settings panel?";
+                    emit EmitTextUpdate();
+                }
 
             }
             else {
@@ -458,13 +485,13 @@ void PawThread::run()
                 output = "<b>ERROR</b><br>"+std;
                 emit EmitTextUpdate();
                 //ui->leOutput->setText(output);
-                return;
+                //return;
             }
             if (err.toLower().contains("error")) {
                 output = "<b>ERROR</b><br>"+err;
                 //ui->leOutput->setText(output);
                 emit EmitTextUpdate();
-                return;
+                //return;
             }
             output+=err;// + processCompress.readAllStandardOutput();
   //          qDebug() << std;

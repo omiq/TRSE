@@ -20,26 +20,31 @@
 */
 
 #include "node.h"
-#include "source/Compiler/assembler/mos6502/astdispatcher6502.h"
+#include "source/Compiler/codegen/codegen_6502.h"
+
 
 int Node::m_currentLineNumber;
+
 MemoryBlockInfo  Node::m_staticBlockInfo;
 QSharedPointer<MemoryBlock> Node::m_curMemoryBlock = nullptr;
 QString Node::sForceFlag = "";
-uint Node::s_nodeCount = 0;
+Assembler* Node::s_as;
 
-QMap<QString, bool> Node::flags;
+QHash<QString, bool> Node::flags;
 QSharedPointer<SymbolTable>  Node::parserSymTab;
-
-//QMap<QSharedPointer<Node>, QSharedPointer<Node>> Node::s_uniqueSymbols;
+uint Node::s_nodeCount = 0;
+//QHash<QSharedPointer<Node>, QSharedPointer<Node>> Node::s_uniqueSymbols;
 
 void Node::SwapNodes() {
+    if (m_hasSwapped)
+        return;
     QSharedPointer<Node> n = m_left;
     m_left = m_right;
     m_right = n;
+    m_hasSwapped = true;
 }
 
-void Node::ReplaceInline(Assembler* as,QMap<QString, QSharedPointer<Node> >& inp)
+void Node::ReplaceInline(Assembler* as,QHash<QString, QSharedPointer<Node> >& inp)
 {
     if (m_left != nullptr)
         m_left->ReplaceInline(as,inp);
@@ -47,12 +52,46 @@ void Node::ReplaceInline(Assembler* as,QMap<QString, QSharedPointer<Node> >& inp
         m_right->ReplaceInline(as,inp);
 }
 
+void Node::ReplaceInlineAssemblerVariables(Assembler *as, QString var, QString val)
+{
+    if (m_left != nullptr)
+        m_left->ReplaceInlineAssemblerVariables(as,var,val);
+    if (m_right != nullptr)
+        m_right->ReplaceInlineAssemblerVariables(as,var,val);
+
+}
+
+void Node::ResetInlineAssembler()
+{
+    if (m_left != nullptr)
+        m_left->ResetInlineAssembler();
+    if (m_right != nullptr)
+        m_right->ResetInlineAssembler();
+
+}
+
+TokenType::Type Node::getClassvariableType() {
+    TokenType::Type t1=TokenType::NADA,t2=TokenType::NADA;
+    if (m_left!=nullptr)
+        t1 = m_left->getClassvariableType();
+    if (m_left!=nullptr)
+        t2 = m_left->getClassvariableType();
+
+    if (t1!=TokenType::NADA) return t1;
+    if (t2!=TokenType::NADA) return t2;
+    return TokenType::NADA;
+}
+
+bool Node::isPure() {
+    return isPureNumericOrAddress() || isPureVariable();
+}
+
 Node::Node() {
     m_blockInfo = m_staticBlockInfo;
     s_nodeCount++;
 }
 
-void Node::DispatchConstructor(Assembler *as, AbstractASTDispatcher* dispatcher) {
+void Node::DispatchConstructor(Assembler *as, AbstractCodeGen* dispatcher) {
     //        m_blockInfo = m_staticBlockInfo;s
     m_currentLineNumber = m_op.m_lineNumber;
     bool ok = true;
@@ -111,6 +150,22 @@ int Node::MaintainBlocks(Assembler* as)
 
 }
 
+QString Node::getStoreTypesDebug()
+{
+    QString s = "";
+    if (m_left!=nullptr && m_right!=nullptr) {
+        s+= "Load type: " + TokenType::getType(m_left->getLoadType())+ "  "+TokenType::getType(m_right->getLoadType())+ "  "+TokenType::getType(getLoadType());
+        s+="\n\t;Store type: " + TokenType::getType(m_left->getStoreType())+"  "+TokenType::getType(m_right->getStoreType()) +"  "+ TokenType::getType(getStoreType());
+    }
+    else {
+        s+= "Load type: " + TokenType::getType(getLoadType());
+        s+="\n\t;Store type: " + TokenType::getType(getStoreType());
+    }
+
+    return s;
+
+}
+
 void Node::ForceAddress() {
     m_forceAddress = true;
     if (m_left!=nullptr)
@@ -119,11 +174,19 @@ void Node::ForceAddress() {
         m_right->ForceAddress();
 }
 
+void Node::FindPotentialSymbolsInAsmCode(QStringList &lst)
+{
+    if (m_left)
+        m_left->FindPotentialSymbolsInAsmCode(lst);
+    if (m_right)
+        m_right->FindPotentialSymbolsInAsmCode(lst);
+}
+
 
 
 void Node::RequireAddress(QSharedPointer<Node> n, QString name, int ln) {
     if (!n->isAddress()) {
-        ErrorHandler::e.Error("'"+name + "' requires parameter to be a memory address. Did you forget a '^' symbol such as ^$D800?", ln);
+       // ErrorHandler::e.Error("'"+name + "' requires parameter to be a memory address. Did you forget a '^' symbol such as ^$D800?", ln);
     }
 }
 
@@ -132,26 +195,35 @@ void Node::RequireNumber(QSharedPointer<Node> n, QString name, int ln) {
         ErrorHandler::e.Error(name + " requires parameter to be pure numeric", ln);
 }
 
-bool Node::verifyBlockBranchSize(Assembler *as, QSharedPointer<Node> testBlockA,QSharedPointer<Node> testBlockB, AbstractASTDispatcher* dispatcher)
+bool Node::verifyBlockBranchSize(Assembler *as, QSharedPointer<Node> testBlockA,QSharedPointer<Node> testBlockB, AbstractCodeGen* dispatcher)
 {
-    //QSharedPointer<Assembler> as =
-    //    AsmMOS6502 tmpAsm;
-  //  tmpAsm.m_symTab = as->m_symTab;
-//    ASTDispatcher6502 dispatcher;
-//    dispatcher.as = &tmpAsm;
+    if (m_evaluatedLines!=-1)
+        return m_evaluatedLines<120;
     auto app = QSharedPointer<Appendix>(new Appendix);
+    auto newtemp = QSharedPointer<Appendix>(new Appendix);
+    auto keep2 = as->m_tempVarsBlock;
+  //  if (as->offPageStack==0)
+        as->m_tempVarsBlock = newtemp;
     auto keep = as->m_currentBlock;
+    as->offPageStack++;
+
     as->m_currentBlock = app;
     QStringList keepTemps = as->m_tempVars;
+
     if (testBlockA!=nullptr)
         testBlockA->Accept(dispatcher);
     if (testBlockB!=nullptr)
         testBlockB->Accept(dispatcher);
+
     as->m_tempVars = keepTemps;
 
     int count = as->CodeSizeEstimator(app->m_source);
     as->m_currentBlock = keep;
+    as->offPageStack--;
 
+//    if (as->offPageStack==0)
+    as->m_tempVarsBlock = keep2;
+    m_evaluatedLines = count;
 
     return count<120;
 
@@ -179,11 +251,47 @@ bool Node::isSigned(Assembler *as) {
     return isSigned;
 }
 
+bool Node::hasFlag(Assembler *as, QString flag) {
+    return false;
+}
+
 void Node::setReference(bool ref) {
     m_op.m_isReference = ref;
     if (m_left!=nullptr)
         m_left->setReference(ref);
     if (m_right!=nullptr)
         m_right->setReference(ref);
+
+}
+
+void Node::clearComment() {
+    m_comment = "";
+    if (m_right!=nullptr)
+        m_right->clearComment();;
+    if (m_left!=nullptr)
+        m_left->clearComment();;
+}
+
+void Node::ReplaceVariable(Assembler* as, QString name, QSharedPointer<Node> node)
+{
+    if (m_right!=nullptr)
+        if (m_right->isPureVariable() && m_right->getValue(as)==name)
+            m_right = node;
+    if (m_left!=nullptr)
+        if (m_left->isPureVariable() && m_left->getValue(as)==name)
+            m_left = node;
+
+    if (m_right!=nullptr)
+        m_right->ReplaceVariable(as,name,node);
+    if (m_left!=nullptr)
+        m_left->ReplaceVariable(as,name,node);
+}
+
+int Node::getArrayDataSize(Assembler* as) {
+    if (getArrayType(as)==TokenType::INTEGER) return 2;
+    if (getArrayType(as)==TokenType::POINTER) return Syntax::s.m_currentSystem->getPointerSize();
+    if (getArrayType(as)==TokenType::LONG) return 4;
+//        if (getArrayType(as)==TokenType::POINTER) return Syntax::s.m_currentSystem->getPointerSize();
+    return 1;
 
 }

@@ -4,6 +4,7 @@ var
 procedure Test1();
 begin
 	Vars::j:=15;
+	Vars::i:=0;
 	case Vars::j of
 		4: Vars::i:=5;
 		15: Vars::i:=10;
@@ -19,6 +20,7 @@ end;
 procedure Test2();
 begin
 	Vars::j2:=15000;
+	Vars::i:=0;
 	case Vars::j2 of
 		4: Vars::i2:=5;
 		15000: Vars::i2:=10;
@@ -29,6 +31,21 @@ begin
 	if (Vars::i2=10) then Common::PASS() else Common::FAIL();
 end;
 
+procedure Test3();
+begin
+	Vars::j:=15;
+	Vars::i:=0;
+	case (Vars::j*3+1) of
+		4: Vars::i:=5;
+		46: Vars::i:=10;
+		24: Vars::i:=0;
+	end;
+
+	Vars::text := "T3:";
+	if (Vars::i=10) then Common::PASS() else Common::FAIL();
+end;
+
+
 //--------------------------------------------------------------------------------------------
 /* MAIN PROGRAM */
 procedure Exec();
@@ -38,10 +55,14 @@ begin
 	// Mul and div
 	Test1();
 	@ifndef GAMEBOY
-	@ifndef AMSTRADCPC
+	@ifndef CPU_Z80
+	@ifndef CPU_Z180
 	Test2();
 	@endif
 	@endif
+	@endif
+		
+	Test3();
 	Common::WaitABit();
 end;
 

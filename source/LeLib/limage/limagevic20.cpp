@@ -197,19 +197,21 @@ QString LImageVIC20::getMetaInfo()
     return txt;
 }
 
-void LImageVIC20::Color2Raw(QByteArray &ba, int ys)
+void LImageVIC20::Color2Raw(QByteArray &ba, int ys,int sx,int sy, int ex,int ey)
 {
     char mc = 0;
     if (isMultiColor())
         mc = 8;
     for (int y=0;y<m_charHeight;y+=ys)
-    for (int x=0;x<m_charWidth;x++)
+    for (int x=0;x<m_charWidth;x++) {
+        if (x>=sx && y>=sy && x<ex && y<ey)
         ba.append(m_data[y*m_charWidth + x].c[3] | mc);
+    }
 
 }
 
 void LImageVIC20::FixUp(QByteArray &ba) {
-    for (int i=0;i<ba.count();i++) {
+    for (int i=0;i<ba.length();i++) {
         ba[i] = PixelChar::reverse(PixelChar::VIC20Swap(PixelChar::reverse(ba[i])));
 
     }

@@ -2,13 +2,14 @@ unit Screen;
 var
 	ytab : array[193] of integer=BuildTable("0x4000 + (i&0b00111000)*4 | (i&7 | (i&0b11000000)/8)*0x100 ");
 	ytab_color : array[24] of integer=BuildTable("0x5800+i*32 ");
-	@donotremove ytab
-	@donotremove tabpow
+	//@donotremove ytab
+	//@donotremove tabpow
 	tabpow: array[] of byte = (128,64,32,16,8,4,2,1);
 	i,j:byte;
 	x,y,x2,y2 : byte;
 	zp:pointer;
-
+	const width:integer = 256;
+	const height:byte = 192;
 
 	
 procedure BorderColor(_a:byte);
@@ -26,6 +27,16 @@ begin
 	fill(#vram, x, $1800);
 	fill(#cram, y, 768);
 end;
+
+procedure FillScreen(x,y,x2  : global byte);
+begin
+	for i:=x to y do
+	begin
+		zp:=ytab[i];
+		fill(zp, x2, 32);
+	end;
+end;
+
 
 procedure SetColor(x,y,i : global byte);
 begin
@@ -92,12 +103,12 @@ begin
         ");
         for i:=0 to 256 do
 		begin
-			pos[0]:=lo(intPos);
-			pos[1]:=hi(intPos);
+			pos[1]:=lo(intPos);
+			pos[0]:=hi(intPos);
 			pos:=pos+2;
 		end; 
-		intPos[0]:=$fb;
-		intPos[1]:=$c9;
+		intPos[0]:=$fb; // ei
+		intPos[1]:=$c9; // ret
 		asm(" ei");
         /*
         inc a

@@ -16,18 +16,46 @@ LImageCGA::LImageCGA(LColorList::Type t)  : LImageQImage(t)
     m_supports.displayForeground = false;
     m_supports.displayBackground = false;
 
+    m_GUIParams[btnEditFullCharset] = "Char";
+    m_supports.displayCharOperations = true;
+
+    m_GUIParams[tabCharset] = "1";
+    m_updateCharsetPosition = true;
+    m_colorList.m_isCharset = true;
+
+    m_charWidth=80;
+    m_charHeight=25;
+    m_updateCharsetPosition = true;
+
+    m_supports.displayCharOperations = true;
+
 }
 
 void LImageCGA::ExportBin(QFile &file)
 {
     QByteArray even, odd,m1,m2;
     toCGA(even,odd,m1,m2,0,0,320,200);
+    if (m_exportParams["export1"]==1) {
+        // Chunky export
+        QByteArray c;
+        int a=0;
+        int b=0;
+        for (int i=0;i<100;i++) {
+            for (int j=0;j<80;j++)
+                c.append(even[a++]);
+            for (int j=0;j<80;j++)
+                c.append(odd[b++]);
+        }
+//        qDebug() << "HHHERE";
+        file.write(c);
+        return;
+    }
     for (int i=0;i<192;i++) even.append((char)0);
     file.write(even);
     file.write(odd);
 }
 
-QStringList LImageCGA::SpriteCompiler(QString name, QString source, QString dst, int xp, int yp, int w, int h) {
+QStringList LImageCGA::SpriteCompiler(QString name, QString currentDir,QString source, QString dst, int xp, int yp, int w, int h, QString pparam) {
     QStringList src;
 
     src<<";Sprite Compiler appendix CGA for : "+name;

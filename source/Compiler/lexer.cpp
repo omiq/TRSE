@@ -28,11 +28,11 @@
 
 int Lexer::getPositionInPercent()
 {
-    if (m_text.count()==0)
+    if (m_text.length()==0)
         return 100;
 
-    int val = (100*m_pos)/m_text.count();
-//    int val = (100*Pmm::Data::d.lineNumber)/m_lines.count();
+    int val = (100*m_pos)/m_text.length();
+//    int val = (100*Pmm::Data::d.lineNumber)/m_lines.length();
     return val;
 }
 
@@ -40,7 +40,7 @@ int Lexer::getTotalNumberOfLines()
 {
     QStringList lst = m_text.split("\n");
     lst.removeAll("");
-    return lst.count();
+    return lst.count() + m_currentLineCount;
 }
 
 int Lexer::getLineNumber(QString find)
@@ -93,7 +93,7 @@ Lexer::Lexer(QString text, QStringList lines, QString path) {
     m_orgText = text;
     m_pos = 0;
     m_path = path;
-    if (m_text.count()>0)
+    if (m_text.length()>0)
         m_currentChar = m_text[m_pos];
     m_lines = lines;
     m_ignorePreprocessor = true;
@@ -240,6 +240,11 @@ Token Lexer::Number(bool& isOk)
         base=2;
     }
 
+    if (res.contains("!")) {
+        res.remove("!");
+        base=8;
+    }
+
     if (res.contains("$")) {
         res.remove("$");
         base=16;
@@ -250,7 +255,6 @@ Token Lexer::Number(bool& isOk)
     }
     val = res.toLong(&isOk, base);
 
-//    qDebug() << val;
     if (isConstant)
         return Token(TokenType::INTEGER_CONST, val);
     else {
@@ -282,6 +286,9 @@ Token Lexer::_Id()
     }
     bool isRef =  m_nextIsReference;
     m_nextIsReference = false;
+//    if (isRef && Syntax::s.isDigit(QString(result[0])))
+  //      ErrorHandler::e.Error("Constant numbers cannot be referenced by #",Pmm::Data::d.lineNumber);
+//    qDebug() << result << isRef;
     return Syntax::s.GetID(result,isRef);
 
 }
@@ -302,17 +309,17 @@ Token Lexer::String()
 {
     QString result="";
     while (!m_finished && m_currentChar!="\"") {
+//        qDebug() <<m_currentChar << result;
         result +=m_currentChar;
         Advance();
         if (m_currentChar=="\\" && peek()=="\"") {
             Advance();
             Advance();
-            result[result.count()-1]='\"';
+            result[result.length()-1]='\"';
         }
     }
     Advance();
 //    ErrorHandler::e.DebugLow("Calling Lexer::String with string: " + result);
-
     return Token(TokenType::STRING, result);
 
 }
@@ -326,6 +333,25 @@ Token Lexer::InlineAsm()
         QString next3  =peek(1) + peek(2) + peek(3)+peek(4);
         if (next3.toLower()=="end;")
             finished = true;
+        Advance();
+    }
+    return Token(TokenType::STRING, result);
+
+}
+
+Token Lexer::Macro()
+{
+    QString result="";
+    bool finished = false;
+    while (!finished) {
+        result +=m_currentChar;
+        QString next3  =peek(1) + peek(2) + peek(3)+peek(4)+peek(5)+peek(6)+peek(7)+peek(8);
+//        qDebug() <<next3;
+        if (next3=="")
+            finished = true;
+        if (next3.toLower().trimmed()=="endmacro")
+            finished = true;
+
         Advance();
     }
     return Token(TokenType::STRING, result);
@@ -353,14 +379,14 @@ void Lexer::Initialize()
 {
     Pmm::Data::d.lineNumber = 0;
     m_finished = false;
-    if (m_text.count()>0)
+    if (m_text.length()>0)
         m_currentChar = m_text[0];
     m_pos = 0;
     m_localPos = 0;
 }
 /*
  *
- * GetNextToken is the main "tokenizer" that transforms the stream
+ * GetNextToken is the main tokenizen that transforms the stream
  * of characters into streams of tokens.
 */
 
@@ -398,7 +424,22 @@ Token Lexer::GetNextToken()
             }
 
         }
-        // Generate string
+        // Convert ascii to number
+        if (m_currentChar=="'") {
+            Advance();
+            int c = m_currentChar.toLatin1()[0];
+//            qDebug() << c;
+            Advance();
+            if (m_currentChar!="'")
+                ErrorHandler::e.Error( "Chars chan only contain one symbol",Pmm::Data::d.lineNumber );
+
+            Advance();
+
+            return Token(TokenType::INTEGER_CONST, c);
+
+
+        }
+
         if (m_currentChar=="\"") {
             Advance();
             return String();
@@ -445,11 +486,12 @@ Token Lexer::GetNextToken()
 
             if (id.m_value.endsWith("^")) {
                 // Replaces p^ with p[0]
-                id.m_value.remove(id.m_value.count()-1,1);
+                id.m_value.remove(id.m_value.length()-1,1);
                 m_text.remove(m_pos-1,1);
                 m_text.insert(m_pos-1,"[0]"); m_currentChar = "[";
 
             }
+            //qDebug() << id.m_value;
             return id;
         }
         // Assign statement a:=b;
@@ -481,6 +523,14 @@ Token Lexer::GetNextToken()
                 return Token(TokenType::GREATEREQUAL, ">=");
             }
             if (peek()==">") {
+                if (peek(2)=="=") {
+                    Advance();
+                    Advance();
+                    Advance();
+                    return Token(TokenType::ASSIGNOP, ">>");
+
+                }
+
                 Advance();
                 Advance();
                 return Token(TokenType::SHR, ">>");
@@ -489,12 +539,21 @@ Token Lexer::GetNextToken()
             return Token(TokenType::GREATER, ">");
         }
         if (m_currentChar=="<") {
+            QString c = m_currentChar;
             if (peek()=="=") {
                 Advance();
                 Advance();
                 return Token(TokenType::LESSEQUAL, "<=");
             }
             if (peek()=="<") {
+                if (peek(2)=="=") {
+                    Advance();
+                    Advance();
+                    Advance();
+                    return Token(TokenType::ASSIGNOP, "<<");
+
+                }
+
                 Advance();
                 Advance();
                 return Token(TokenType::SHL, "<<");
@@ -536,16 +595,16 @@ Token Lexer::GetNextToken()
             return Token(TokenType::MINUS, "-");
         }
         if (m_currentChar=="&") {
-            QString c = m_currentChar;
-            if (peek()=="=") {
-                Advance();
-                Advance();
-                return Token(TokenType::ASSIGNOP, c);
+                  QString c = m_currentChar;
+                  if (peek()=="=") {
+                      Advance();
+                      Advance();
+                      return Token(TokenType::ASSIGNOP, c);
 
-            }
-            Advance();
-            return Token(TokenType::BITAND, "&");
-        }
+                  }
+                  Advance();
+                  return Token(TokenType::BITAND, "&");
+              }
         if (m_currentChar=="|") {
             QString c = m_currentChar;
             if (peek()=="=") {
@@ -567,6 +626,17 @@ Token Lexer::GetNextToken()
             }
             Advance();
             return Token(TokenType::XOR, "^");
+        }
+        if (m_currentChar=="~") {
+            QString c = m_currentChar;
+            if (peek()=="=") {
+                Advance();
+                Advance();
+                return Token(TokenType::ASSIGNOP, c);
+
+            }
+            Advance();
+            return Token(TokenType::BITNOT, "~");
         }
 
         if (m_currentChar=="*") {

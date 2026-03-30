@@ -31,8 +31,15 @@
 #include "source/Compiler/ast/nodebuiltinmethod.h"
 #include "source/Compiler/ast/nodeblock.h"
 #include "source/Compiler/ast/nodeproceduredecl.h"
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
 
+/*
+    The Parent node of the entire program. 
+    m_left: undefined
+    m_right: undefined
+    m_op: undefined
+
+*/
 class NodeProgram : public Node {
 public:
     QString m_name, m_param;
@@ -50,12 +57,23 @@ public:
     }
 
 
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override {
+        if (m_NodeBlock!=nullptr)
+            m_NodeBlock->FindPotentialSymbolsInAsmCode(lst);
+    }
 
 
     void ExecuteSym(QSharedPointer<SymbolTable>  symTab) override;
 
 
-    void Accept(AbstractASTDispatcher* dispatcher) override;
+    void Accept(AbstractCodeGen* dispatcher) override;
+
+    virtual bool Optimize() override {
+        if (m_NodeBlock!=nullptr)
+            m_NodeBlock->Optimize();
+        return false;
+    }
+
 
 };
 

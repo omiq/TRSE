@@ -9,9 +9,12 @@ AsmZ80::AsmZ80()
     m_sprram = QSharedPointer<Appendix>(new Appendix);
     m_ram = QSharedPointer<Appendix>(new Appendix);
 
-    m_wram->Append("i_input_current:	DS	1",0);
-    m_wram->Append("i_input_previous:	DS	1",0);
-    m_wram->Append("cmpvar:	DS	1",0);
+
+    if (Syntax::s.m_currentSystem->m_system==AbstractSystem::GAMEBOY) {
+        m_wram->Append("i_input_current:	DS	1",0);
+        m_wram->Append("i_input_previous:	DS	1",0);
+        m_wram->Append("cmpvar:	DS	1",0);
+    }
     m_hram->m_isMainBlock = true;
     m_wram->m_isMainBlock = true;
     m_sprram->m_isMainBlock = true;
@@ -36,6 +39,9 @@ void AsmZ80::Connect() {
     }
     newSource << " ; Temp vars section";
     newSource<< m_tempVars;
+    if (m_tempVarsBlock!=nullptr)
+        newSource << m_tempVarsBlock->m_source;
+
     newSource << " ; Temp vars section ends";
     for (int i=m_varDeclEndsLineNumber;i<m_source.count(); i++) {
         newSource<<m_source[i];
@@ -44,14 +50,21 @@ void AsmZ80::Connect() {
     //m_source<<m_appendix;
     //    m_appendix.append(m_ extraBlocks);
     SortAppendix();
-
+    Label("EndBlock"+QString::number(Syntax::s.m_currentSystem->m_programStartAddress,16));
     //  qDebug() << m_appendix[0].m_source;
     QStringList pre;
     for (int i=0;i<m_appendix.count();i++) {
 
+        QString add = "\t"+GetOrg(Util::NumberFromStringHex(m_appendix[i]->m_pos));
+        if (Syntax::s.m_currentSystem->m_system==AbstractSystem::GAMEBOY) {
+            add = "";
+        }
+
+
         if (Util::NumberFromStringHex(m_appendix[i]->m_pos)<Syntax::s.m_currentSystem->m_programStartAddress)
-            pre <<m_appendix[i]->m_source;
-        else m_source << m_appendix[i]->m_source;
+            pre <<add<<m_appendix[i]->getSource();
+
+        else m_source << add<<m_appendix[i]->getSource();
 
     }
 
@@ -59,7 +72,6 @@ void AsmZ80::Connect() {
     m_appendix.clear();
 
     m_source = QStringList() <<pre << m_source;
-
 
 
 
@@ -71,8 +83,9 @@ void AsmZ80::Program(QString name, QString vicParam)
 //    Asm("[ORG "+Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress) + "]");
     m_hash = "";
  //   qDebug() << "z80 program start " <<Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress);
-//    StartMemoryBlock(Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress));
-
+//    m_currentBlock = nullptr;
+  //  StartMemoryBlock(Util::numToHex(Syntax::s.m_currentSystem->m_programStartAddress));
+    Label("StartBlock"+QString::number(Syntax::s.m_currentSystem->m_programStartAddress,16));
 }
 
 void AsmZ80::EndProgram()
@@ -97,8 +110,11 @@ void AsmZ80::DeclareArray(QString name, QString type, int count, QStringList dat
 
 
     QString t = byte;
-    if (type.toLower()=="integer")
+    int scale = 1;
+    if (type.toLower()=="integer" || type.toLower()=="pointer") {
         t = word;
+        scale = 2;
+    }
     if (type.toLower()=="byte")
         t = byte;
 
@@ -107,6 +123,9 @@ void AsmZ80::DeclareArray(QString name, QString type, int count, QStringList dat
 // array  resb  251*256  ;251 ROWS X 256 COLUMNS.
 
      if (data.count()==0 && pos!="") {
+        if (Syntax::s.m_currentSystem->isGB())
+            name = "def " + name;
+
          Write(name + " equ " + pos);
          return;
      }
@@ -122,14 +141,16 @@ void AsmZ80::DeclareArray(QString name, QString type, int count, QStringList dat
   */
 
         //Write(name+":" +"\t times "+QString::number(count) +" "+t+" 0",0);
+
         if (m_currentBlock==m_hram || m_currentBlock==m_wram || m_currentBlock==m_sprram || m_currentBlock==m_ram) {
-            Write(name+":" +"\t ds "+QString::number(count),0);
-            m_currentBlock->m_dataSize+=count;
+
+            Write(name+":" +"\t ds "+QString::number(count*scale),0);
+            m_currentBlock->m_dataSize+=count*scale;
 
         }
         else
 
-        Write(name+":" +"\t ds "+QString::number(count));// +" "+t+" 0",0);
+        Write(name+":" +"\t ds "+QString::number(count*scale),0);// +" "+t+" 0",0);
 
     }
     else {
@@ -178,19 +199,21 @@ void AsmZ80::DeclareVariable(QString name, QString type, QString initval, QStrin
         initval = "0";
 
     if (type.toLower()=="const") {
+        if (Syntax::s.m_currentSystem->isGB())
+            name = "def " + name;
         Write(name + " equ " + initval,0);
         return;
     }
-
-
+    //if (Syntax::s.m_currentSystem->iseZ80())
+    //   Write(".align 4",0);
     if (type.toLower()=="integer")
         t = word;
-    if (type.toLower()=="byte") {
+    if (type.toLower()=="byte"  || type.toLower()=="boolean") {
         t = byte;
     }
 
-//    if (DeclareRecord(name,type,1,QStringList(),position))
-  //       return;
+    if (DeclareRecord(name,type,1,QStringList(),position))
+         return;
     if (DeclareClass(name,type,1,QStringList(),position))
          return;
 
@@ -200,10 +223,11 @@ void AsmZ80::DeclareVariable(QString name, QString type, QString initval, QStrin
 
 
 
-
 //    qDebug() << "IS WRAM " <<(m_currentBlock==m_wram) << name;
+    if (Syntax::s.m_currentSystem->m_system!=AbstractSystem::POKEMONMINI)
     if (m_currentBlock==m_hram || m_currentBlock==m_wram || m_currentBlock==m_sprram) {
         t = "ds";
+
         if (type.toLower()=="byte") {
             initval = "1";
             m_currentBlock->m_dataSize+=1;
@@ -211,15 +235,23 @@ void AsmZ80::DeclareVariable(QString name, QString type, QString initval, QStrin
         if (type.toLower()=="integer") {
             initval = "2";
             m_currentBlock->m_dataSize+=2;
+
         }
 
 
     }
+    if (type.toLower()=="integer")
+        if (Syntax::s.m_currentSystem->iseZ80())
+            Write(".align 4",0);
 
-    if (position=="")
+    if (position=="") {
         Write(name+":" +"\t" + t + "\t"+initval,0);
+    }
     else
     {
+        if (Syntax::s.m_currentSystem->isGB())
+            name = "def " + name;
+
         Write(name +"\t equ \t"+position,0);
 /*        Appendix* app = new Appendix(position);
         app->Append(GetOrg(Util::NumberFromStringHex(position)),1);
@@ -232,13 +264,18 @@ void AsmZ80::DeclareVariable(QString name, QString type, QString initval, QStrin
 
         m_appendix.append(app);*/
     }
+    if (type.toLower()=="integer")
+        if (Syntax::s.m_currentSystem->iseZ80())
+            Write(".align 4",0);
+
 }
 
 void AsmZ80::DeclareString(QString name, QStringList initVal, QStringList flags) {
+    Comment("Declaring string asmz80");
     Write(name +":\t" + String(initVal,!flags.contains("no_term")),0);
 }
 
-void AsmZ80::BinOP(TokenType::Type t, bool clearFlag)
+void AsmZ80::BinOP(TokenType::Type t,  bool clearFlag)
 {
     if (t == TokenType::PLUS) {
         m_term = "add ";
@@ -359,10 +396,24 @@ void AsmZ80::Label(QString s)
 
 QString AsmZ80::GetOrg(int pos)
 {
+    if (Syntax::s.m_currentSystem->m_processor==AbstractSystem::S1C88) {
+        return ".orgfill " + Util::numToHex(pos);
+
+    }
     if (Syntax::s.m_currentSystem->m_system == AbstractSystem::GAMEBOY)
         return "[org " + Util::numToHex(pos).replace("$","0x") + "]";
-    else
+    else {
         return "org " + Util::numToHex(pos);
+    }
+}
+
+
+QString AsmZ80::GetOrg() {
+    if (Syntax::s.m_currentSystem->m_processor==AbstractSystem::S1C88) {
+        return ".orgfill ";
+
+    }
+    return "org ";
 }
 
 QString AsmZ80::String(QStringList lst, bool term)
@@ -371,22 +422,13 @@ QString AsmZ80::String(QStringList lst, bool term)
     QString res;
     QString mark = byte;
 
-    for (QString s:lst) {
-        bool ok=false;
-        uchar val = s.toInt(&ok);
-        if (!ok)
-            res=res+"\t"+mark+"\t" +"\"" + s + "\"\n";
+    for (QString s:lst)
+        res+=DeclareSingleString(s,mark,mark);
 
-        else res=res + "\t"+mark+"\t"+QString::number(val) + "\n";
-
-        /*        if (s!=lst.last())
-                    res=res + "\n";
-        */
-
-    }
     if (term)
         res=res + "\t"+mark+"\t0";
-    m_term +=res;
+
+    //m_term +=res;
     return res;
 }
 
@@ -442,4 +484,5 @@ void AsmZ80::EndMemoryBlock() {
   //      return;
 
 }
+
 

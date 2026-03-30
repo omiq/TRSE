@@ -25,18 +25,18 @@ end;
 
 procedure Advanced04();
 begin
-	Vars::p2:=$4000;
+	Vars::p2:=#Vars::addr;
 	Vars::v1:=1;
 	Vars::p2[Vars::v1]:=2;
 	Vars::p1:=$0400;
-	asm(";fail");
+	asm(";cc2");
 	Vars::p1:=Vars::p1 + Vars::p2[Vars::v1];
 	Vars::text := "04:"; if Vars::p1=$0402 then Common::PASS() else Common::FAIL();
 end;
 
 procedure Advanced05();
 begin
-	Vars::p2:=$4000;
+	Vars::p2:=#Vars::addr;
 	Vars::p2[1]:=$20;
 	Vars::v1:=1;
 	Vars::p1:=$0400;
@@ -47,7 +47,7 @@ end;
 
 procedure Advanced06();
 begin
-	Vars::p2:=$4000;
+	Vars::p2:=#Vars::addr;;
 	Vars::v1:=1;
 	Vars::v2:=3;
 	Vars::p2[Vars::v1]:=$20;
@@ -60,7 +60,7 @@ end;
 */
 procedure Advanced07();
 begin
-	Vars::p2:=$4000;
+	Vars::p2:=#Vars::addr;
 	Vars::p2[1]:=$20;
 	Vars::v1:=1;
 	Vars::p1:=$0400 + Vars::p2[1];
@@ -69,11 +69,31 @@ end;
 
 procedure Advanced08();
 begin
-	Vars::p2:=$4000;
+	Vars::p2:=#Vars::addr;
 	Vars::p2[1]:=$20;
 	Vars::p1:=$0400 + Vars::p2[1]*3;
 	Vars::text := "08:"; if Vars::p1=$0460 then Common::PASS() else Common::FAIL();
 end;
+
+@ifdef C64
+
+function factorial( p: byte stack ):byte;
+begin
+	if (p>1) then
+	begin
+		p:=p*factorial(p-1);
+	end;
+	factorial:=p;
+end;
+
+procedure AdvFactorial();
+begin
+	Vars::v1 := factorial(5);
+	Vars::text := "09:"; if Vars::v1=120 then Common::PASS() else Common::FAIL();
+end;
+
+@endif
+
 /*
 procedure Advanced09();
 begin
@@ -85,25 +105,69 @@ begin
 	Vars::text := "09:"; if Vars::p1=$E486 then Common::PASS() else Common::FAIL();
 end;
 */
+@ifndef CPU_PCHIP8
+@ifndef CPU_M68000
+procedure MulDivCombo1();
+begin
+	Vars::text := "M1:";
+	Vars::v1 := $10;
+	Vars::i2 := $0200;
+	// $100/$02*$10 = $800
+ 	Vars::i1 := ($100 / (hi(Vars::i2)) ) * Vars::v1; 
+	if Vars::i1=$800 then Common::PASS() else Common::FAIL();
+end;
+
+procedure MulDivCombo2();
+begin
+	Vars::text := "M2:";
+	Vars::v1 := $10;
+	Vars::i2 := $0400;
+	// $100*$04/$10 = $40
+	Vars::i1 := ($100 * (hi(Vars::i2)) ) / Vars::v1; 
+	if Vars::i1=$40 then Common::PASS() else Common::FAIL();
+end;
+
+procedure MulDivCombo3();
+begin
+	Vars::text := "M3:";
+	Vars::v1 := $10;
+	Vars::v2 := $4;
+	Vars::i2 := $0200;
+	// $10*$100/$02*4 = $2000
+	Vars::i1 :=  (Vars::v1*($100 / (hi(Vars::i2)) ))*Vars::v2; 
+	if Vars::i1=$2000 then Common::PASS() else Common::FAIL();
+end;
+@endif
+@endif
+
 procedure Exec();
 begin
 	// initialise everything
 	Common::Initialise("ADVANCED TESTS");
-	
 	@ifndef GAMEBOY  // Fails because of `ex`
 	Advanced01();
 	Advanced02();
 	Advanced03();
-	@ifndef AMSTRADCPC
 	Advanced04();
 	Advanced05();
+	@ifndef ATARI520ST
 	Advanced06();
+	@endif
 	Advanced07(); 
 	Advanced08();
 	@endif
+	@ifdef C64
+	AdvFactorial();
 	@endif
-//	Advanced09();// fails
+@ifndef CPU_PCHIP8
+@ifndef CPU_M68000
+	MulDivCombo1();
+	MulDivCombo2();
+	MulDivCombo3();
+@endif
+@endif
 	Common::WaitABit();
+	
 end;
 
 end.

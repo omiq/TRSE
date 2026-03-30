@@ -15,6 +15,7 @@ LImageNES::LImageNES(LColorList::Type t) : CharsetImage(t)
     m_charWidth = 32;
     m_charHeight = 32;
 
+    usePens = true;
 
     //m_data = new PixelChar[m_charWidth*m_charHeight];
     m_charWidthDisplay=16;
@@ -22,7 +23,7 @@ LImageNES::LImageNES(LColorList::Type t) : CharsetImage(t)
     m_gridWidthDisplay = 16;
 
 //    m_double=false;
-    Clear();
+    Clear(0);
     m_type = LImage::Type::NES;
     m_supports.asmExport = true;
     m_supports.binaryLoad = true;
@@ -137,6 +138,10 @@ void LImageNES::SaveBin(QFile &file)
     file.write( ( char * )( &m_data ),  m_charWidth*m_charHeight*12 );
     file.write(m_colorList.m_nesPPU);
 
+}
+
+QStringList LImageNES::getBankNames() {
+    return QStringList()<<"Bank 0"<<"Bank 1";
 }
 
 
@@ -531,3 +536,4 @@ void LImageNES::CopySingleChar(LImage *src, int srcChar, int dstChar)
     }
 
 }
+

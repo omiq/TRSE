@@ -1,0 +1,45 @@
+unit Input;
+var
+	jpad1,jpad1l,jpad2,jpad3,jpad4: byte;
+	i:byte;
+	procedure Read();
+	begin
+		jpad1 := peek(^$4219,0);
+		jpad1l := peek(^$4218,0);
+	end;
+
+	function Movement(i:global byte pure):byte;
+	begin
+		Movement:=i&$0F;
+	end;
+	
+    function Right(i:global byte pure):byte;
+	begin
+		returnvalue(i&1);
+	end;
+	function Left(i:global byte pure):byte;
+	begin
+		returnvalue((i>>1)&1);
+	end;
+	function Up(i:global byte pure):byte;
+	begin
+		returnvalue((i>>2)&1);
+	end;
+	function Down(i:global byte pure):byte;
+	begin
+		returnvalue((i>>3)&1);
+	end;
+	function Start(i:global byte pure) : byte;
+	begin
+		returnvalue((i>>4)&1);
+	end;
+	function Select(i:global byte pure):byte;
+	begin
+		returnvalue((i>>5)&1);
+	end;
+	function B(i:global byte pure):byte;
+	begin
+		returnvalue((i>>6)&1);
+	end;
+	
+end.

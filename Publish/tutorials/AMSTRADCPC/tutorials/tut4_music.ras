@@ -10,7 +10,6 @@ program Tutorial4_music;
 var  
 	image : incbin("resources/images/image1.bin");
 	palette : incbin("resources/images/image1_palette.bin");
-	@donotremove music
 
 /*
   How to do music: 
@@ -46,14 +45,10 @@ begin
 end;
 
 begin
-	Crtc::SetBorder(0);
-	Crtc::SetMode(0);
-	
-	Memory::DisableLRom();
+	Crtc::InitDefault(0);
 	
 	// Set up colortab1
 	Music::InitMusic(#some_song,0);
-	Crtc::Synchronize();
 	RasterIRQ(MainRaster());
 	
 	Crtc::SetPalette(#palette);

@@ -32,9 +32,13 @@ public:
     LImageQImage() {}
     LImageQImage(LColorList::Type t);
     QImage* m_qImage = nullptr;
+    QVector<QSharedPointer<QImage>> m_banks;
     ~LImageQImage() {
         Release();
     }
+
+//    int LImage::getCanvasColor(int x, int y);
+
 
     void Initialize(int width, int height) override;
 
@@ -45,6 +49,9 @@ public:
 
     void SaveBin(QFile &f) override;
     void LoadBin(QFile &f) override;
+    void SaveBinRGBA(QFile &f);
+    void LoadBinRGBA(QFile &f);
+    virtual LImage* getCharset() override { return this; }
 
     void LoadQImage(QString filename);
 
@@ -54,22 +61,37 @@ public:
     double getHeight() override {return m_height;}
     double getL() override {return 8;}
 
+    QPoint getPixelPosition(int x, int y);
 
-    virtual void ToQImage(LColorList& lst, QImage& img, float zoom, QPointF center) override;
+    virtual QPixmap ToQPixMap(int chr) override;
+
+    int getCharWidthDisplay() override;
+
+    int getCharHeightDisplay() override;
+
+    int getGridWidth() override;
+
+
+    QByteArray toQByteArray(bool inverted=false);
+    void fromQByteArray(QByteArray& ba);
+
+    virtual void ToQImage(LColorList& lst, QImage& img, double zoom, QPointF center) override;
     void fromQImage(QImage* img, LColorList& lst) override;
 
-    void ExportBlackWhite(QFile &file, int p1, int p2, int p3, int p4) override;
+    void ExportBlackWhite(QFile &file, int p1, int p2, int p3, int p4, int type) override;
+    void ExportBin(QFile &file) override;
 
     void RemapCharset(QImage* other, int cw, int ch, int bw, int bh, int dw, int dh, int allowance);
 
     void Release() override;
 
     void ApplyToLabel(QLabel* l) override;
-    void Clear() override {
+    void Clear(int val=0) override {
         if (m_qImage)
-            m_qImage->fill(QColor(0,0,0,255));
+            m_qImage->fill(QColor(val,val,val,255));
     }
 
+    bool KeyPress(QKeyEvent *e) override;
 
 
     // Specific stuff
@@ -78,7 +100,7 @@ public:
     QImage* Blur(float rad);
     QImage* ApplyEffectToImage(QImage& src, QGraphicsBlurEffect *effect);
 
-    void CreateGrid(int x, int y, QColor color, int strip,float zoom, QPointF center, float scale);
+    void CreateGrid(double x, double y, QColor color, int strip,double zoom, QPointF center, double scale, int type, int height, double aspect);
 
 
     void CopyFrom(LImage *img) override;

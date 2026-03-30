@@ -1,0 +1,81 @@
+program m1armtest;
+@use "console"
+var
+	text: string=("Hello TRSE m1 world!***\010\013");
+	test2 : string="test : ";
+	@donotremove i
+	i,k,time:integer;
+	tp:pointer;
+	xx,yy:long;
+	j:byte;
+
+
+begin
+	Console::ClearScreen();
+	tp:=#text;
+	Console::GetWindowSize();
+	while (true) do
+	begin
+		i:=xx+yy+time;
+		Console::PrintChar(i&63+64);
+		i+=111;
+		k+=1;
+		
+		xx+=1;
+		if (xx=Console::sizex-1) then
+		begin
+			xx:=0;
+			yy+=1;
+		end;
+		
+		
+		if (k=Console::sizex*Console::sizey) then 
+		begin
+			//Console::Sleep(30000);			
+			Console::ClearScreen();
+			k:=0;
+			i:=0;	
+			xx:=0;
+			yy:=0;
+			time+=1;
+		end;
+	end;
+
+	
+/*	Console::Print(#text);
+	Console::Print(#text);
+	Console::Print(#text);
+	Console::Print(#text);
+*/
+
+	/*
+	
+	Console::ClearScreen();
+	i:=10;
+	
+	j:=i*10 + i*6;
+	
+	for i:=0 to 10 do	
+		Console::Print(#text);
+
+	*/	
+	asm("
+
+_inf:
+		b _inf
+
+        mov     X0, #0      // Use 0 return code
+        mov     X16, #1     // Service command code 1 terminates this program
+        svc     0           // Call MacOS to terminate the program
+
+
+
+
+        
+.data
+
+
+test : .hword 0
+	
+	");
+end.

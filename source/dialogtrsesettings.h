@@ -189,6 +189,80 @@ private slots:
 
     void on_btnLZ4_clicked();
 
+    void on_btnQemuHelp_clicked();
+
+    void on_btnQemu_clicked();
+
+    void on_btnOric_clicked();
+
+    void on_btnSnes_clicked();
+
+    void on_btnCL65_clicked();
+
+    void on_btnVZ200_clicked();
+
+    void on_btnVZ200Help_clicked();
+
+    void on_btnAcornHelp_clicked();
+
+    void on_btnAcornEmulator_clicked();
+
+    void on_btnJDH8Emu_clicked();
+
+    void on_btnMameEmulator_clicked();
+
+    void on_btnPMAS_clicked();
+
+    void on_btnTRS80help_clicked();
+
+    void on_btnTRS80_clicked();
+
+    void on_btnWasm_clicked();
+
+    void on_btnWonderswan_clicked();
+
+    void on_btnTimEmulator_clicked();
+
+    void on_btnCPMTOOLS_clicked();
+
+    void on_btnTVCEmulator_clicked();
+
+    void on_btnHelpTVC_clicked();
+
+    void on_btnVectrexEmulator_clicked();
+
+
+    void on_btnHelpThomson_clicked();
+
+    void on_btnThomsonEmulator_clicked();
+
+    void on_btnPCWEmulator_clicked();
+
+    void on_btnHelpPCW_clicked();
+
+    void on_btnHelpBK0010_clicked();
+
+    void on_btnBK0010Emulator_clicked();
+
+    void on_btnDragonEmulator_clicked();
+
+    void on_btnSparkle_clicked();
+
+    void on_btnHelpVectrex_clicked();
+
+    void on_btnFoenixEmulator_clicked();
+
+    void on_btnFoenixHelp_clicked();
+
+    void on_btnHelpAgon_clicked();
+
+    void on_btnAgon_clicked();
+
+
+    void on_btnPrimoEmulator_clicked();
+
+    void on_btnHelpTVC_2_clicked();
+
 private:
     Ui::DialogTRSESettings *ui;
 };

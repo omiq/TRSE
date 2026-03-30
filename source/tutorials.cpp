@@ -149,6 +149,39 @@ void Tutorials::PopulateProjectList(QString system, QListWidget *w)
 
 }
 
+void Tutorials::PopulateProjectTable(QString system, QGridLayout *w)
+{
+//    w->clear();
+    int i=0;
+    int j=0;
+    m_widgets.clear();
+    int cnt=0;
+    for (Tutorial& t: m_tutorials) {
+        if ((system != t.m_system))
+            continue;
+
+
+        FormTutorialItem *item = new FormTutorialItem();
+        item->Initialise(t.m_name,t.m_text,"",t.m_file);
+        //      item->setForeground(QColor(190,220,240,255));
+        w->addWidget(item,j,i);
+        m_widgets.append(item); i++;
+        cnt++;
+        if (i==2) {
+            j+=1;
+            i=0;
+        }
+//            w->setItem(i,j,item);
+        }
+
+    if (cnt==1) {
+        // Insert dummy widget to get a grid
+        QLabel* item = new QLabel("                                                                                                  ");
+        //      item->setForeground(QColor(190,220,240,255));
+        w->addWidget(item,0,1);
+    }
+}
+
 void Tutorials::PopulateTemplateList(QListWidget *w, QString system)
 {
     w->clear();

@@ -30,12 +30,23 @@
 #include "source/Compiler/ast/node.h"
 #include "source/Compiler/ast/nodebinaryclause.h"
 #include <QVector>
-#include "source/Compiler/assembler/abstractastdispatcher.h"
+#include "source/Compiler/codegen/abstractcodegen.h"
+/* 
+   Repeat ...  until block
+   example:
+   repeat
+        i:=i+1;
+        Print(i);
+   until i=22;
 
+
+    m_left: undefined
+    m_right: undefined
+    m_op: undefined
+*/
 class NodeRepeatUntil : public Node {
 public:
 
-//    QVector<QSharedPointer<Node>> m_a, m_b;
 
     QSharedPointer<Node> m_block = nullptr;
     QSharedPointer<NodeBinaryClause> m_clause = nullptr;
@@ -45,12 +56,23 @@ public:
 
 
 
+    void ReplaceVariable(Assembler* as, QString name, QSharedPointer<Node> node) override {
+        Node::ReplaceVariable(as,name,node);
+        if (m_block!=nullptr)
+            m_block->ReplaceVariable(as,name,node);
+        if (m_clause!=nullptr)
+            m_clause->ReplaceVariable(as,name,node);
+    }
+    void FindPotentialSymbolsInAsmCode(QStringList& lst)  override {
+        if (m_block!=nullptr)
+            m_block->FindPotentialSymbolsInAsmCode(lst);
+    }
 
     void ExecuteSym(QSharedPointer<SymbolTable> symTab) override {
        m_block->ExecuteSym(symTab);
     }
 
-    void Accept(AbstractASTDispatcher* dispatcher) override {
+    void Accept(AbstractCodeGen* dispatcher) override {
         dispatcher->dispatch(qSharedPointerDynamicCast<NodeRepeatUntil>(sharedFromThis()));
     }
 

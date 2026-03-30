@@ -9,6 +9,22 @@
 #include <QSharedPointer>
 
 
+
+/*
+ *
+ *
+ *  Main wrapper class used for building .ras source files. Used by both the IDE and the CLI.
+ *
+ *  Main point: Contains the compiler, the system.
+ *
+ *  Main methods:
+ *   - Build
+ *   - Assemble
+ *
+ *  emits build success/failure strings and compiler ticks.
+ *
+ */
+
 class SourceBuilder : public QObject
 {
     Q_OBJECT
@@ -19,7 +35,7 @@ public:
 
     QSharedPointer<CIniFile> m_iniFile, m_projectIniFile;
 
-    QMap<QString,QStringList> m_options;
+    QHash<QString,QStringList> m_options;
 
     bool m_buildSuccess = false;
     bool m_assembleSuccess = false;
@@ -60,8 +76,10 @@ private:
 public:
 signals:
     void EmitBuildString();
+    void emitRequestSystemChange(QString);
 public slots:
     void AcceptParserTick(QString val);
+    void AcceptRequestSystemChange(QString val);
 
 };
 

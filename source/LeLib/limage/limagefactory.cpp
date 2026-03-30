@@ -23,7 +23,7 @@
 
 
 LImage *LImageFactory::Create(LImage::Type t, LColorList::Type colorType) {
-
+//    qDebug() << "Creating type: " <<LImage::TypeToString(t);
 
     if (t == LImage::Type::QImageBitmap)
         return new LImageQImage(colorType);
@@ -88,7 +88,44 @@ LImage *LImageFactory::Create(LImage::Type t, LColorList::Type colorType) {
         return new LImageVGA(colorType);
     if (t == LImage::Type::Spectrum)
         return new LImageSpectrum(colorType);
-
+    if (t == LImage::Type::SNES)
+        return new LImageSNES(colorType);
+    if (t == LImage::Type::LevelEditorSNES)
+        return new LImageLevelSNES(colorType);
+    if (t == LImage::VZ200)
+        return new LImageVZ200(colorType);
+    if (t == LImage::CustomC64)
+        return new LImageCustomC64(colorType);
+    if (t == LImage::JDH8)
+        return new LImageJDH8(colorType);
+    if (t == LImage::LImageGeneric)
+        return new LImageGeneric(colorType);
+    if (t == LImage::GenericSprites)
+        return new LImageGenericSprites(colorType);
+    if (t == LImage::CGA160x100)
+        return new LImageCGA160x100(colorType);
+    if (t == LImage::AmstradSprites)
+        return new LImageAmstradSprites(colorType);
+    if (t == LImage::SNESGeneric)
+        return new LImageSnesGeneric(colorType);
+    if (t == LImage::TIM)
+        return new LImageTIM(colorType);
+    if (t == LImage::TVC)
+        return new LImageTVC(colorType);
+    if (t == LImage::COCO3)
+        return new LImageCOCO3(colorType);
+    if (t == LImage::THOMSON)
+        return new LImageThomson(colorType);
+    if (t == LImage::TIMG)
+        return new LImageTIMGen(colorType);
+    if (t == LImage::LevelEditorGeneric)
+        return new LImageLevelGeneric(colorType);
+    if (t == LImage::AGON)
+        return new LImageAgon(colorType);
+    if (t == LImage::PRIMO)
+        return new LImagePrimo(colorType);
+    if (t == LImage::CGA_HIRES)
+        return new LImageCGAHires(colorType);
 
     qDebug() << "ERROR: LImageFactory could not find type " << t;
     return nullptr;

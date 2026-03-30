@@ -90,8 +90,10 @@ void TRSEDocument::keyPressEvent(QKeyEvent *e) {
 //    qDebug() << (e->key() == 16777249) << e->key() << Qt::Key_S <<(e->modifiers() & Qt::ControlModifier);
     if (((e->key() == Qt::Key_S) &&  ((QApplication::keyboardModifiers() & Qt::ControlModifier)))) {
         SaveCurrent();
+        return;
     }
     if (e->key() == Qt::Key_B &&  (QApplication::keyboardModifiers() & Qt::ControlModifier)) {
+        m_run=false;
         Build();
     }
 
@@ -115,6 +117,7 @@ void TRSEDocument::keyPressEvent(QKeyEvent *e) {
 
 }
 
+
 void TRSEDocument::UserDefined()
 {
     QProcess p;
@@ -133,11 +136,12 @@ void TRSEDocument::UserDefined()
         if (m_projectIniFile->getString("main_ras_file")!=m_currentFileShort)
             src = m_currentDir+ m_projectIniFile->getString("main_ras_file");
 
-
-
-    paramsStr = paramsStr.replace("@prg", src.replace(".ras", "."+m_programEndingType)).trimmed();
     QStringList params = paramsStr.split(" ");
-    p.startDetached(cmd,params);
+    for (auto& param : params) {
+        if (param.startsWith("@prg"))
+            param = param.replace("@prg", src.replace(".ras", "."+m_programEndingType)).trimmed();
+    }
+    p.startDetached(cmd, params);
     p.waitForFinished();
 
 }

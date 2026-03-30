@@ -23,7 +23,10 @@
 #include "source/LeLib/util/util.h"
 #include "source/Compiler/syntax.h"
 
-void ImageLevelEditor::SetLevel(QPoint f)
+
+CharmapLevel ImageLevelEditor::m_copyLevel;
+
+void ImageLevelEditor::SetLevel(QPoint f, bool updateUi)
 {
     // Clamp
     f.setX(Util::clamp(f.x(), 0, m_meta.m_sizex-1));
@@ -34,25 +37,41 @@ void ImageLevelEditor::SetLevel(QPoint f)
         return;
     m_currentLevel = m_levels[f.x() + f.y()*m_meta.m_sizex];
 
-//    qDebug() << "Current colors:";
+//    qDebug() << "Current colors:" ;
+    first = false;
+    if (!updateUi)
+        return;
 
     for (int i=0;i<3;i++)
-        if (i<m_currentLevel->m_ExtraData.count())
+        if (i<m_currentLevel->m_ExtraData.length()) {
            m_colorList.setPen(i,m_currentLevel->m_ExtraData[i]);
+           if (m_charset!=nullptr)
+               m_charset->m_colorList.setPen(i,m_currentLevel->m_ExtraData[i]);
+        }
+
+//    qDebug() << "** Manual INIPENS" <<m_colorList.getPenList() <<&m_colorList;
+//    MultiColorImage::InitPens();
+    if (updateUi)
+        m_colorList.UpdateUI();
+
+  //  qDebug() << "** Manual INIPENS end";
 
 //        qDebug() << QString::number(m_currentLevel->m_ExtraData[i]);
     if (m_charset==nullptr)
         return;
 
-    m_colorList.m_ignoreSetIsMulti = true;
+//    qDebug() << "HERE "<< m_currentLevel->m_ExtraData.length();
 
-    if (m_currentLevel->m_ExtraData.count()>=3) {
+    m_colorList.m_ignoreSetIsMulti = true;
+    if (m_currentLevel->m_ExtraData.length()>=3) {
+
         if (!(m_type==LImage::LevelEditorNES || m_type==LImage::LevelEditorGameboy )) {
             m_charset->SetColor(m_currentLevel->m_ExtraData[0], 0);
             m_charset->SetColor(m_currentLevel->m_ExtraData[1], 1);
             m_charset->SetColor(m_currentLevel->m_ExtraData[2], 2);
         }
         else {
+//            qDebug() << "Setting colors in setlevel";
             SetColor(m_currentLevel->m_ExtraData[0], 0);
             SetColor(m_currentLevel->m_ExtraData[1], 1);
             SetColor(m_currentLevel->m_ExtraData[2], 2);
@@ -64,6 +83,7 @@ void ImageLevelEditor::SetLevel(QPoint f)
             qDebug() << "Extra data" << QString::number(m_extraCols[i]);
     }
 */
+    first = true;
 }
 
 ImageLevelEditor::ImageLevelEditor(LColorList::Type t)  : MultiColorImage(t)
@@ -87,6 +107,8 @@ ImageLevelEditor::ImageLevelEditor(LColorList::Type t)  : MultiColorImage(t)
     m_supports.asmExport = false;
     m_supports.koalaExport = false;
     m_supports.koalaImport = false;
+    m_supports.tilestamp = true;
+    m_supports.d800_limit = false;
 
     m_GUIParams[btnLoadCharset] ="Load Charset";
     m_GUIParams[btn1x1] = "";
@@ -108,6 +130,8 @@ ImageLevelEditor::ImageLevelEditor(LColorList::Type t)  : MultiColorImage(t)
     m_supports.displayCharOperations = false;
     m_supports.displayDefaultClearButton = true;
 
+
+    m_colorList.m_supportsFooterPen = true;
     m_metaParams.append(new MetaParameter("screen_width","Screen width",20,2,1000));
     m_metaParams.append(new MetaParameter("screen_height","Screen height",10,2,1000));
     m_metaParams.append(new MetaParameter("levels_x","Levels x",4,1,100));
@@ -117,15 +141,21 @@ ImageLevelEditor::ImageLevelEditor(LColorList::Type t)  : MultiColorImage(t)
     m_metaParams.append(new MetaParameter("data_extra","Extra data",3,0,1000));
     m_metaParams.append(new MetaParameter("use_colors","Colour data is stored with level data",1,1,1));
 
+    m_colorList.m_isLevelEditor = true;
+
+
     EnsureSystemColours();
+    m_clearWithCurrentChar = true;
+//    m_colorList.SetC64Pens(m_meta.m_displayMultiColor,true);
+//    m_colorList.SetC64Pens(mul)
 }
 
 void ImageLevelEditor::ReInitialize()
 {
 //    m_meta = meta;
-    m_meta.Calculate();
-//    qDebug() << meta.m_width;
-  //  qDebug() << meta.dataSize();
+//    m_meta.Calculate();
+  //  qDebug() << m_meta.m_width <<m_meta.m_sizex;
+  //  qDebug() << m_meta.dataSize();
     m_levels.resize(m_meta.m_sizex*m_meta.m_sizey);
     for (int i=0;i<m_meta.m_sizex;i++)
         for (int j=0;j<m_meta.m_sizey;j++)
@@ -148,10 +178,18 @@ void ImageLevelEditor::ReInitialize()
 
 }
 
+
 QString ImageLevelEditor::GetCurrentDataString() {
     int curPos = (m_currentLevelPos.x() + m_currentLevelPos.y()*m_meta.m_sizex);
     return " Room " + QString::number(m_currentLevelPos.x())+","+QString::number(m_currentLevelPos.y())
             + " ("+ QString::number(curPos) +  ")";
+}
+
+void ImageLevelEditor::setBasePixel(int x, int y)
+{
+    int pos;
+    PixelToPos(x,y,pos,m_meta.m_width, m_meta.m_height);
+    m_basePixel = curPos;
 }
 
 void ImageLevelEditor::CtrlLeftShift(int x, int y)
@@ -166,15 +204,68 @@ void ImageLevelEditor::CtrlLeftShift(int x, int y)
 
 }
 
+void ImageLevelEditor::ShiftXY(int dx, int dy)
+{
+    CopyChar();
+    for (int j=0;j<m_meta.m_height; j++)
+        for (int i=0;i<m_meta.m_width; i++) {
+            int pos = i + j*m_meta.m_width;
+            int ix = (i-dx+m_meta.m_width)%m_meta.m_width;
+            int iy = (j-dy+m_meta.m_height)%m_meta.m_height;
+            int np = ix + iy*m_meta.m_width;
+            m_currentLevel->m_CharData[pos] = m_copyLevel.m_CharData[np];
+            m_currentLevel->m_CharDataHi[pos] = m_copyLevel.m_CharDataHi[np];
+            m_currentLevel->m_ColorData[pos] = m_copyLevel.m_ColorData[np];
+        }
+}
+
+void ImageLevelEditor::CopyChar()
+{
+    m_copyLevel = *m_currentLevel;
+}
+
+void ImageLevelEditor::PasteChar()
+{
+    //        m_copyLevel = *m_currentLevel;
+    if (m_copyLevel.m_CharData.length()!=0) {
+
+        if (m_currentLevel->m_CharData.length()!=m_copyLevel.m_CharData.length())
+            return;
+
+       *m_currentLevel = m_copyLevel;
+        m_currentLevel->m_CharData = m_copyLevel.m_CharData;
+        m_currentLevel->m_CharDataHi = m_copyLevel.m_CharDataHi;
+        m_currentLevel->m_ColorData = m_copyLevel.m_ColorData;
+    }
+}
+void ImageLevelEditor::InitPens()
+{
+    if (first) {
+        SetColor(m_colorList.getPen(0),0);
+        SetColor(m_colorList.getPen(1),1);
+        SetColor(m_colorList.getPen(2),2);
+        first = false;
+    }
+    MultiColorImage::InitPens();
+    SetColor(m_colorList.getPen(0),0);
+    SetColor(m_colorList.getPen(1),1);
+    SetColor(m_colorList.getPen(2),2);
+
+//    SetLevel(m_currentLevelPos);
+}
+
 void ImageLevelEditor::SetColor(uchar col, uchar idx)
 {
     if (m_charset==nullptr)
         return;
 
-//    qDebug() << "SetColor being set..." << QString::number(col) << " and " << QString::number(idx);
+//    if (idx==2)
+  //      qDebug() << "imageleveeditorr "<< (int)col <<(int)idx;
 
-    if (m_currentLevel->m_ExtraData.count()>=3) {
+//    qDebug() <<"extradata length: " <<m_currentLevel->m_ExtraData.length();
+    if (m_currentLevel->m_ExtraData.length()>=3) {
         m_currentLevel->m_ExtraData[idx] = col;
+//        qDebug() << "Setting : "<<QString::number(idx) << " to col " <<QString::number(col);
     }
     /*
     m_extraCols[idx] = col;
@@ -191,10 +282,10 @@ void ImageLevelEditor::SetColor(uchar col, uchar idx)
     m_charset->SetColor(col, idx);
 }
 
-void ImageLevelEditor::Clear()
+void ImageLevelEditor::Clear(int val=0)
 {
     if (m_currentLevel!=nullptr)
-        m_currentLevel->Clear();
+        m_currentLevel->Clear(val);
 }
 
 void ImageLevelEditor::SaveBin(QFile &file)
@@ -208,13 +299,16 @@ void ImageLevelEditor::SaveBin(QFile &file)
 
     for (CharmapLevel* l : m_levels) {
         file.write( l->m_CharData);
+        if (m_meta.m_is16bit)
+            file.write( l->m_CharDataHi);
+
         if (m_meta.m_useColors)
            file.write( l->m_ColorData);
 
 //        qDebug() << "LevelEditor::savebin count " <<l->m_ColorData.count();
 //        qDebug() << "ImageLevelEditor exportbin " << l->m_ExtraData.count();
 
-        if (l->m_ExtraData.count()!=0)
+        if (l->m_ExtraData.length()!=0)
             file.write( l->m_ExtraData,m_meta.m_extraDataSize);
       //  for (int i=0;i<m_meta.m_extraDataSize;i++)
     //        qDebug() << "Saving extracol: " <<QString::number(l->m_ExtraData[i]);
@@ -238,7 +332,7 @@ void ImageLevelEditor::ExportBin(QFile &file)
         if (m_meta.m_useColors)
            file.write( l->m_ColorData);
 
-        if (l->m_ExtraData.count()!=0)
+        if (l->m_ExtraData.length()!=0)
             file.write( l->m_ExtraData,m_meta.m_extraDataSize);
 
     }
@@ -257,13 +351,14 @@ void ImageLevelEditor::LoadBin(QFile &file)
     for (CharmapLevel* l : m_levels) {
 
         l->m_CharData = file.read(m_meta.dataSize());
+        if (m_meta.m_is16bit)
+            l->m_CharDataHi = file.read(m_meta.dataSize());
+
         if (m_meta.m_useColors)
             l->m_ColorData = file.read(m_meta.dataSize());
         if (m_meta.m_extraDataSize!=0)
             l->m_ExtraData = file.read(m_meta.m_extraDataSize);
-
-
-
+//        qDebug() << "Loading extradatasize "<<m_meta.m_extraDataSize;
 //        for (int i=0;i<m_meta.m_extraDataSize;i++)
   //          qDebug() << "Saving extracol: " <<QString::number(l->m_ExtraData[i]);
 
@@ -276,6 +371,7 @@ void ImageLevelEditor::LoadBin(QFile &file)
     m_charHeight = m_meta.m_height;
     m_charWidthDisplay = m_meta.m_width;
     m_charHeightDisplay = m_meta.m_height;
+    first=true;
 
 }
 
@@ -292,7 +388,7 @@ void ImageLevelEditor::BuildData(QTableWidget *tbl, QStringList header)
     int j=0;
     if (m_currentLevel == nullptr)
         return;
-    for (int k=3;k<m_currentLevel->m_ExtraData.count();k++) {
+    for (int k=3;k<m_currentLevel->m_ExtraData.length();k++) {
         tbl->setItem(i,j,new QTableWidgetItem(QString::number(m_currentLevel->m_ExtraData[k])));
         if (++i>=size) {
             i=0;
@@ -309,7 +405,7 @@ void ImageLevelEditor::StoreData(QTableWidget *tbl)
     int j=0;
     if (m_currentLevel==nullptr)
         return;
-    for (int k=3;k<m_currentLevel->m_ExtraData.count();k++) {
+    for (int k=3;k<m_currentLevel->m_ExtraData.length();k++) {
         if (tbl->item(i,j)==nullptr)
                 return;
         uchar val = tbl->item(i,j)->text().toInt();
@@ -379,13 +475,23 @@ CharmapLevel *ImageLevelEditor::getLevel(int i, int j)
 QVector<QPixmap> ImageLevelEditor::CreateIcons()
 {
     QVector<QPixmap> lst;
+    auto keep = m_currentLevelPos;
+    m_footer.set(LImageFooter::POS_DISPLAY_CHAR,0);
     for (int i=0;i<m_meta.m_sizex;i++)
         for (int j=0;j<m_meta.m_sizey;j++) {
-            QImage img = getLevel(i,j)->createImage(64,m_colorList,m_meta.m_width, m_meta.m_height);
+            bool hasBorder = false;
+            if (m_currentLevelPos.x() ==i && m_currentLevelPos.y()==j)
+                hasBorder = true;
+   //         QImage img = getLevel(i,j)->createImage(64,m_colorList,m_meta.m_width, m_meta.m_height, hasBorder);
+            SetLevel(QPoint(i,j));
+            QImage img = QImage(m_width,m_height,QImage::Format_ARGB32);
+//            ToQImage(m_colorList,img,0,QPointF(m_width/2,m_height/2));
+            ToQImage(m_colorList,img,1,QPoint(0,0));
             QPixmap pixmap = QPixmap::fromImage(img);
             //QIcon icon(pixmap);
             lst.append(pixmap);
         }
+    SetLevel(keep);
     return lst;
 }
 
@@ -449,6 +555,8 @@ bool ImageLevelEditor::PixelToPos(int x, float y, int& pos, int w, int h)
   //  qDebug() <<m_meta.m_width;
 
     pos = x + (int)y*w;
+    curPos.setX(x);
+    curPos.setY(y);
     if ((pos<0 || pos>=w*h))
         return false;
 
@@ -510,6 +618,22 @@ void ImageLevelEditor::setPixel(int x, int y, unsigned int color)
 
 
 
+    int sx = fmax(m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+    int sy = fmax(m_footer.get(LImageFooter::POS_CURRENT_STAMP_X),1);
+//    qDebug() << sx<<sy;
+    int w = fmax(m_footer.get(LImageFooter::LImageFooter::POS_CHARSET_WIDTH),1);
+    int tx = fmax(m_footer.get(LImageFooter::LImageFooter::POS_CURRENT_DISPLAY_X),1);
+    int ty = fmax(m_footer.get(LImageFooter::LImageFooter::POS_CURRENT_DISPLAY_Y),1);
+
+//    qDebug() << tx << ty;
+
+    int dx = (m_basePixel.x())%sx;
+    int dy = (m_basePixel.y())%sy;
+
+    int shift = (tx*(sx+curPos.x()-dx))%sx + (ty*((sy+curPos.y()-dy))%sy)*w;
+    // subtract mouse pos
+
+
 //    qDebug() << QString::number(m_currentChar);
     if (m_currentLevel==nullptr)
         return;
@@ -520,9 +644,9 @@ void ImageLevelEditor::setPixel(int x, int y, unsigned int color)
     }
 
 
-    if (m_writeType==Character || m_forcePaintColorAndChar)
-        m_currentLevel->m_CharData[pos] = m_currentChar;
-    if (m_writeType==Color || m_forcePaintColorAndChar)
+    if (m_classvariableType==Character || m_forcePaintColorAndChar)
+        m_currentLevel->m_CharData[pos] = m_currentChar + shift;
+    if (m_classvariableType==Color || m_forcePaintColorAndChar)
         m_currentLevel->m_ColorData[pos] = color;
 
     //BuildImage();
@@ -533,14 +657,15 @@ unsigned int ImageLevelEditor::getPixel(int x, int y)
     if (m_charset==nullptr)
         return 0;
     int pos;
+    m_charset->m_footer.set(LImageFooter::POS_DISPLAY_CHAR,0);
     if (!PixelToPos(x,y, pos,m_meta.m_width, m_meta.m_height))
         return 0; // out of bounds
 
-    int cx = m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_X);
+    float cx = m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_X);
     int cy = m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_Y);
 
     int shift=0;
-    shift += (x%16)/(16/cx);
+    shift += (x%16)/(16/((int)cx));
     shift += ((y%16)/(16/cy))*m_charWidthDisplay;
   //  shift += ((y%cy)/8)*40;
 //    if (x%cx>=8) shift+=1;
@@ -549,89 +674,81 @@ unsigned int ImageLevelEditor::getPixel(int x, int y)
     int ss = m_scale;
 
     uchar v = m_currentLevel->m_CharData[pos];
+    int cpos = v + shift;
     uchar col=0;
-    if (m_meta.m_useColors) {
-        // Colors per level
+    if (m_meta.m_useColors)
         col = m_currentLevel->m_ColorData[pos];
-    }
-//    else {
-        // COlors per CHAR
-//        m_charset->setMultiColor(true);
 
+    else col = m_charset->m_data[cpos].c[3];
+
+    if (m_classvariableType == LevelCharacter) {
+        return v;
+    }
+
+//    if (col>=8) {
+//        cx/=2;
   //  }
-    pos = v + shift;
 
     int bitmask = 1;
     if (m_meta.m_displayMultiColor)
         bitmask  = 3;
 
-    if (!m_meta.m_useColors) {
-        col = m_charset->m_data[pos].c[3];
-    }
-    else {
-        // Check if level colour is >8 etc, set hires or mc
-        if (col>=8)
+
+    if (m_colorList.m_isHybridMode) {
+        if (col>=8) {
             ss = 2;
+            bitmask = 3;
+        }
         else {
             ss = 1;
             bitmask = 1;
         }
-
     }
 
 
-
-
-/*    if (!m_meta.m_useColors)
-    if (m_meta.m_displayMultiColor) {
-        if (col>=8)
-            m_charset->setMultiColor(true);
-        else {
-            m_charset->setMultiColor(false);
-            ss = 1;
-        }
-    }
-*/
-
-//    m_charset->setMultiColor(true);
-//    int scaleX = m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_X);
-//    int scaleY = m_footer.get(LImageFooter::POS_CURRENT_DISPLAY_Y);
-    int ix = ((x*cx/2) % (8)/ss)*ss;//- (dx*40);
+    int ix = (((int)(x*cx/2) % (8)/ss))*ss;//- (dx*40);
     int iy = (y*cy/2) % 8;//- (dy*25);
 
- //   return pc.get(m_scale*ix, iy, m_bitMask);
 
-//    if (ix>m_meta.m_width)
-  //      return 0;
+    //m_charset->m_data[pos].c[3] = col;
+    uint val = m_charset->m_data[cpos].get(ix, iy,bitmask);
+    uint pval = m_charset->m_data[cpos].getByteValue(ix, iy,bitmask);
 
-
-    m_charset->m_data[pos].c[3] = col;
-
-    uint val = m_charset->m_data[pos].get(ix, iy,bitmask);
-
-    if (m_meta.m_useColors) {
-        if (m_meta.m_displayMultiColor) {
-            if (col<8) // Non-multicolor
-                if (val!=getBackground())
-                    val = col;
+    uchar aux1 = m_colorList.getPen(1);
+    uchar aux2 = m_colorList.getPen(2);
+    if (m_currentLevel->m_ExtraData.size()>=2)
+        aux1 = m_currentLevel->m_ExtraData[1];
+    if (m_currentLevel->m_ExtraData.size()>=3)
+        aux2 = m_currentLevel->m_ExtraData[2];
+ //   if (rand()%1000>998)
+   //     qDebug() << (int)aux1 << aux2;
+  //  if (!m_meta.m_useColors) {
+//        aux1 = m_charset->m_data[cpos].c[1];
+  //      aux2 = m_charset->m_data[cpos].c[2];
+    //}
+    if (!isMultiColor())
+    if (val!=getBackground()) {
+        val = col;
+        if (m_charset->m_colorList.m_isHybridMode) {
+            if (val>=8) {
+                val &=7;
+                if (pval==0b10)
+                    val = aux1;
+                if (pval==0b01)
+                    val = aux2;
+            }
         }
-        else
-            if (val!=getBackground())
-                val = col;
     }
 
     if (dynamic_cast<LImageMetaChunk*>(m_charset)!=nullptr) {
-
-
         val = m_charset->getCharPixel(v, col, x,y);
             if (m_charset->m_footer.get(LImageFooter::POS_DISPLAY_MULTICOLOR)!=1)
                 if (val!=getBackground())
                     val = col;
     }
 
-
     if (m_meta.m_useColors) {
-        if (val==m_charset->m_data[pos].c[3] && val!=getBackground())
+        if (val==m_charset->m_data[cpos].c[3] && val!=getBackground())
         //if (val !=0  && val!=m_background)
         {
             val = col&0b00000111;
@@ -653,7 +770,7 @@ void ImageLevelEditor::CopyFrom(LImage *mc)
     if (c!=nullptr) {
         if (c->m_charset==nullptr)
             return;
-
+        m_aspect = c->m_aspect;
         m_width = c->m_width;
         m_height = c->m_height;
         CharmapGlobalData d = c->m_meta;
@@ -681,15 +798,17 @@ void ImageLevelEditor::CopyFrom(LImage *mc)
         m_charset = c->m_charset;
         m_charWidthDisplay = c->m_charWidthDisplay;
         m_gridWidthDisplay = c->m_gridWidthDisplay;
-        m_writeType = c->m_writeType;
+        m_classvariableType = c->m_classvariableType;
 //        for (int i=0;i<4;i++)
   //          m_extraCols[i] = c->m_extraCols[i];
         //SetLevel(QPoint(0,0));
         m_currentLevelPos = c->m_currentLevelPos;
-        SetLevel(m_currentLevelPos);
+        SetLevel(m_currentLevelPos, false);
         renderPathGrid = c->renderPathGrid;
         m_scale = c->m_scale;
         m_colorList.CopyFrom(&c->m_colorList);
+        m_colorList.m_isLevelEditor = mc->m_colorList.m_isLevelEditor;;
+
     }
     else
     LImage::CopyFrom(mc);
@@ -701,6 +820,8 @@ void ImageLevelEditor::onFocus()
     if (m_charsetFilename!="") {
         LoadCharset(m_charsetFilename,0);
         setMultiColor(m_meta.m_displayMultiColor);
+        if (m_charset!=nullptr)
+            m_charset->m_colorList.m_isLevelEditor = true;
     }
 
 }
@@ -719,7 +840,7 @@ void ImageLevelEditor::Resize(CharmapGlobalData newMeta)
         m_meta.m_extraDataSize = 3+m_meta.m_dataChunkSize*m_meta.m_dataChunks;
         m_meta.Calculate();
         for (int i=0;i<m_meta.m_sizex*m_meta.m_sizey;i++) {
-            int k = m_levels[i]->m_ExtraData.count();
+            int k = m_levels[i]->m_ExtraData.length();
             QByteArray newData;
             newData.resize(m_meta.m_extraDataSize);
             newData.fill(0);
@@ -728,7 +849,7 @@ void ImageLevelEditor::Resize(CharmapGlobalData newMeta)
                     int nidx = 3+j*m_meta.m_dataChunkSize+k;
                     int oidx = 3+j*odcs + k;
                     char val = 0;
-                    if (oidx<m_levels[i]->m_ExtraData.count() &&
+                    if (oidx<m_levels[i]->m_ExtraData.length() &&
                        j<odc && k<odcs)
                         val=m_levels[i]->m_ExtraData[oidx];
                     //qDebug() << odcs << " vs "  <<m_meta.m_dataChunkSize << " and k " << k << " :  " << QString::number(val) ;
@@ -795,9 +916,10 @@ int CharmapGlobalData::dataSize() const
     return m_dataSize;
 }
 
-QImage CharmapLevel::createImage(int size, LColorList& lst, int width, int height)
+QImage CharmapLevel::createImage(int size, LColorList& lst, int width, int height, bool hasBorder)
 {
     QImage img = QImage(size, size, QImage::Format_ARGB32);
+    QColor border = Qt::yellow;
     for (int i=0;i<size;i++)
         for (int j=0;j<size;j++) {
             QColor c = QColor(0,0,0);
@@ -806,13 +928,19 @@ QImage CharmapLevel::createImage(int size, LColorList& lst, int width, int heigh
             int pos = x+ width*y;
             uchar val = 32;
             uchar colval = 0;
-            if (pos>=0 && pos<m_CharData.count()) {
+            if (pos>=0 && pos<m_CharData.length()) {
                 val = m_CharData[pos];
                 colval = m_ColorData[pos];
             }
             if (val==32)
                 colval = 0;
             img.setPixel(i,j, lst.get(colval).color.rgba());
+            if (hasBorder) {
+                int sz = size/12;
+                if (i<sz || i>size-sz || j<sz || j>size-sz)
+                    img.setPixel(i,j, border.rgba());
+
+            }
         }
 
     return img;

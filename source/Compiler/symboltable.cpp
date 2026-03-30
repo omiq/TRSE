@@ -25,36 +25,25 @@
 bool SymbolTable::isInitialized = false;
 int SymbolTable::m_currentSid = 0;
 QString Symbol::s_currentProcedure = "";
-QMap<QString,int> SymbolTable::s_classSizes;
+QHash<QString,int> SymbolTable::s_classSizes;
+int SymbolTable::pass = 0;
+QStringList SymbolTable::s_ignoreUnusedSymbolWarning;
+//QStringList SymbolTable::m_forwardedVariables;
+//QHash<QString, QSharedPointer<Symbol>> SymbolTable::m_forwardedSymbols;
 
 
-//QString SymbolTable::m_gPrefix = "";
-//QMap<QString,QSharedPointer<Symbol>> SymbolTable::m_constants;
 
 SymbolTable::~SymbolTable() {
-/*    for (QString s: m_symbols.keys())
-        delete m_symbols[s];
-    m_symbols.clear();
-
-    for (QString s: m_constants.keys())
-        delete m_constants[s];
-    m_constants.clear();
-
-    for (QString s: m_records.keys())
-        delete m_records[s];
-    m_records.clear();
-*/
     Delete();
 }
 
 void SymbolTable::ExitProcedureScope(bool removeSymbols) {
-    // "TRUE" doesn't work
     if (removeSymbols)
-    for (QString s: m_symbols.keys()) {
-        if (s.startsWith(m_currentProcedure)) {
-            m_symbols.remove(s);
+        for (QString s: m_symbols.keys()) {
+            if (s.startsWith(m_currentProcedure)) {
+                m_symbols.remove(s);
+            }
         }
-    }
 
 
     m_currentProcedure="";
@@ -76,7 +65,6 @@ void SymbolTable::DefineSid(unsigned int initAddress, unsigned int playAddress) 
     QString play = "SIDFILE_"+s+"_PLAY";
     m_constants[init] = QSharedPointer<Symbol>(new Symbol("$"+QString::number(initAddress,16),"ADDRESS", initAddress));
     m_constants[play] = QSharedPointer<Symbol>(new Symbol("$"+QString::number(playAddress,16),"ADDRESS", playAddress));
-//    qDebug() << "DEFINE SID "<<playAddress;
 
 }
 
@@ -92,10 +80,6 @@ bool SymbolTable::ContainsArrays()
 
 void SymbolTable::Initialize()
 {
-  //  if (isInitialized)
-//        return;
-
-  //  m_constants.clear();
 
     QVector<QSharedPointer<Symbol>> keeps;
     if (
@@ -112,16 +96,21 @@ void SymbolTable::Initialize()
         m_tempPointers.push("tempPointer"+QString::number(i));
 
     QString currentSystem = AbstractSystem::StringFromSystem(Syntax::s.m_currentSystem->m_system).toLower();
-//    qDebug() << currentSystem;
+    //    qDebug() << currentSystem;
     for (QString s: Syntax::s.m_syntaxData.split('\n')) {
         s= s.simplified();
-        if (s.count()==0) continue;
+        if (s.length()==0) continue;
         if (s.startsWith("#")) continue;
         s=s.replace(" ", "");
 
         QStringList data = s.split(";");
         if (data[0].toLower()!="c")
             continue;
+        if (data.count()!=5) {
+            qDebug() << "SymbolTable::Initialize reporting ERROR in syntax.txt";
+            qDebug() << "Line: " << s;
+            exit(1);
+        }
         QString constant = data[1].toUpper();
         QString system = data[2].toLower();
         QString type = data[3].toLower();
@@ -133,72 +122,57 @@ void SymbolTable::Initialize()
             value = values[0];
 
 
-    //    if (constant=="KEY_2")
-      //      qDebug() << system << currentSystem << system.contains(currentSystem);
+        if (Syntax::s.m_currentSystem->systemIsOfType(system.split(","))) {
 
-        if (system.contains(currentSystem)) {
-
-            long ival = Util::NumberFromStringHex(value);
-            if (ival==0 && value.count()>4) {
-//                qDebug() << "IVAL zero so : " << value;
+            ulong ival = Util::NumberFromStringHex(value);
+            if (ival==0 && value.length()>4) {
                 QString tst = value;
                 tst = tst.remove("$");
                 bool ok;
                 ival = tst.toLongLong(&ok,16);
-                if (!ok)
+               if (!ok)
                     ErrorHandler::e.Error("Error reading constant '"+constant+"' with value '"+value+"' in syntax.txt. This should not happen, contant leuat@www.irio.co.uk at once!");
-  //              qDebug() << "OK? " <<ok <<tst;
             }
-//            qDebug() << "TRYING : " << value << ival;
             if (type=="b")
                 m_constants[constant] = QSharedPointer<Symbol>(new Symbol(value,"BYTE", ival));
-            if (type=="a")
+            if (type=="a") {
                 m_constants[constant] = QSharedPointer<Symbol>(new Symbol("^"+value,"ADDRESS", ival));
+            }
             if (type=="i")
                 m_constants[constant] = QSharedPointer<Symbol>(new Symbol(value,"INTEGER", ival));
             if (type=="l")
                 m_constants[constant] = QSharedPointer<Symbol>(new Symbol(value,"LONG", ival));
 
-//            if (constant.toLower().contains("palette"))
-    //            qDebug() << "SYMTAB "<<constant<<value<<ival <<m_constants[constant]->m_value->m_fVal;
-
-//            if (constant=="KEY_2")
-  //              qDebug() << constant << Util::numToHex(value.toInt()));
-
-//            reservedWords.append(Token(TokenType::getType(word), word.toUpper())));
-        }
-
-     }
-//    if (Syntax::s.m_currentSystem->m_system!=AbstractSystem::NES)
-    if (Syntax::s.m_currentSystem->m_system==AbstractSystem::C64 || Syntax::s.m_currentSystem->m_system==AbstractSystem::MEGA65)
-    if (!m_constants.contains("SIDFILE_1_INIT")) {
-        for (int i=1;i<10;i++) {
-           if (!m_constants.contains("SIDFILE_"+QString::number(i)+"_INIT")) {
-               m_constants["SIDFILE_"+QString::number(i)+"_INIT"] = QSharedPointer<Symbol>(new Symbol("","ADDRESS", 0));
-               m_constants["SIDFILE_"+QString::number(i)+"_PLAY"] = QSharedPointer<Symbol>(new Symbol("","ADDRESS", 0));
-//               qDebug() << "Redefining : "<<i;
-
-           }
         }
 
     }
+    if (Syntax::s.m_currentSystem->m_system==AbstractSystem::C64 || Syntax::s.m_currentSystem->m_system==AbstractSystem::MEGA65 ||  Syntax::s.m_currentSystem->m_system==AbstractSystem::C128)
+        if (!m_constants.contains("SIDFILE_1_INIT")) {
+            for (int i=1;i<10;i++) {
+                if (!m_constants.contains("SIDFILE_"+QString::number(i)+"_INIT")) {
+                    m_constants["SIDFILE_"+QString::number(i)+"_INIT"] = QSharedPointer<Symbol>(new Symbol("","ADDRESS", 0));
+                    m_constants["SIDFILE_"+QString::number(i)+"_PLAY"] = QSharedPointer<Symbol>(new Symbol("","ADDRESS", 0));
+                    //               qDebug() << "Redefining : "<<i;
+
+                }
+            }
+
+        }
 
     if (Syntax::s.m_currentSystem->m_system == AbstractSystem::C64 )
-    for (unsigned char key: Syntax::s.m_c64keys.keys()) {
-        C64Key k = Syntax::s.m_c64keys[key];
-        m_constants[k.m_key] = QSharedPointer<Symbol>(new Symbol(QString::number(k.m_value), "BYTE",  k.m_value));
-    }
-//    qDebug()  << Util::numToHex(m_constants["KEY_2"]->m_value->m_fVal);
+        for (unsigned char key: Syntax::s.m_c64keys.keys()) {
+            C64Key k = Syntax::s.m_c64keys[key];
+            m_constants[k.m_key] = QSharedPointer<Symbol>(new Symbol(QString::number(k.m_value), "BYTE",  k.m_value));
+        }
 
 
     if (
             (Syntax::s.m_currentSystem->m_system==AbstractSystem::AMSTRADCPC ||
-            Syntax::s.m_currentSystem->m_system==AbstractSystem::SPECTRUM)
+             Syntax::s.m_currentSystem->m_system==AbstractSystem::SPECTRUM)
             && keeps.count()==3) {
         m_constants["INIT_MUSIC"] = keeps[0];
         m_constants["PLAY_MUSIC"] = keeps[1];
         m_constants["STOP_MUSIC"] = keeps[2];
-//        qDebug() << Util::numToHex(keeps[0]->m_value->m_fVal);
     }
 
 
@@ -208,8 +182,6 @@ void SymbolTable::Initialize()
 void SymbolTable::Merge(SymbolTable *other, bool mergeConstants)
 {
     for (QString k : other->m_records.keys()) {
-//        if (m_records.contains(k) && m_externalRecords.contains(k))
-  //          ErrorHandler::e.Error("Record already defined : '"+k+"'");
         m_records[k] = other->m_records[k];
     }
     for (QString k : other->m_symbols.keys()) {
@@ -217,38 +189,34 @@ void SymbolTable::Merge(SymbolTable *other, bool mergeConstants)
             m_symbols[k] = other->m_symbols[k];
         }
     }
-//    qDebug() << other->m_constants.keys();
     m_globalList.append(other->m_globalList);
     m_globalList.removeDuplicates();
     if (mergeConstants)
-    for (QString k : other->m_constants.keys()) {
+        for (QString k : other->m_constants.keys()) {
 
-        if (!m_constants.contains(k)) {
-            QString newName = k;
-            if (!other->m_constants[k]->m_constIsPrefixed) {
-                newName = other->m_gPrefix.toUpper()+k;
-                other->m_constants[k]->m_constIsPrefixed = true;
+            if (!m_constants.contains(k)) {
+                QString newName = k;
+                if (!other->m_constants[k]->m_constIsPrefixed) {
+                    newName = other->m_gPrefix.toUpper()+k;
+                    other->m_constants[k]->m_constIsPrefixed = true;
+                }
+                m_constants[newName] = other->m_constants[k];
             }
-            m_constants[newName] = other->m_constants[k];
+
+
         }
-
-
-    }
-/*
-    for (QString t : m_symbols.keys())
-        qDebug() << m_symbols[t]->isUsedBy;
-*/
 }
 
 void SymbolTable::Define(QSharedPointer<Symbol> s, bool isUsed) {
 
-//    if (isRegisterName(s->m_name))
- //       return ;
     QString name = m_currentProcedure+ s->m_name;
+    if (m_ignoreAllprefixes)
+        name = s->m_name;
+
     if (isRegisterName(s->m_name))
         name = s->m_name;
 
-//        qDebug() << "Registering : "<<s->m_name;
+    //        qDebug() << "Registering : "<<s->m_name;
     m_symbols[name] = s;
     m_symbols[name]->isUsed = isUsed;
 
@@ -258,35 +226,7 @@ void SymbolTable::Define(QSharedPointer<Symbol> s, bool isUsed) {
 }
 
 void SymbolTable::Delete() {
-/*    for (QString val : m_symbols.keys()) {
-        QSharedPointer<Symbol> s = m_symbols[val];
-        if (s!=nullptr) {
-            if (s->m_value)
-                delete s->m_value;
-
-        }
-        delete s;
-    }*/
     m_symbols.clear();
-    // Delete static constants as well
-/*    if (isInitialized) {
-        for (QString val : m_constants.keys()) {
-            QSharedPointer<Symbol> s = m_symbols[val];
-
-            if (s!=nullptr) {
-                if (s->m_value)
-                    delete s->m_value;
-
-            }
-            delete s;
-        }
-        isInitialized = false;
-
-    }
-    m_constants.clear();
-    */
-//    for (QString s: m_records.keys())
-//        delete m_records[s];
     m_records.clear();
 
 }
@@ -298,11 +238,6 @@ void SymbolTable::setName(QString s) {
 void SymbolTable::InitBuiltins()
 {
 
-/*    m_globalList << "screenmemory" << "sine" << "return";
-     << "log2_table"
-                 << "joystickup" << "joystickdown" << "joystickleft" << "joystickright" <<"joystickbutton"
-                 << "joy1" << "joy1pressed" <<
-*/
     m_addToGlobals = true;
     // Define global methods here
     Define(QSharedPointer<Symbol>(new BuiltInTypeSymbol("INTEGER","")));
@@ -395,19 +330,19 @@ void SymbolTable::InitBuiltins()
         Define(QSharedPointer<Symbol>(new Symbol("copper_bitplane2", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("copper_bitplane3", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("copper_bitplane4", "integer")));
-      //  Define(new Symbol("copper_bitplane0", "integer")));
+        //  Define(new Symbol("copper_bitplane0", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("copper_mod_even", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("copper_mod_odd", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("copper_palette", "integer")));
-//        Define(QSharedPointer<Symbol>(new Symbol("copper_diwstrt", "integer")));
-  //      Define(QSharedPointer<Symbol>(new Symbol("copper_diwstop", "integer")));
+        //        Define(QSharedPointer<Symbol>(new Symbol("copper_diwstrt", "integer")));
+        //      Define(QSharedPointer<Symbol>(new Symbol("copper_diwstop", "integer")));
 
 
         Define(QSharedPointer<Symbol>(new Symbol("ddfstrt", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("ddfstop", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("copper_resolution", "integer")));
         Define(QSharedPointer<Symbol>(new Symbol("copper_custom", "integer")));
-/*        Define(new Symbol("copper_wait_for_raster", "integer")));
+        /*        Define(new Symbol("copper_wait_for_raster", "integer")));
         Define(new Symbol("copper_palette_start", "integer")));
         Define(new Symbol("copper_scroll", "integer")));
 */
@@ -456,16 +391,16 @@ QStringList SymbolTable::getUnusedVariables()
 {
     QStringList lst;
     for (QString s : m_symbols.keys()) {
-        if (!m_symbols[s]->isUsed)
+        if (!m_symbols[s]->isUsed && !s_ignoreUnusedSymbolWarning.contains(s))
             lst<<s;
     }
     return lst;
 }
 
 QSharedPointer<Symbol> SymbolTable::Lookup(QString name, int lineNumber, bool isAddress) {
-//            name = name.toUpper();
+    //            name = name.toUpper();
 
-/*    if (name.toLower()=="_a" || name.toLower()=="_x"  || name.toLower()=="_z")
+    /*    if (name.toLower()=="_a" || name.toLower()=="_x"  || name.toLower()=="_z")
         return nullptr;
 
 */
@@ -486,40 +421,106 @@ QSharedPointer<Symbol> SymbolTable::Lookup(QString name, int lineNumber, bool is
         m_symbols[name] = s;
         return s;
     }
+    bool forceGlobal = false;
+
+    if (name.toLower().startsWith("global_")) {
+        //qDebug() << "FORCE GLOBAL " <<name;
+        //        if (pass==0)
+        name = name.replace("global_","");
+
+    }
+
+    if (name.toLower().startsWith("g_global_")) {
+        //qDebug() << "FORCE GLOBAL " <<name;
+        //        if (pass==0)
+        name = name.replace("g_global_","");
+        if (pass==1) {
+            forceGlobal = true;
+        }
+
+    }
+
 
     QString localName = name;
-    if (!isRegisterName(name))
+    if (!isRegisterName(name) &&!forceGlobal && !m_ignoreAllprefixes) {
         localName = m_currentProcedure+name;
+        //        qDebug() << "LOCAL NAME "<<localName << SymbolTable::pass;
+    }
 
     QString localUnitName = name;
     if (!isRegisterName(name))
         localUnitName = m_currentUnit+name;
 
-//    qDebug() << "SYMTAB "<< localName << name;;
-//    if (name.contains("posX"))
+
+
+    //    qDebug() << "SYMTAB "<< localName << name;;
+    //    if (name.contains("posX"))
     //qDebug() << "SYMTAB ERROR Looking up : "<<name <<localName <<m_symbols.keys();
     name = name.remove("#");
 
-
     if (!m_symbols.contains(name) && !m_symbols.contains(localName)&& !m_symbols.contains(localUnitName)) {
         QString similarSymbol = findSimilarSymbol(name,85,2,QStringList());
-        name = name.remove(m_gPrefix);
-        similarSymbol = similarSymbol.remove(m_gPrefix);
+        if (m_forwardedSymbols.contains(name))
+            return m_forwardedSymbols[name];
+
+
+/*        auto uadd = m_units;
+        if (m_currentUnit!="") uadd<<m_currentUnit;
+        qDebug() << uadd;
+        for (auto unit: uadd) {
+            if (!unit.endsWith("_"))
+               unit+="_";
+            auto globName = name;
+            globName = globName.remove(unit);
+            qDebug() << "SYMTAB " << globName<<unit<<name << m_forwardedSymbols.keys() << similarSymbol << m_symbols.keys();
+            if (m_symbols.contains(globName)) {
+                qDebug() << "Found "<<globName;
+                return m_symbols[globName];
+            }
+        }
+*/
+        // IF you are in a class, you might want to look up a GLOBAL variable in that class
+/*        qDebug() << "SYMTAB 2 " <<m_currentUnit<<name << m_forwardedSymbols.keys() << similarSymbol << m_symbols.keys();
+        qDebug() <<         m_symbols.contains(name);
+*/
+        if (m_currentClass!="") {
+            auto n = name;
+            n = n.replace(m_currentClass+"_", m_currentUnit);
+            if (m_symbols.contains(n))
+                return m_symbols[n];
+            if (m_constants.contains(n))
+                return m_constants[n];
+        }
+        // Check if it is a global variable used from within a class
+        // IN dispatcher.
+
+        if (pass==1)
+            for (auto r:m_units)
+                if (m_symbols.contains(r+"_"+name) ) {
+                    ErrorHandler::e.Error("Could not find global variable '<font color=\"#FF8080\">" + name + "'</font>. If you declared '<font color=\"#FF8080\">"+name+"</font>' as a global procedure variable within a class, then please declare it as '<font color=\"#FF8080\">"+r+"::"+name+"'</font>.", lineNumber);
+                }
+
+
+        similarSymbol = similarSymbol.remove(m_gPrefix).remove(Syntax::s.m_currentSystem->m_renamedVariablePrefix);
+        if (m_constants.contains(similarSymbol))
+            similarSymbol = similarSymbol.remove(Syntax::s.m_currentSystem->m_renamedVariablePrefix.toUpper());
+        name = name.remove(Syntax::s.m_currentSystem->m_renamedVariablePrefix);
         QString em = "";
         if (similarSymbol!="") {
             em+="Did you mean '<font color=\"#A080FF\">"+similarSymbol+"</font>'?<br>";
         }
-//        qDebug() << "SYMTAB HERE " << "NAME "<< name <<   "    LOCALHAME "<< localName <<m_symbols.keys();;
+        //        qDebug() << "SYMTAB HERE " << "NAME "<< name <<   "    UNIT "<< m_currentUnit<<localName <<m_symbols.keys();;
+
+
         ErrorHandler::e.Error("Could not find variable '<font color=\"#FF8080\">" + name + "'</font>.<br>"+em, lineNumber);
         return nullptr;
     }
     if (m_symbols.contains(localUnitName) && !m_symbols.contains(name)) {
-//        qDebug() << "SWITCHING FROM "<<name <<localUnitName;
+        //        qDebug() << "SWITCHING FROM "<<name <<localUnitName;
         name = localUnitName;
     }
-//    qDebug() << "ISUSED " <<  name;
-    if (m_symbols.contains(localName)) {
-    //    qDebug() << "Found local name " << localName;
+    if (m_symbols.contains(localName) &&!forceGlobal) {
+        //    qDebug() << "Found local name " << localName << forceGlobal;
         m_symbols[localName]->setIsUsed();
 
         if (m_symbols.contains(name))
@@ -527,11 +528,14 @@ QSharedPointer<Symbol> SymbolTable::Lookup(QString name, int lineNumber, bool is
         return m_symbols[localName];
 
     }
+
+
     if (m_symbols[name]==nullptr)
         ErrorHandler::e.Error("Could not find variable '<font color=\"#FF8080\">" + name + "'</font>.<br>", lineNumber);
 
     m_symbols[name]->setIsUsed();
-
+    //  if (forceGlobal)
+    //    qDebug() << "ISUSED " <<  name << forceGlobal <<m_symbols[name]->m_name;
     return m_symbols[name];
 }
 
@@ -588,7 +592,7 @@ int SymbolTable::getShiftedPositionOfVariable(QString var, int mul)
         cur+=1;
 
     }
- //   qDebug() << "Counting length for "<<var<<cnt;
+    //   qDebug() << "Counting length for "<<var<<cnt;
     return cnt;
 
 }
@@ -641,6 +645,8 @@ TokenType::Type Symbol::getTokenType() {
         return TokenType::PURE_VARIABLE;
     if (m_type.toLower()=="pure_number")
         return TokenType::PURE_NUMBER;
+    if (m_type.toLower()=="boolean")
+        return TokenType::BOOLEAN;
 
     return TokenType::NADA;
 }
@@ -671,7 +677,7 @@ int Symbol::getLength() {
 void Symbol::setSizeFromCountOfData(int cnt)
 {
     m_size = std::max(cnt,1);
-  //  if (getEndType().toLower()=="record")
+    //  if (getEndType().toLower()=="record")
     //    return;
     m_size*=getCountingLength();
     //qDebug() << "SYMBOL " <<m_name<< getCountingLength()<<cnt<<m_size<<getEndType()<<m_type<<m_arrayTypeText<<m_pointsTo;
@@ -684,7 +690,6 @@ int Symbol::getCountingLength()
     QString type = getEndType();
 
     if (SymbolTable::s_classSizes.contains(type)) {
-//        qDebug() << "SYMBOL END TYPE "<<type<<SymbolTable::s_classSizes[type];
         return SymbolTable::s_classSizes[type];
     }
     int l = 1;
@@ -692,6 +697,9 @@ int Symbol::getCountingLength()
         l = 2;
     if (type.toLower() == "long")
         l = 4;
+    // Actual pointer
+    if (type.toLower() == "pointer")
+        return Syntax::s.m_currentSystem->getPointerSize();
 
 
     return l;
@@ -701,8 +709,11 @@ QString Symbol::getEndType()
 {
     if (m_type.toLower()=="array")
         return m_arrayTypeText;
-    if (m_type.toLower()=="pointer")
-        return m_pointsTo;
+    if (m_type.toLower()=="pointer") {
+        if (m_pointsTo!="")
+            return m_pointsTo;
+        else return "pointer";
+    }
     return m_type;
 }
 
@@ -712,7 +723,7 @@ int SymbolTable::getSize()
     int cnt = 0;
     for (QString s: m_orderedByDefinition) {
         cnt+= m_symbols[s]->m_size;
-//        qDebug() << "Size of "<<s <<m_symbols[s]->m_size;
+        //        qDebug() << "Size of "<<s <<m_symbols[s]->m_size;
     }
 
     return cnt;

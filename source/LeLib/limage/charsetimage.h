@@ -64,15 +64,14 @@ public:
     void LoadCharset(QString file, int skipBytes) override;
 
 
-    CharsetImage* getCharset() override { return this; }
+    LImage* getCharset() override { return this; }
     unsigned int getPixel(int x, int y) override;
 
     void ImportBin(QFile& f) override;
     void ExportBin(QFile& f) override;
     virtual void FromRaw(QByteArray& arr);
     virtual void ToRaw(QByteArray& arr);
-    virtual void ToQPixMaps(QVector<QPixmap>& map);
-    virtual QPixmap ToQPixMap(int chr);
+    virtual QPixmap ToQPixMap(int chr) override;
     virtual void setPixel(int x, int y, unsigned int color) override;
 
     virtual void CreateMagicalCharset() override;
@@ -88,7 +87,7 @@ public:
     void Invert() override;
 
 
-    void RenderEffect(QMap<QString, float> params) override;
+    void RenderEffect(QHash<QString, float> params) override;
 
 //    void CopyFrom(LImage* mc) override;
     bool KeyPress(QKeyEvent *e) override;

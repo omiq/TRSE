@@ -1,0 +1,111 @@
+program Level;
+
+/*
+
+	Loads a level (image/level1.flf) and displays it 
+
+
+*/
+
+@use "music/adlibplayer"
+@use "system/screen"
+@use "system/memory"
+@use "system/compression"
+@use "system/file"
+@use "gfx/genericlevels"
+
+
+@export "images/tiles1.flf" "images/tiles1.bin" 256
+// Lz4-compress the image to a new file
+@compress "images/tiles1.bin" "images/tiles1_c.bin"
+
+@export "images/level1.flf" "images/level1.bin" 256
+
+
+var
+	
+	filename1 : string="images/tiles1_c.BIN";
+	// Palette file is automatically exported as well
+	palette1 : string="IMAGES/tiles1.pal";
+	
+	levels : incbin("images/level1.bin");
+	
+	l: GenericLevels::Level;
+	
+	f1 : File::File;
+	pos : integer;
+	curx,xx,yy,dx,i,xscroll : byte = 0;
+	scr,keep,zp,zp2 : ^byte;
+	
+	const width : byte = 16;
+
+procedure Render();
+begin
+	xx := curx/width;
+	dx := mod(curx,width);
+	pos:=0;
+	for i:=0 to 19 do
+	begin
+		l.RenderLevelStrip(xx,0, 16,16,dx, pos);
+		pos+=width;
+		dx+=1;
+		if (dx=width) then
+		begin
+			dx:=0;
+			xx+=1;
+		end;
+	end;
+	// Fill black borders
+	zp:=keep;
+	zp2:=zp+(320-16);
+	for i:=0 to 200 do
+	begin
+		fill(zp,0,16);
+		fill(zp2,0,16);
+		zp2+=320;
+		zp+=320;
+	end;
+	waitforverticalblank();
+	
+	memcpy32(keep, scr,16000);
+	
+	
+end;
+
+
+
+begin
+	Memory::Init();
+	Screen::SetMode($13);
+	Screen::InitVGABuffers(3);
+	// Load palette from file
+	File::SetPaletteFromFile(#palette1);		
+	scr := ptr(#Screen::VGA, 0);
+	keep := Screen::buffer2;
+	// Open compressed file and read all to a buffer
+	File::ReadAllLarge(#filename1, Screen::buffer1);
+	// Decomress data from buffer to screen	
+	Compression::Decompress(Screen::buffer1,Screen::buffer3);
+
+	
+	setpalette(0,0,0,0);
+
+	l.ReadHeader(#levels);
+	Tiles::SetTileLoc(Screen::buffer3);
+	
+	// Loop infinitely
+	while (true) do 
+	begin
+		asm(";here");
+		Screen::buffer2:= keep-xscroll+16;
+//		Screen::buffer2+=16;
+		Render();
+		xscroll+=1;
+		if (xscroll=16) then
+		begin
+			xscroll:=0;
+			curx+=1;
+
+		end;
+	end;
+end.

@@ -35,7 +35,6 @@ var
 //	textcols : array[7] of byte = (7,4,4,3,3,11, 11);
 
 
-@donotremove zp2
 
 @define roadBlock $3D
 
@@ -816,7 +815,7 @@ begin
 
 	asm("
 		
-		ldy a
+		ldy varPrefixed_a
 pwl:		tya
 		adc ms_shift
 		and #7
@@ -826,7 +825,7 @@ pwl:		tya
 		sta (p1),y
 		
 		iny
-		cpy b
+		cpy varPrefixed_b
 		bne pwl
 
 	");

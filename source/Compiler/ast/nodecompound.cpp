@@ -20,7 +20,7 @@
 */
 
 #include "nodecompound.h"
-
+#include "nodebuiltinmethod.h"
 
 void NodeCompound::ExecuteSym(QSharedPointer<SymbolTable>  symTab) {
     Pmm::Data::d.Set(m_op.m_lineNumber, m_op.m_currentLineText);
@@ -30,9 +30,50 @@ void NodeCompound::ExecuteSym(QSharedPointer<SymbolTable>  symTab) {
     }
 }
 
-void NodeCompound::ReplaceInline(Assembler* as,QMap<QString, QSharedPointer<Node> > &inp)
+void NodeCompound::FindPotentialSymbolsInAsmCode(QStringList &lst) {
+    for (auto n : children)
+        n->FindPotentialSymbolsInAsmCode(lst);
+
+}
+
+void NodeCompound::ReplaceVariable(Assembler *as, QString name, QSharedPointer<Node> node)
+{
+    Node::ReplaceVariable(as,name,node);
+    for (auto n:children)
+        n->ReplaceVariable(as,name,node);
+}
+
+void NodeCompound::ReplaceInline(Assembler* as,QHash<QString, QSharedPointer<Node> > &inp)
 {
     for (auto n: children)
         n->ReplaceInline(as, inp);
+}
+
+void NodeCompound::ReplaceInlineAssemblerVariables(Assembler *as, QString var, QString val)
+{
+    for (auto n: children)
+        n->ReplaceInlineAssemblerVariables(as, var, val);
+
+}
+
+void NodeCompound::ResetInlineAssembler()
+{
+    for (auto n: children)
+        n->ResetInlineAssembler();
+
+}
+
+bool NodeCompound::Optimize() {
+    QVector<QSharedPointer<Node>> removal;
+    for (auto n: children) {
+        if (n->Optimize())
+            removal.append(n);
+    }
+//    children.remove(removal);
+    for (auto n: removal) {
+        qDebug() << "Optimizing...";
+        children.removeAll(n);
+    }
+    return false;
 }
 

@@ -9,10 +9,10 @@ void Orgasm::LoadFile(QString filename) {
     QFile f(filename);
     f.open(QFile::ReadOnly);
     m_source=f.readAll();
-
     ProcessSource();
     f.close();
     m_lines = m_source.split("\n");
+
     m_pCounter = 0;
     m_done = false;
     m_constantPassLines = -1;
@@ -30,7 +30,7 @@ void Orgasm::LoadCodes(int CPUFlavor)
     QString all = f.readAll();
    // qDebug() << filename << all;
     f.close();
-    for (QString s: all.split("\n")) {
+    for (QString& s: all.split("\n")) {
         s = s.trimmed().simplified().toLower();
         if (s=="") continue;
         if (s.startsWith("#")) continue;
@@ -51,33 +51,79 @@ void Orgasm::LoadCodes(int CPUFlavor)
 
 void Orgasm::ProcessSource()
 {
-  //  QElapsedTimer t;
-    //t.start();
     for (int i=0;i<256;i++) {
         QString r = "#P"+QString::number(i)+";";
-//        m_source = m_source.replace(r,QChar(i));
         m_source = m_source.replace(r,"\"," + QString::number(i) + ",\"");
     }
-    //    qDebug() << "Orgasm::Processources took " << Util::MilisecondToString(t.elapsed());
 }
 
 
 
-QString Orgasm::processRepeatIndex(QString s, int current)
+QString Orgasm::processRepeatIndex(QString s, int currentX, int currentY)
 {
-    s = s.replace("[i+1]",QString::number(current+1));
-    s = s.replace("[i-1]",QString::number(current-1));
-    s = s.replace("[i]",QString::number(current));
-    s = s.replace("[i*8]",QString::number(current*8));
-//    qDebug() << current << QString::number(current) << s;
+    QJSEngine jsEngine;
+
+    int start = s.indexOf("{");
+    if (start!=-1) {
+        // evalue expression
+        int end = s.split(";").first().indexOf("}");
+        auto orgStr = s.mid(start,end-start+1);
+        if (orgStr.contains("{") )
+        {
+            auto str = orgStr;
+            str = str.replace("{","").replace("}","");
+            str = str.replace("i",QString::number(currentX));
+            str = str.replace("j",QString::number(currentY));
+
+
+            auto val = jsEngine.evaluate(str);
+            if (val.isError()) {
+                //qDebug() << str;//<< orgStr <<str <<val.toString();
+                throw OrgasmError("Error evaluation expression in unrolled code : " + orgStr + " <br><br>",0);
+
+
+            }
+
+            s = s.replace(orgStr,val.toString());
+            return s;
+
+        }
+
+    }
+
+    for (int i=0;i<2;i++) {
+        int val = currentX;
+        QString r = "i";
+        if (i==1) {
+            val = currentY;
+            r = "j";
+        }
+
+        s = s.replace("["+r+"+1]",QString::number(val+1));
+        s = s.replace("["+r+"-1]",QString::number(val-1));
+        s = s.replace("["+r+"]",QString::number(val));
+        s = s.replace("["+r+"*2]",QString::number(val*2));
+        s = s.replace("["+r+"*4]",QString::number(val*4));
+        s = s.replace("["+r+"*3]",QString::number(val*3));
+        s = s.replace("["+r+"*8]",QString::number(val*8));
+        s = s.replace("["+r+"*16]",QString::number(val*16));
+        s = s.replace("["+r+"*256]",QString::number(val*256));
+        s = s.replace("["+r+"*320]",QString::number(val*320));
+        s = s.replace("["+r+"*160]",QString::number(val*160));
+        s = s.replace("["+r+"*40]",QString::number(val*40));
+        s = s.replace("["+r+"*80]",QString::number(val*80));
+        s = s.replace("["+r+"*120]",QString::number(val*120));
+//        qDebug() << s;
+    }
+    //    qDebug() << current << QString::number(current) << s;
     return s;
 }
 
-QStringList Orgasm::processRepeatIndex(QStringList s, int current)
+QStringList Orgasm::processRepeatIndex(QStringList s, int currentX, int currentY)
 {
     QStringList ret;
     for (QString& l : s)
-       ret<<processRepeatIndex(l,current);
+       ret<<processRepeatIndex(l,currentX, currentY);
     return ret;
 }
 
@@ -87,7 +133,8 @@ void Orgasm::ProcessUnrolling()
     QStringList newLines;
     QStringList repeatList;
     bool isInRepeat = false;
-    int repeatCount = 0;
+    int repeatCountX = 0;
+    int repeatCountY = 0;
     int ln =0;
     for (QString& l  : m_lines) {
         ln++;
@@ -95,14 +142,29 @@ void Orgasm::ProcessUnrolling()
             if (isInRepeat)
                 throw OrgasmError("Cannot do nested unrolling.",ln);
             isInRepeat = true;
-            QString last = l.simplified().split(" ").last();
+            auto lst = l.simplified().split(" ");
+            bool isOk = false;
             bool ok;
-            repeatCount = last.toInt(&ok);
+            if (lst.count()==2) {
+                QString last = lst.last();
+                repeatCountX = last.toInt(&ok);
+                repeatCountY = 1;
+                isOk = true;
+            }
+            if (lst.count()==3) {
+                isOk = true;
+                repeatCountX = lst[lst.count()-2].toInt(&ok);
+                repeatCountY = lst[lst.count()-1].toInt(&ok);
+            }
+            if (!isOk) {
+                throw OrgasmError("Repeat count must be either 1 or 2-dimensional.",ln);
+
+            }
 //            qDebug() << last << ok;
             if (!ok)
                 throw OrgasmError("Repeat count must be a number.",ln);
 
-            if (repeatCount<=0)
+            if (repeatCountX<=0 || repeatCountY<=0)
                 throw OrgasmError("Repeat count must be larger than 0.",ln);
             repeatList.clear();
 //            qDebug() << "Starting REPEAT list!";
@@ -113,15 +175,26 @@ void Orgasm::ProcessUnrolling()
                 throw OrgasmError("Not in an repeat loop.",ln);
             isInRepeat = false;
 
-            for (int i=1;i<repeatCount;i++) {
-                newLines.append(processRepeatIndex(repeatList,i));
+            if (repeatCountY==1) {
+                for (int x=1;x<repeatCountX;x++) {
+                    newLines.append(processRepeatIndex(repeatList,x,0));
+                }
+
             }
-            repeatCount = 0;
+            else
+
+            for (int y=0;y<repeatCountY;y++)
+            for (int x=0;x<repeatCountX;x++) {
+//                qDebug() << "******* " <<x << y;
+                newLines.append(processRepeatIndex(repeatList,x,y));
+            }
+            repeatCountX = 0;
+            repeatCountY = 0;
             repeatList.clear();
             continue;
         }
         if (isInRepeat)
-            newLines +=processRepeatIndex(l,0);
+            newLines +=processRepeatIndex(l,0,0);
         else
             newLines +=l;
         if (isInRepeat)
@@ -129,8 +202,9 @@ void Orgasm::ProcessUnrolling()
 
     }
     m_lines = newLines;
-  //  qDebug().noquote() << m_lines;
+    //  qDebug().noquote() << m_lines;
 }
+
 
 OrgasmLine Orgasm::LexLine(int i) {
     OrgasmLine l;
@@ -139,13 +213,12 @@ OrgasmLine Orgasm::LexLine(int i) {
 //    line = line.replace("//",";");
     line = line.replace("\t", " ");
     line = line.replace("dc.b", ".byte");
-    if (m_cpuFlavor==CPUFLAVOR_Z80) {
-//        line = line.replace("dw", ".word");
-  //      line = line.replace(" db", ".byte");
-    }
     line = line.replace("!by", ".byte");
     line = line.replace("!fi", ".byte");
+//    line = line.replace("fcb", ".byte");
+  //  line = line.replace("fcc", ".dc");
     line = line.replace("dc.w", ".word");
+    line = line.replace("dc.l", ".long24");
     line = line.replace(" EQU ", " = ");
     line = line.replace(" equ ", " = ");
 
@@ -173,8 +246,8 @@ OrgasmLine Orgasm::LexLine(int i) {
 
 //    if (line.toLower().contains("else"))
   //      qDebug() << line;
-
-    line.replace("("," (");
+    if (!line.contains("\""))
+        line.replace("("," (");
 
 
 /*      if (line.simplified().toLower().startsWith("repeat") || line.simplified().toLower().startsWith("repend")) {
@@ -220,6 +293,7 @@ OrgasmLine Orgasm::LexLine(int i) {
         return l;
 
     }
+
 /*
     if (!(line[0]==' ') && !(line.contains("=") && !line.contains("\""))) {
         QString lbl = line.split(":").first().trimmed().simplified();
@@ -234,6 +308,20 @@ OrgasmLine Orgasm::LexLine(int i) {
 
   */
 //    qDebug() << line.contains("\"") << line;
+
+    if (line.simplified().toLower().startsWith(".align")) {
+        QStringList lst = line.simplified().split(" ");
+        l.m_type = OrgasmLine::ALIGN;
+        if (lst.count()!=2) {
+            throw OrgasmError("Align only takes one parameter",l);
+        }
+        l.m_expr = lst[1];
+//        qDebug() << l.m_expr;
+        return l;
+    }
+
+
+
     if (!(line[0]==' ') && !(line.contains("=") && !line.contains("\""))) {
         QString ll= line;
         QString lbl = ll.replace(":", " ").trimmed().split(" ")[0];
@@ -242,9 +330,8 @@ OrgasmLine Orgasm::LexLine(int i) {
         if (line.startsWith(":"))
             line = line.remove(0,1);
 
-//        qDebug() <<"LABEL " <<lbl <<line;
     }
-    if (m_cpuFlavor==CPUFLAVOR_Z80) {
+    if (m_cpuFlavor==CPUFLAVOR_Z80 || m_cpuFlavor==CPUFLAVOR_Z80) {
         if (line.trimmed().simplified().split(" ").first().endsWith(":")) {
             QString lbl = line.trimmed().simplified().split(" ").first().remove(":");
             l.m_label = lbl;
@@ -260,8 +347,9 @@ OrgasmLine Orgasm::LexLine(int i) {
         return l;
     }
 
-
     QStringList lst = line.simplified().split(" ");
+
+
 //    qDebug() << line.trimmed();
     if (line.trimmed().toLower().startsWith("incbin")) {
         lst.clear();
@@ -279,12 +367,13 @@ OrgasmLine Orgasm::LexLine(int i) {
 
         return l;
     }
+
     if (lst[0].toLower()=="incbin") {
         l.m_type = OrgasmLine::INCBIN;
         l.m_expr = lst[1];
         return l;
     }
-    if (line.contains("=") && !line.contains("\"")) {
+    if (line.contains("=") && !line.contains("\"") && !line.contains("*")) {
         l.m_type = OrgasmLine::CONSTANT;
         QStringList cl = line.split("=");
         l.m_label = cl[0].trimmed();
@@ -295,9 +384,10 @@ OrgasmLine Orgasm::LexLine(int i) {
         //qDebug() << l.m_expr;
         return l;
     }
-    if (lst[0].toLower()==".byte" || lst[0].toLower()=="db") {
+    if (lst[0].toLower()==".byte" || lst[0].toLower()=="db" || lst[0].toLower()=="fcb" || lst[0].toLower()=="dc") {
         l.m_type = OrgasmLine::BYTE;
         l.m_expr = line.replace(".byte", "").trimmed();//.simplified();
+        l.m_expr = line.replace("fcb ", "").trimmed();//.simplified();
         l.m_expr = line.replace(" db ", "").trimmed();//.simplified();
         return l;
     }
@@ -311,6 +401,12 @@ OrgasmLine Orgasm::LexLine(int i) {
         l.m_type = OrgasmLine::WORD;
         l.m_expr = line.replace(".word", "").trimmed();//.simplified();
         l.m_expr = line.replace(" dw ", "").trimmed();//.simplified();
+        return l;
+    }
+    if (lst[0].toLower()==".long24" || lst[0].toLower()=="dc.l") {
+        l.m_type = OrgasmLine::LONG24;
+        l.m_expr = line.replace(".long24", "").trimmed();//.simplified();
+        l.m_expr = line.replace(" dc.l ", "").trimmed();//.simplified();
         return l;
     }
     l.m_type = OrgasmLine::INSTRUCTION;
@@ -343,7 +439,12 @@ bool Orgasm::Assemble(QString filename, QString outFile)
 {
     m_success = false;
     LoadFile(filename);
+    FindCPUtype();
+    ApplyCPUType();
     m_olines.clear();
+  //  m_symbols.clear();
+//    m_symbolsList.clear();
+    //m_constants.clear();
 
     try {
         ProcessUnrolling();
@@ -354,37 +455,53 @@ bool Orgasm::Assemble(QString filename, QString outFile)
         ol.m_lineNumber = i;
         if (!ol.m_ignore)
             m_olines.append(ol);
+//        if (ol.m_expr.contains("(C)"))
+  //      qDebug() << ol.m_expr;
     }
 
     emit EmitTick(" [constants] ");
     PassFindConstants();
     PassReplaceConstants();
 
-//       for (QString s: m_constants.keys())
-  //         qDebug() << s << " " << m_constants[s];
-   //     exit(1);
-/*    while (m_constantPassLines!=0) {
-        PassConstants();
-        qDebug() << "PAssing" << m_constantPassLines;
-    }
-*/
     QTimer myTimer;
     myTimer.start();
 //    qDebug() << "LABELS  " << QString::number((myTimer.elapsed()/100.0));
     emit EmitTick(" [labels] ");
     Compile(OrgasmData::PASS_LABELS);
 
+
     emit EmitTick(" [symbols] ");
     Compile(OrgasmData::PASS_SYMBOLS);
+
+
+//    qDebug() << filename <<m_symbolsList.count();
+
 
     if (!m_hasOverlappingError)
         m_success = true;
 
     if (QFile::exists(outFile))
         QFile::remove(outFile);
+
+    if (m_header==HEADER_DECB && m_success) {
+        int size = m_data.size();
+        m_data.insert(0,(uchar)0);
+        m_data.insert(1,(size>>8)&0xFF);
+        m_data.insert(2,(size)&0xFF);
+        m_data.insert(3,(m_startAddress>>8)&0xFF);
+        m_data.insert(4,(m_startAddress)&0xFF);
+        // Appendix
+        m_data.append(0xff);
+        m_data.append((char)0x00);
+        m_data.append((char)0x00);
+        m_data.append((m_startAddress>>8)&0xFF);
+        m_data.append((m_startAddress)&0xFF);
+    }
+
     if (m_success) {
         QFile out(outFile);
         out.open(QFile::WriteOnly);
+
         out.write(m_data);
         out.close();
     }
@@ -402,7 +519,17 @@ bool Orgasm::Assemble(QString filename, QString outFile)
         qDebug() << i << Util::numToHex(m_lineAddress[i]);
     }
 */
+
     return m_success;
+}
+
+void Orgasm::FindCPUtype()
+{
+    for (auto s:m_lines) {
+        if (s.trimmed().simplified().toLower().startsWith("cpu ")) {
+            m_subCpu = s.simplified().split(" ").last();
+        }
+    }
 }
 
 void Orgasm::PassReplaceConstants()
@@ -410,7 +537,7 @@ void Orgasm::PassReplaceConstants()
     //    if (m_constantPassLines==0)
     for (OrgasmLine& ol : m_olines) {
         if (ol.m_type != OrgasmLine::CONSTANT && ol.m_type!= OrgasmLine::INCBIN) {
-            for (QString k : m_constList) {
+            for (QString& k : m_constList) {
                 if (ol.m_expr.contains(k))
                     ol.m_expr =  OrgasmData::ReplaceWord(ol.m_expr, k, m_constants[k]);
             }
@@ -490,6 +617,7 @@ void Orgasm::Compile(OrgasmData::PassType pt)
             {
                 m_symbols[ol.m_label] = m_pCounter;
                 m_symbolsList.append(ol.m_label);
+//                qDebug() << "ADDING "<<ol.m_label;
             }
             else {
                 throw OrgasmError("OrgAsm error: symbol '"+ol.m_label+"' already defined",ol);
@@ -520,8 +648,14 @@ void Orgasm::Compile(OrgasmData::PassType pt)
         if (ol.m_type==OrgasmLine::WORD)
             ProcessWordData(ol);
 
+        if (ol.m_type==OrgasmLine::LONG24)
+            ProcessLong24Data(ol);
+
         if (ol.m_type==OrgasmLine::ORG)
             ProcessOrgData(ol);
+
+        if (ol.m_type==OrgasmLine::ALIGN)
+            ProcessAlignData(ol);
 
       if (ol.m_type==OrgasmLine::INSTRUCTION)
             ProcessInstructionData(ol, pt);
@@ -544,15 +678,12 @@ void Orgasm::ProcessByteData(OrgasmLine &ol,OrgasmData::PassType pt)
         m_data.append((char)0x00);
         return;
     }
-//    qDebug() << ol.m_expr;
+    QStringList lst = Util::splitStringSafely(ol.m_expr);
 
-
-
-    QStringList lst = Util::fixStringListSplitWithCommaThatContainsStrings(ol.m_expr.split(","));
-
-    for (QString s: lst) {
-
+    for (QString& s: lst) {
+        bool ok = true;
         if (s.trimmed()=="") continue;
+        if (s.trimmed().simplified()==".byte") continue;
         //      qDebug() << Util::NumberFromStringHex(s);
         if (!s.contains("\"")) {
 
@@ -564,15 +695,18 @@ void Orgasm::ProcessByteData(OrgasmLine &ol,OrgasmData::PassType pt)
 
                     }
                 //              qDebug() << "After: "<<s;
-
-                s = Util::numToHex(Util::NumberFromStringHex(s));
+                s = Util::numToHex(Util::NumberFromStringHex(s,ok));
                 //                qDebug() << "After2: "<<s;
 
             }
 
+            s = s.trimmed();
+            m_data.append(Util::NumberFromStringHex(s,ok));
 
-//            if (lst.count()>1)  qDebug() << "Adding: " <<  Util::NumberFromStringHex(s);
-            m_data.append(Util::NumberFromStringHex(s));
+            if (!ok && !(s.startsWith("<") || s.startsWith('>') || s.startsWith('^'))) {
+                throw OrgasmError("Incorrect number format: "+s, ol);
+
+            }
 
 //            qDebug() << Util::NumberFromStringHex(s);
             //qDebug() << s << Util::NumberFromStringHex(s);
@@ -583,13 +717,13 @@ void Orgasm::ProcessByteData(OrgasmLine &ol,OrgasmData::PassType pt)
             QString str = s;
 //            str = str.remove("\"");
             str = str.remove(0,1);
-            str = str.remove(str.count()-1,1);
+            str = str.remove(str.length()-1,1);
             str = str.replace("\\n","\n");
             str = str.replace("\\r","\r");
-
             for (int i=0;i<str.length();i++) {
 
                 int c = str.at(i).toLatin1();
+//                qDebug().noquote() << (char)c << c;
                 m_data.append((uchar)c);
                 m_pCounter++;
 /*                if (str.at(i)==':') {
@@ -597,6 +731,7 @@ void Orgasm::ProcessByteData(OrgasmLine &ol,OrgasmData::PassType pt)
                 }
 */
             }
+//            qDebug()<<"";
   //          exit(1);
 
         }
@@ -636,17 +771,79 @@ void Orgasm::ProcessWordData(OrgasmLine &ol)
         return;
     }
     QStringList lst = ol.m_expr.split(",");
-    for (QString s: lst) {
+    for (QString& s: lst) {
         if (s.trimmed()=="") continue;
         s = s.trimmed().simplified();
         if (m_symbolsList.contains(s)) {
-            m_data.append(m_symbols[s]&0xFF);
-            m_data.append((m_symbols[s]>>8)&0xFF);
+            if (isLittleEndian) {
+                m_data.append(m_symbols[s]&0xFF);
+                m_data.append((m_symbols[s]>>8)&0xFF);
+            }
+            else {
+                m_data.append((m_symbols[s]>>8)&0xFF);
+                m_data.append(m_symbols[s]&0xFF);
+            }
         }
         else {
-            m_data.append(Util::NumberFromStringHex(s)&0xFF);
-            m_data.append(Util::NumberFromStringHex(s)>>8);
+            if (isLittleEndian) {
+                m_data.append(Util::NumberFromStringHex(s)&0xFF);
+                m_data.append(Util::NumberFromStringHex(s)>>8);
+            }
+            else {
+                m_data.append(Util::NumberFromStringHex(s)>>8);
+                m_data.append(Util::NumberFromStringHex(s)&0xFF);
+
+            }
         }
+        m_pCounter++;
+        m_pCounter++;
+    }
+}
+
+void Orgasm::ProcessLong24Data(OrgasmLine &ol)
+{
+    if (ol.m_expr=="") {
+        m_pCounter+=3;
+        m_data.append((char)0x00);
+        m_data.append((char)0x00);
+        m_data.append((char)0x00);
+        return;
+    }
+
+
+    QHash <QString, int> g;
+
+
+    QStringList lst = ol.m_expr.split(",");
+    for (QString& s: lst) {
+        if (s.trimmed()=="") continue;
+        s = s.trimmed().simplified();
+        if (m_symbolsList.contains(s)) {
+            if (isLittleEndian) {
+                m_data.append(m_symbols[s]&0xFF);
+                m_data.append((m_symbols[s]>>8)&0xFF);
+                m_data.append((m_symbols[s]>>16)&0xFF);
+            }
+            else {
+                m_data.append((m_symbols[s]>>16)&0xFF);
+                m_data.append((m_symbols[s]>>8)&0xFF);
+                m_data.append(m_symbols[s]&0xFF);
+            }
+        }
+        else {
+            if (isLittleEndian) {
+                m_data.append(Util::NumberFromStringHex(s)&0xFF);
+                m_data.append((Util::NumberFromStringHex(s)>>8)&0xFF);
+                m_data.append((Util::NumberFromStringHex(s)>>16)&0xFF);
+            }
+            else {
+                m_data.append((Util::NumberFromStringHex(s)>>16)&0xFF);
+                m_data.append((Util::NumberFromStringHex(s)>>8)&0xFF);
+                m_data.append(Util::NumberFromStringHex(s)&0xFF);
+
+            }
+        }
+        m_pCounter++;
         m_pCounter++;
         m_pCounter++;
     }
@@ -656,17 +853,27 @@ void Orgasm::ProcessOrgData(OrgasmLine &ol)
 {
     if (m_pCounter == 0) {
         int val = Util::NumberFromStringHex(ol.m_expr);
+/*        QString washed =ol.m_expr;
+        qDebug() << washed;
+        for (QString s: m_symbols.keys())
+            washed = OrgasmData::ReplaceWord(washed,s,Util::numToHex(m_symbols[s]));
+        qDebug() << washed;
+        int val = Util::NumberFromStringHex(Util::BinopString(washed));
+        qDebug() << val;
+*/
         if (m_cpuFlavor!=CPUFLAVOR_Z80) {
             m_data.append(val&0xFF);
             m_data.append((val>>8)&0xFF);
         }
         m_pCounter = val;
+        if (m_startAddress==-1)
+            m_startAddress = m_pCounter;
         return;
     }
     else {
 
 
-        for (QString s: m_symbols.keys())
+        for (QString& s: m_symbols.keys())
                 ol.m_expr = OrgasmData::ReplaceWord(ol.m_expr,s,Util::numToHex(m_symbols[s]));
 
         ol.m_expr =ol.m_expr.replace("#","");
@@ -689,6 +896,18 @@ void Orgasm::ProcessOrgData(OrgasmLine &ol)
     }
 }
 
+void Orgasm::ProcessAlignData(OrgasmLine &ol)
+{
+    uint val = ol.m_expr.toInt();
+    if (val<=0)
+        throw OrgasmError("Invalid align parameter, must be >0",ol);
+
+    while (m_pCounter%val!=0) {
+        m_data.append((uchar)0x00);
+        m_pCounter+=1;
+    }
+}
+
 void Orgasm::ProcessIncBin(OrgasmLine &ol)
 {
     //qDebug() << ol.m_expr;
@@ -700,7 +919,7 @@ void Orgasm::ProcessIncBin(OrgasmLine &ol)
     QByteArray data = f.readAll();
     f.close();
     m_data.append(data);
-    m_pCounter+=data.count();
+    m_pCounter+=data.length();
 
 
 }
@@ -728,7 +947,7 @@ void Orgasm::ProcessInstructionData(OrgasmLine &ol, OrgasmData::PassType pd)
         add = add.replace("*", Util::numToHex(m_pCounter));
         add = Util::BinopString(add);
         expr = add;//expr.split(" ")[0] + " " + add;
-    //    qDebug() << "* : " << expr;
+//        qDebug() << "* : " << expr;
 
     }
     QString orgExpr = expr;
@@ -846,7 +1065,7 @@ void Orgasm::ProcessInstructionData(OrgasmLine &ol, OrgasmData::PassType pd)
 
     int code = cyc.m_opcodes[(int)type];
 
-    if (code==0 && pd==OrgasmData::PASS_SYMBOLS) {
+    if (code==0 && pd==OrgasmData::PASS_SYMBOLS && m_opCode.toLower()!="brk") {
         qDebug() << "ERROR on line : " << m_opCode + " " +expr;
         throw OrgasmError("Opcode type not implemented or illegal: " + m_opCode + "  type " +QString::number(type) + "        on line " + ol.m_expr,ol );
     }
@@ -886,9 +1105,9 @@ void Orgasm::ProcessInstructionData(OrgasmLine &ol, OrgasmData::PassType pd)
 
 
 
-    if (data.count()>0) {
+    if (data.length()>0) {
         m_data.append(data);
-        m_pCounter+=data.count();
+        m_pCounter+=data.length();
     }
 }
 
@@ -898,7 +1117,7 @@ void Orgasm::SaveSymbolsList(QString filename)
         QFile::remove(filename);
 
     QFile file( filename );
-    QMap<int, bool> isSet;
+    QHash<int, bool> isSet;
     if ( file.open(QIODevice::ReadWrite) )
     {
         QTextStream stream( &file );
@@ -906,11 +1125,15 @@ void Orgasm::SaveSymbolsList(QString filename)
 
         stream<<"; labels" << endl;
         for (QString s: m_symbolsList) {
-            if (!s.startsWith("trse_breakpoint"))
+            isSet[m_symbols[s]] = false;
+        }
+        for (QString s: m_symbolsList) {
+            if (!s.startsWith("trse_breakpoint") && !s.startsWith("trse_disassemble"))
                 if (!isSet[m_symbols[s]]) {
                     stream << "al  " << Util::numToHex(m_symbols[s]) << " ."<< s << endl;
-                    isSet[m_symbols[s]]=true;
+  //                  isSet[m_symbols[s]]=true;
                 }
+//            else qDebug() << "ISSET "<<s;
         }
         for (QString s: m_extraSymbols.keys()) {
             stream << "al  " << m_extraSymbols[s] << " ."<< s << endl;
@@ -928,6 +1151,9 @@ void Orgasm::SaveSymbolsList(QString filename)
         for (QString s: m_symbolsList) {
             if (s.startsWith("trse_breakpoint")) {
                 stream << "break " << Util::numToHex(m_symbols[s])<<endl;
+            }
+            if (s.startsWith("trse_disassemble")) {
+                stream << "d " << Util::numToHex(m_symbols[s])<<endl;
             }
         }
         for (QString& s: m_extraMonCommands) {

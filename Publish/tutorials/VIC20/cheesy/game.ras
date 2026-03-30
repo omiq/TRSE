@@ -2,7 +2,6 @@
 // reset to a new game
 procedure Game_NewGame();
 begin
-
 	gameRoom := 0;		// Room player is in or selected
 
 	// for text drawing routine
@@ -11,6 +10,9 @@ begin
 	cat_delta := 0;
 	cat_ears := 12;
 	cat_tail := 0;
+
+
+	
 
 	// clear completed room list
 	levelComplete[ 0 ] := 1;

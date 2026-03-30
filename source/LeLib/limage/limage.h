@@ -36,6 +36,7 @@
 #include "source/LeLib/limage/lcolorlist.h"
 // Footer contains image-state specific data
 
+#define CHECK_BIT(var,pos) (((var) & (1<<(pos)))>>pos)
 
 class CharsetImage;
 
@@ -68,14 +69,15 @@ public:
     bool koalaImport = false;
     bool movieExport = false;
     bool compressedExport = false;
-
+    bool tilestamp = false;
     bool editPalette = true;
     bool displayColors = true;
     bool displayCmbColors = true;
+    bool spritepadImport = false;
 
     bool exportc = false;
     bool importc = false;
-
+    bool d800_limit = false;
     bool displayBackground = true;
     bool displayForeground = true;
     bool displayMC1 = true;
@@ -100,11 +102,14 @@ Q_OBJECT
 public:
     enum Type { QImageBitmap, MultiColorBitmap, HiresBitmap,
                 NotSupported, Tiff, CharMapMulticolor, FullScreenChar, LevelEditor, CharmapRegular, CharMapMultiColorFixed,
-              Sprites, VIC20_MultiColorbitmap, Sprites2, CGA, AMIGA320x200, AMIGA320x256, ATARI320x200,
-                OK64_256x256,X16_640x480, NES, LMetaChunk, LevelEditorNES, SpritesNES, GAMEBOY, LevelEditorGameboy, HybridCharset, AmstradCPC, AmstradCPCGeneric, BBC, VGA, Spectrum};
+                Sprites, VIC20_MultiColorbitmap, Sprites2, CGA, AMIGA320x200, AMIGA320x256, ATARI320x200,
+                OK64_256x256,X16_640x480, NES, LMetaChunk, LevelEditorNES, SpritesNES, GAMEBOY, LevelEditorGameboy, HybridCharset,
+                AmstradCPC, AmstradCPCGeneric, BBC, VGA, Spectrum, SNES,LevelEditorSNES,VZ200, CustomC64, JDH8, LImageGeneric, GenericSprites, CGA160x100,
+                AmstradSprites, SNESGeneric, TIM, TVC, COCO3, THOMSON, TIMG, LevelEditorGeneric, AGON, PRIMO,CGA_HIRES
+              };
 
 
-    enum WriteType { Color, Character };
+    enum WriteType { Color, Character, LevelCharacter };
     LImage() {}
     LImage(LColorList::Type t);
     virtual ~LImage() {
@@ -123,14 +128,26 @@ public:
                    tabLevels, tabCharset, tabData, tabSprites, tabEffects, col1,col2,col3,col4};
 
 
-    QMap<QString, float> m_exportParams;
-    QMap<QString, QString> m_exportParamsComments;
+    QHash<QString, float> m_exportParams;
+    QHash<QString, QString> m_exportParamsComments;
     QVector<int> m_ignoreValues;
 
-    QMap<GUIType, QString> m_GUIParams;
+    QHash<GUIType, QString> m_GUIParams;
+
 
     virtual bool isNes() {return false;}
+    virtual bool isSnes() {return false;}
+    bool m_returnActualColor = true;
+    float m_importScale = 1.0;
+    float m_aspect = 1.0;
+    static int m_canvasStart;
+    void setAspect(float as) {
+        m_aspect = as;
+    }
 
+    virtual bool isLevelEditor() { return false; }
+
+    virtual int getCanvasColor(int x, int y);
     QVector<MetaParameter*> m_metaParams;
     MetaParameter* getMetaParameter(QString name);
     virtual QString getMetaInfo() { return "";}
@@ -139,10 +156,17 @@ public:
     virtual LColorList::Type getColorType() {
         return m_colorList.m_type;
     }
+    bool m_fixMultiColorYSave = false;
+    void ToQImageUsingPens(LColorList &lst, QImage &img, double zoom, QPointF center);
+
+    virtual QByteArray getDirArt() { return QByteArray();}
+    virtual QByteArray getBinaryExportData() { return QByteArray();}
 
     virtual void CopyImageData(LImage* img);
     virtual int getCharWidthDisplay();
     virtual int getCharHeightDisplay();
+
+    QPointF getZoomedCoordinates(int i, int j, const QPointF& center, double zoom);
 
     int m_charHeightDisplay = 25;
     int m_charWidthDisplay = 40;
@@ -150,7 +174,9 @@ public:
     int m_gridWidthDisplay = 40;
 
 
+    virtual QStringList getBankNames();
     bool m_updatePaletteInternal = true;
+    bool m_savePalette = false;
     virtual void SetBank(int bnk) {
         m_footer.set(LImageFooter::POS_CURRENT_BANK,bnk);
     }
@@ -174,13 +200,20 @@ public:
     virtual void VBMExport(QFile& file, int p1, int p2, int p3, int p4) {}
     virtual void VBMExportColor(QFile& file, int p1, int p2, int p3, int p4) {}
     virtual void VBMExportChunk(QFile& file, int p1, int p2, int p3, int p4) {}
+    virtual void VBMCompileChunk(QTextStream& f, QString procName, QString pointerName, QString asmOperation, int p1, int p2, int p3, int p4) {}
 
     virtual void CopySingleChar(LImage* src, int srcChar, int dstChar) {qDebug() << "CopySingleChar not implemented";}
 
-    virtual void ExportBlackWhite(QFile& file, int p1, int p2, int p3, int p4) {}
+    virtual void ExportBlackWhite(QFile& file, int p1, int p2, int p3, int p4, int type) {}
 
+    virtual void CPCExport0(QFile& file, int xpos, int ypos, int width, int height) {}
+    virtual void CPCExportTile0(QFile& file, int start, int end, int width, int height) {}
 
-    virtual QStringList SpriteCompiler(QString name, QString src, QString dst, int x, int y, int w, int h) {return QStringList();}
+    virtual void CPCExportPal(QFile &ofile) {}
+
+    virtual void SetForceD800Color(int val) {}
+
+    virtual QStringList SpriteCompiler(QString name, QString currentDir, QString src, QString dst, int x, int y, int w, int h, QString pparam) {return QStringList();}
 
     virtual void BeforeRightButton() {}
     virtual void AfterRightButton() {}
@@ -190,18 +223,27 @@ public:
     bool m_silentExport=false;
     int m_width;
     int m_height;
+    bool m_isHybridTemp;
+
+    int m_forceD800Color = -1;
+
+
+    void PushHybrid();
+    void PopHybrid();
+
     float m_scaleX = 1.0f;
 
 //    unsigned int m_border=0, m_background=0;
 
     Type m_type = Type::QImageBitmap;
-    WriteType m_writeType = WriteType::Color;
+    WriteType m_classvariableType = WriteType::Color;
     unsigned char m_bitMask = 0b11;
     unsigned char m_scale = 2;
     unsigned char m_noColors = 4;
     unsigned char m_minCol = 1;
-    float m_importScaleX = 1;
-    float m_importScaleY = 1;
+    double m_importScaleX = 1;
+    double m_importScaleY = 1;
+    bool m_clearWithCurrentChar = false;
     unsigned int m_currentChar;
     // Updates charset position in editor
     bool m_updateCharsetPosition = false;
@@ -209,6 +251,7 @@ public:
 
     static QPoint m_copySize;
     static uchar m_copy[];
+    QPoint m_basePixel;
 
     virtual int getGridWidth() {
 //        return getCharWidthDisplay();
@@ -241,14 +284,18 @@ public:
     }
 
 
-    virtual void SpritePacker(LImage* in, QByteArray& sprData, int x, int y, int w, int h, int comp) {
+    virtual void SpritePacker(LImage* in, QByteArray& rawDataOut, QByteArray& sprData, int x, int y, int w, int h, int comp, int& noChars) {
         qDebug() << "LImage::SpritePacker not implemented for this image type : " <<m_type;
     }
+    int m_charWidth=40;
+    int m_charHeight=25;
 
+    void ToQPixMaps(QVector<QPixmap> &map);
+    virtual QPixmap ToQPixMap(int chr) {return QPixmap();}
 
     virtual void setCurrentChar(int i) {m_currentChar = i;}
 
-    virtual CharsetImage* getCharset() { return nullptr; }
+    virtual LImage* getCharset() { return nullptr; }
 
     bool renderPathGrid = false;
 //    unsigned char m_extraCols[4];
@@ -272,7 +319,7 @@ public:
     }
 
 
-    virtual void FloydSteinbergDither(QImage& img, LColorList& colors, bool dither);
+    virtual void FloydSteinbergDither(QImage& img, LColorList& colors, bool dither, double strength);
     virtual void OrdererdDither(QImage& img, LColorList& colors, QVector3D strength, QPoint size,float gamma);
 
     virtual void InitPens();
@@ -281,7 +328,7 @@ public:
 
 //    virtual void AddNew(int x, int y) {};
 
-    virtual void RenderEffect(QMap<QString, float> params) {}
+    virtual void RenderEffect(QHash<QString, float> params) {}
 
     virtual void CopyChar();
 
@@ -305,6 +352,7 @@ public:
 
     virtual void Initialize(int width, int height) = 0;
 
+    virtual void FixHires() {}
 
     virtual QString GetCurrentDataString() {
         return "";
@@ -313,10 +361,16 @@ public:
     virtual void Rotate(QPoint center, float angle, float scale, LImage* img);
 
     virtual void setPixel(int x, int y, unsigned int color) = 0;
+    virtual void setBasePixel(int x, int y) {}
     virtual unsigned int getPixel(int x, int y) = 0;
+
+    virtual unsigned int getPixel(QPointF p);
+
     virtual void SetColor(uchar col, uchar idx) {}
 
-    virtual void LoadCharset(QString file, int skipBytes) {}
+    virtual void LoadCharset(QString file, int skipBytes) {
+
+    }
 
     virtual bool KeyPress(QKeyEvent *e) {return false;}
     virtual void SaveBin(QFile &file) = 0;
@@ -337,9 +391,19 @@ public:
     virtual QPoint GetCurrentPosInImage(float x, float y) {
         return QPoint(x,y);
     }
+    virtual QString getSpriteInfo() { return "";}
+
+    virtual void ExportSubregion(QString outfile,int x, int y, int w, int h,int type);
 
     virtual void ExportBin(QFile &file) {}
     virtual void ImportBin(QFile &file) {}
+
+    virtual QStringList getPaletteNames() {
+        return QStringList() <<"Tiles 1"<<"Tiles 2"<<"Tiles 3"<<"Tiles 4"<<"Sprites 1"<<"Sprites 2"<<"Sprites 3"<<"Sprites 4";;
+    }
+
+
+    virtual void ImportSpritepad(QString filename) {}
 
     virtual void ExportRGB8Palette(QString filename);
 
@@ -368,25 +432,31 @@ public:
     void drawLine(float x0, float y0, float x1, float y1, unsigned int col, int size);
     void drawCircle(float x0, float y0, float r, float r0, unsigned int col);
 
+    bool usePens = false;
 
     void Box(int x, int y, unsigned char col, int size);
 
-    virtual void ToQImage(LColorList& lst, QImage& img, float zoom = 1, QPointF center = QPointF(160,100)) = 0;
+    virtual void ToQImage(LColorList& lst, QImage& img, double zoom = 1, QPointF center = QPointF(160,100)) = 0;
+
+    virtual void SavePalette() {}
 
     virtual void CopyFrom(LImage* img);
 
+    virtual void Duplicate() {}
+
+    virtual void SaveCurrentPaletteToPPU();
 
     virtual int getCharAtPos(QPoint p, float zoom, QPointF center) { return 0;}
 
     virtual void SetCurrentType(WriteType wt) {
-        m_writeType = wt;
+        m_classvariableType = wt;
     }
 
     void CopyTo(LImage* img);
     virtual void FromLImageQImage(LImage* other) {}
     virtual void CreateMagicalCharset() {}
 
-    virtual void Clear();
+    virtual void Clear(int val=0);
     virtual void fromQImage(QImage* img, LColorList& lst) = 0;
 
     virtual void ExportAsm(QString filename)  { qDebug() << "ASM Write not supported"; }

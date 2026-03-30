@@ -87,7 +87,7 @@ void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502(QString file, QString ba
         alreadySet.clear();
     }
 
-    QMap<uchar,QVector<int>> lst;
+    QHash<uchar,QVector<int>> lst;
     QVector<int> lst2;
     for (int y=yp;y<h;y++) {
         for (int x=xp;x<w;x++) {
@@ -114,7 +114,7 @@ void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502(QString file, QString ba
                     //uchar inv = (char)((~c)&0xFF);
                     if (!alreadySet.contains(pos)) {
                         uchar inv = (char)((~c)&0xFF);
-                        if (bg.count()==0)
+                        if (bg.length()==0)
                             c = inv;
                         else {
                             c = (bg[pos-base]) & inv;
@@ -188,6 +188,19 @@ void AbstractDemoEffect::UpdateScreenDataFrame(QVector<int> &screen, int xp, int
 
 }
 
+void AbstractDemoEffect::SaveImageBin(QString fname)
+{
+    QByteArray ba;
+    for (int y=0;y<m_img.height();y++) {
+        for (int x=0;x<m_img.width();x++) {
+            auto col = QColor(m_img.pixel(x,y));
+            int avg = (col.red()+col.green()+col.blue())/3;
+            ba.append((char)avg);
+        }
+    }
+    Util::SaveByteArray(ba,fname);
+}
+
 
 
 void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502ColorOut(QString file, QString background, QString name, QString waitFunc, int base, int xp, int yp, int w, int h, int speed, int endCol) {
@@ -217,7 +230,7 @@ void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502ColorOut(QString file, QS
 
 
 
-    QMap<uchar,QVector<int>> lst;
+    QHash<uchar,QVector<int>> lst;
     QVector<int> lst2;
     for (int y=yp;y<h;y++) {
         for (int x=xp;x<w;x++) {
@@ -311,7 +324,7 @@ void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502ColorIn(QString file, QSt
 
 
 
-    QMap<uchar,QVector<int>> lst;
+    QHash<uchar,QVector<int>> lst;
     QVector<int> lst2;
     for (int y=yp;y<h;y++) {
         for (int x=xp;x<w;x++) {
@@ -416,7 +429,7 @@ void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502ColorInAddress(QString fi
 
 
 
-    QMap<uchar,QVector<int>> lst;
+    QHash<uchar,QVector<int>> lst;
     QVector<int> lst2;
     for (int y=yp;y<h;y++) {
         for (int x=xp;x<w;x++) {
@@ -510,7 +523,7 @@ void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502In(QString file, QString 
         alreadySet.clear();
     }
 
-    QMap<uchar,QVector<int>> lst;
+    QHash<uchar,QVector<int>> lst;
     QVector<int> lst2;
     for (int y=yp;y<h;y++) {
         for (int x=xp;x<w;x++) {
@@ -537,7 +550,7 @@ void AbstractDemoEffect::ExportDiffAsUnrolledBitmap6502In(QString file, QString 
                     //uchar inv = (char)((~c)&0xFF);
                     if (!alreadySet.contains(pos)) {
                         uchar inv = (char)((c)&0xFF);
-                        if (bg.count()==0)
+                        if (bg.length()==0)
                             c = inv;
                         else {
                             c = (bg[pos-base]) & inv;
@@ -599,11 +612,15 @@ void AbstractDemoEffect::ConvertToC64(int dither, bool isMulticolor, QVector3D d
     //     m_mc->m_forcePaintColorAndChar = false;
     m_mc->m_colorList.EnableColors(m_cols);
     if (dither==1)
-        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true);
-    if (dither==2)
+        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true,ditherStrength.x());
+    if (dither==2) {
+        //int scale = m_mc->m_scale;
+      //  m_mc->m_scale = 1.0;
         m_mc->OrdererdDither(m_img, m_mc->m_colorList, ditherStrength,QPoint(1,size), 1);
+       // m_mc->m_scale = scale;
+    }
     if (dither==0)
-        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false);
+        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false,ditherStrength.x());
 
     m_mc->ToQImage(m_mc->m_colorList,m_img,1,QPointF(160,100));
 
@@ -631,11 +648,15 @@ void AbstractDemoEffect::ConvertToCharset(int dither, bool isMulticolor, QVector
     //     m_mc->m_forcePaintColorAndChar = false;
     m_mc->m_colorList.EnableColors(m_cols);
     if (dither==1)
-        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true);
-    if (dither==2)
+        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, true,ditherStrength.x());
+    if (dither==2) {
+    //    int scale = m_mc->m_scale;
+//        m_mc->m_scale = 1.0;
         m_mc->OrdererdDither(m_img, m_mc->m_colorList, ditherStrength,QPoint(1,size), 1);
+  //      m_mc->m_scale = scale;
+    }
     if (dither==0)
-        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false);
+        m_mc->FloydSteinbergDither(m_img, m_mc->m_colorList, false,ditherStrength.x());
 
     m_mc->ToQImage(m_mc->m_colorList,m_img,1,QPointF(160,100));
 
