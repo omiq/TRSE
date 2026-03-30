@@ -6,8 +6,13 @@
 #
 # Uses system liblua5.4 (bundled liblua.a is x86-64 only). Default trse.ini: /etc/trse/trse.ini
 # If offscreen fails: docker run -e QT_QPA_PLATFORM=minimal ...  or  xvfb-run docker run ...
+#
+# Parallel compile: default -j2 to avoid OOM (cc1plus "Killed" on low-RAM hosts).
+# Override: docker build --build-arg MAKE_JOBS=4 ...
 
 FROM debian:bookworm-slim AS builder
+
+ARG MAKE_JOBS=2
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -27,7 +32,7 @@ COPY . .
 # Replace bundled x86 liblua link with system liblua5.4 (required on ARM).
 RUN sed -i 's|LIBS += -L$$PWD/libs/lua/ -llua -ldl|LIBS += -llua5.4 -ldl|' TRSE.pro \
     && qmake PREFIX=/usr TRSE.pro \
-    && make -j"$(nproc)"
+    && make -j"${MAKE_JOBS}"
 
 # Install binary + published resources (themes, ini template) like TRSE linux package.
 RUN install -d /opt/trse/bin /opt/trse/Publish \
