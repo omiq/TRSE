@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qtbase5-dev \
     qt5-qmake \
     qtdeclarative5-dev \
+    libqt5opengl5-dev \
     libgl1-mesa-dev \
     libgomp1 \
     ca-certificates \
