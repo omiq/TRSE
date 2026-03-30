@@ -1,0 +1,8 @@
+.git
+.github
+**/*.o
+**/moc_*.cpp
+**/ui_*.h
+**/qrc_*.cpp
+**/Makefile
+**/.qmake.stash
