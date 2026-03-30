@@ -132,11 +132,20 @@ Templates under `Publish/project_templates/` are good references for valid combi
 
 ## Units and includes
 
-- TRSE resolves **`#include "file"`** by first looking in the **project directory**, then under **`units/<System>/`**, then **`units/cpu_specific/<processor>/`** (see `Parser::PreprocessIncludeFiles` in `source/Compiler/parser.cpp`).
-- In **GUI** TRSE, `Util::path` points at the install; in **CLI**, that path is often empty, so **standard units are missing** unless they exist as **`./units/...`** relative to the working directory.
-- This API optionally seeds **`units/`** from **`TRSE_UNITS_STOCK`** (full TRSE repo checkout: use the repo’s **`units/`** directory at the root).
+- **`@use "screen/screen"`** (and similar) loads **`.tru`** units via `Parser::HandleUseTPU`. TRSE searches, in order:
+  1. The **project directory** (`m_currentDir`),
+  2. **`units/<System>/`** (e.g. `units/C64/`),
+  3. **`units/cpu_specific/<CPU>/`** (e.g. `units/cpu_specific/MOS6502/`),
+  4. **`units/global/`**,
+  under **`Util::GetSystemPrefix()`** — on Linux, the directory **above** the `trse` binary (so **`/opt/trse/units/...`** when `trse` is `/opt/trse/bin/trse`).
 
-Upload any project-specific includes or assets via **`updates`** with the same relative paths your sources expect.
+- The **`trse:cli` Docker image** (current `docker/Dockerfile`) copies the repo’s **`units/`** tree to **`/opt/trse/units/`**, so built-in units work in the container **without** extra configuration.
+
+- **Native `trse` on the host:** install or symlink **`units/`** next to your install layout (same as desktop TRSE), or point the PHP API’s **`TRSE_UNITS_STOCK`** at a checkout’s **`units/`** directory (copied into each session as `./units/`).
+
+- **`#include "file"`** (assembler/includes) uses similar logic; see `Parser::PreprocessIncludeFiles`.
+
+Upload any **project-only** extra files via **`updates`** with the paths your sources reference.
 
 ---
 

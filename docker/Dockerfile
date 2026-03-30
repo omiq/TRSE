@@ -36,10 +36,12 @@ RUN sed -i 's|LIBS += -L$$PWD/libs/lua/ -llua -ldl|LIBS += -llua5.4 -ldl|' TRSE.
     && qmake PREFIX=/usr TRSE.pro \
     && make -j"${MAKE_JOBS}"
 
-# Install binary + published resources (themes, ini template) like TRSE linux package.
+# Install binary + resources + built-in TRU units (@use "screen/screen", etc.).
+# Parser::HandleUseTPU looks under Util::GetSystemPrefix()+units/<System>/ (Linux: ../units from trse binary).
 RUN install -d /opt/trse/bin /opt/trse/Publish \
     && install -m755 trse /opt/trse/bin/ \
-    && cp -a Publish /opt/trse/
+    && cp -a Publish /opt/trse/ \
+    && cp -a units /opt/trse/
 
 FROM debian:bookworm-slim
 
