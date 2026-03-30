@@ -4,7 +4,7 @@ moc_predefs.h
 qrc_resources.cpp
 ui_*.h
 Makefile
-trse
+/trse
 TRSE.pro.user
 w_*.tru
 
