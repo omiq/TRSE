@@ -126,6 +126,8 @@ The `.trse` file is INI text (`key = value`). Important keys:
 
 Templates under `Publish/project_templates/` are good references for valid combinations.
 
+**Full table of platform names and output formats:** [PLATFORMS_AND_OUTPUTS.md](./PLATFORMS_AND_OUTPUTS.md).
+
 ---
 
 ## Units and includes
