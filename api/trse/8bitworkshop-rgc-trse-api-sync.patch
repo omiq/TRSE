@@ -1,0 +1,533 @@
+From 3be306bf2b69b7c79d27d461024bb3e070b3486d Mon Sep 17 00:00:00 2001
+From: Cursor Agent <agent@cursor>
+Date: Wed, 1 Apr 2026 16:06:21 +0000
+Subject: [PATCH] TRSE API: CoCo/Dragon output_type=bin, INI merge, strip #
+ comments
+
+- compile.php: strip # lines from trse.ini; merge trse.defaults.ini (assembler_6809=OrgAsm);
+  force output_type=bin for TRS80COCO/DRAGON; include .bin in artifacts
+- trse.defaults.ini: OrgAsm for 6809
+- README: document host behavior; clarify IDE vs server for CoCo bin
+---
+ api/trse/README.md         |  11 +-
+ api/trse/compile.php       | 267 +++++++++++++++++--------------------
+ api/trse/trse.defaults.ini |  78 +----------
+ 3 files changed, 134 insertions(+), 222 deletions(-)
+
+diff --git a/api/trse/README.md b/api/trse/README.md
+index 82570b3..62bf2c2 100644
+--- a/api/trse/README.md
++++ b/api/trse/README.md
+@@ -6,6 +6,15 @@ PHP endpoint that accepts project files from a web IDE (same JSON shape as the K
+ 
+ ---
+ 
++## API host behavior (CoCo / Dragon, INI)
++
++- After copying **`TRSE_SETTINGS`**, **lines whose first non-empty character is `#` are stripped** from session `trse.ini` (TRSE’s parser does not treat `#` as comments).
++- **`trse.defaults.ini`** is merged: any **`key = value`** from defaults is **appended only if that key is missing** (e.g. **`assembler_6809 = OrgAsm`**).
++- For **`system = TRS80COCO`** or **`system = DRAGON`**, the session **`project.trse`** is rewritten to **`output_type = bin`** so the server does not need MAME **imgtool** (requires a TRSE build where **`SystemTRS80CoCo::PostProcess`** returns early when **`output_type == bin`**).
++- Environment variables: **`TRSE_DEFAULTS_INI`**, **`TRSE_UNITS_STOCK`**, **`TRSE_SETTINGS`** — see `compile.php` file header.
++
++---
++
+ ## Prerequisites
+ 
+ 1. **TRSE binary** available either:
+@@ -27,7 +36,7 @@ PHP endpoint that accepts project files from a web IDE (same JSON shape as the K
+ 
+ ## 8bitworkshop IDE integration
+ 
+-When the main file is **`*.ras`** or **`*.tru`** and the current platform is one that maps to a TRSE `system` (see `src/common/trse-platform-map.ts`), the in-browser worker calls this endpoint (`POST`, same JSON as below). Each build injects a generated **`project.trse`** (`system`, `output_type = prg`, `open_files`) and rewrites a root-level main source to **`files/<name>.ras`** so TRSE’s usual layout is satisfied. The compiled binary is picked from the returned **`artifacts`** list (preferring extensions by platform, e.g. `.prg` for C64).
++When the main file is **`*.ras`** or **`*.tru`** and the current platform is one that maps to a TRSE `system` (see `src/common/trse-platform-map.ts`), the in-browser worker calls this endpoint (`POST`, same JSON as below). Each build injects a generated **`project.trse`** (`system`, `output_type = prg` for most targets, `open_files`) and rewrites a root-level main source to **`files/<name>.ras`** so TRSE’s usual layout is satisfied. **On the server**, **`compile.php`** forces **`output_type = bin`** for **TRS80COCO** and **DRAGON** (see [API host behavior](#api-host-behavior-coco--dragon-ini) above). The compiled binary is picked from the returned **`artifacts`** list (preferring extensions by platform, e.g. `.prg` for C64, `.bin` for CoCo when applicable).
+ 
+ ### Error alert colors (UI theming)
+ 
+diff --git a/api/trse/compile.php b/api/trse/compile.php
+index bb33e0d..d02e3b4 100644
+--- a/api/trse/compile.php
++++ b/api/trse/compile.php
+@@ -2,31 +2,18 @@
+ /**
+  * TRSE compile API — same request shape as api/kickass/compile.php
+  *
+- * Requires `trse` on PATH or Docker image `trse:cli` (see TRSE_MODE below).
+- *
+  * JSON body:
+- *   sessionID   — required, alphanumeric (isolates /tmp/trse-api-{id})
+- *   updates     — required, array of { path, data } (UTF-8 text or data:base64,... for binaries)
+- *   buildStep   — required:
+- *       project — path to .trse file relative to session root (e.g. "project.trse")
+- *       path    — main source .ras or .tru relative to session root (e.g. "files/main.ras")
+- *       assemble — optional bool, default true (false = compile to .asm only)
++ *   sessionID, updates[], buildStep { project, path, assemble? }
+  *
+- * Environment variables:
+- *   TRSE_MODE = docker | native
+- *   TRSE_DOCKER_IMAGE = trse:cli
+- *   TRSE_NATIVE_BIN = /opt/trse/bin/trse
+- *   TRSE_SETTINGS = /etc/trse/trse.ini   (native: copied into session as trse.ini)
+- *   TRSE_DOCKER_SETTINGS = /etc/trse/trse.ini   (docker: path inside the image; default matches TRSE Dockerfiles)
+- *   TRSE_UNITS_STOCK = /path/to/TRSE/units  (optional; copied into session/units/)
++ * Environment:
++ *   TRSE_MODE, TRSE_DOCKER_IMAGE, TRSE_NATIVE_BIN, TRSE_SETTINGS, TRSE_UNITS_STOCK
++ *   TRSE_DEFAULTS_INI — path to trse.defaults.ini (default: __DIR__/trse.defaults.ini)
+  *
+- * Response (success):
+- *   artifacts: [ { "name": "main.prg", "mime": "application/octet-stream", "data": "<base64>" }, ... ]
+- *   log: string (compiler stdout/stderr)
++ * API host spec:
++ *   - TRS80COCO / DRAGON: session project.trse is rewritten to output_type = bin (skip MAME imgtool).
++ *   - trse.ini: strip # lines; merge defaults (assembler_6809 = OrgAsm); host TRSE_SETTINGS copied first.
+  *
+- * Response (failure):
+- *   errors: [ { "line": 0, "msg": "...", "path": "" }, ... ]
+- *   log: string (optional)
++ * Requires TRSE with SystemTRS80CoCo::PostProcess skipping imgtool when output_type=bin (upstream TRSE).
+  */
+ 
+ header('Access-Control-Allow-Origin: *');
+@@ -46,14 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+     exit(json_encode(['error' => 'Method not allowed']));
+ }
+ 
+-// --- Configuration (adjust for your server) ---
+-$TRSE_MODE = getenv('TRSE_MODE') ?: 'docker'; // docker | native
++$TRSE_MODE = getenv('TRSE_MODE') ?: 'docker';
+ $TRSE_DOCKER_IMAGE = getenv('TRSE_DOCKER_IMAGE') ?: 'trse:cli';
+ $TRSE_NATIVE_BIN = getenv('TRSE_NATIVE_BIN') ?: 'trse';
+-/** Host path to trse.ini; copied into session as trse.ini when set (so CLI always finds settings). */
+ $TRSE_SETTINGS_HOST = getenv('TRSE_SETTINGS') ?: '/etc/trse/trse.ini';
+-/** If set, recursively copy this directory into session as `units/` before writes (e.g. stock TRSE units). */
+ $TRSE_UNITS_STOCK = getenv('TRSE_UNITS_STOCK') ?: '';
++$TRSE_DEFAULTS_INI = getenv('TRSE_DEFAULTS_INI') ?: (__DIR__ . '/trse.defaults.ini');
+ 
+ $input = file_get_contents('php://input');
+ $data = json_decode($input, true);
+@@ -93,6 +78,7 @@ $result = compileTrse($buildStep, $updates, $sessionID, [
+     'native_bin' => $TRSE_NATIVE_BIN,
+     'settings_host' => $TRSE_SETTINGS_HOST,
+     'units_stock' => $TRSE_UNITS_STOCK,
++    'defaults_ini' => $TRSE_DEFAULTS_INI,
+ ]);
+ 
+ echo json_encode($result, JSON_UNESCAPED_UNICODE);
+@@ -111,7 +97,6 @@ function compileTrse($buildStep, $updates, $sessionID, $cfg)
+         return ['errors' => [['line' => 0, 'msg' => "Session directory not writable: {$sessionDir}", 'path' => '']]];
+     }
+ 
+-    // Optional: seed stock units (global includes) from TRSE install
+     if ($cfg['units_stock'] !== '' && is_dir($cfg['units_stock'])) {
+         trseRecursiveCopy($cfg['units_stock'], $sessionDir . '/units');
+     }
+@@ -149,59 +134,30 @@ function compileTrse($buildStep, $updates, $sessionID, $cfg)
+         return ['errors' => [['line' => 0, 'msg' => "Main source not found: {$mainFile}", 'path' => $mainFile]]];
+     }
+ 
+-    // CoCo/Dragon: TRSE's default `output_type = prg` runs MAME `imgtool` (often missing on API hosts).
+-    // Force raw `bin` in the uploaded/generated project before compile so the log never hits imgtool.
+-    trseForceOutputTypeBinIf6809($sessionDir, $projectFile);
++    $settingsPath = $sessionDir . '/trse.ini';
++    $settingsArg = 'settings=trse.ini';
+ 
+-    $sessionIni = $sessionDir . '/trse.ini';
+-    $bundledDefaults = __DIR__ . '/trse.defaults.ini';
+-    // When the client does not upload trse.ini, seed session trse.ini from repo defaults (6809 Morgasm, etc.).
+-    // Docker mode used to pass only the image's /etc/trse/trse.ini, which often omits assembler_6809=OrgAsm,
+-    // so TRSE required LWASM on disk for CoCo/Dragon/Tandy.
+-    if (!is_file($sessionIni) && is_readable($bundledDefaults)) {
+-        if (!copy($bundledDefaults, $sessionIni)) {
+-            return ['errors' => [['line' => 0, 'msg' => 'Could not copy bundled TRSE defaults to session', 'path' => 'trse.ini']]];
++    if (is_readable($cfg['settings_host'])) {
++        if (!copy($cfg['settings_host'], $settingsPath)) {
++            return ['errors' => [['line' => 0, 'msg' => 'Could not copy TRSE settings to session', 'path' => 'trse.ini']]];
+         }
++    } elseif (!is_file($settingsPath)) {
++        return ['errors' => [['line' => 0, 'msg' => 'No trse.ini: set TRSE_SETTINGS or upload trse.ini in updates', 'path' => 'trse.ini']]];
+     }
+ 
+-    // Settings: prefer session trse.ini when present (seeded above, from updates, or from host below).
+-    // Docker: use settings=trse.ini in /work whenever that file exists so Morgasm/LWASM choice comes from defaults.
+-    $settingsArg = 'settings=trse.ini';
+-    if ($cfg['mode'] === 'docker') {
+-        if (!is_file($sessionIni)) {
+-            $dockerSettings = getenv('TRSE_DOCKER_SETTINGS') ?: '/etc/trse/trse.ini';
+-            $settingsArg = 'settings=' . $dockerSettings;
+-        }
+-    } else {
+-        if (is_readable($cfg['settings_host'])) {
+-            if (!copy($cfg['settings_host'], $sessionIni)) {
+-                return ['errors' => [['line' => 0, 'msg' => 'Could not copy TRSE settings to session', 'path' => 'trse.ini']]];
+-            }
+-        } elseif (!is_file($sessionIni)) {
+-            if (is_readable($bundledDefaults)) {
+-                if (!copy($bundledDefaults, $sessionIni)) {
+-                    return ['errors' => [['line' => 0, 'msg' => 'Could not copy bundled TRSE defaults to session', 'path' => 'trse.ini']]];
+-                }
+-            } else {
+-                return ['errors' => [['line' => 0, 'msg' => 'No trse.ini: set TRSE_SETTINGS to a valid host file, upload trse.ini in updates, or ship api/trse/trse.defaults.ini', 'path' => 'trse.ini']]];
+-            }
+-        }
+-    }
++    trseStripHashCommentsIni($settingsPath);
++    trseMergeIniDefaults($settingsPath, $cfg['defaults_ini']);
++    trseApiForceCoCoDragonBin($sessionDir, $projectFile);
+ 
+     $args = [
+         'op=project',
+         'project=' . $projectFile,
+         'input_file=' . $mainFile,
+         $settingsArg,
++        $assemble ? 'assemble=yes' : 'assemble=no',
+     ];
+-    // Default CLI behavior is compile+assemble; only pass assemble=no when requested (matches bare docker CLI).
+-    if (!$assemble) {
+-        $args[] = 'assemble=no';
+-    }
+ 
+     $cmd = trseBuildCommand($cfg, $sessionDir, $args);
+-    $log = '';
+-    $code = 0;
+     exec($cmd . ' 2>&1', $out, $code);
+     $log = implode("\n", $out);
+ 
+@@ -212,63 +168,119 @@ function compileTrse($buildStep, $updates, $sessionID, $cfg)
+         ];
+     }
+ 
+-    $artifacts = trseCollectArtifacts($sessionDir, $mainFile, $projectFile);
+-
+     return [
+-        'artifacts' => $artifacts,
++        'artifacts' => trseCollectArtifacts($sessionDir, $mainFile, $projectFile),
+         'log' => $log,
+     ];
+ }
+ 
+-function trseIsSafeRelative($path)
++/** TRSE CIniFile treats # as invalid lines — remove # comment lines. */
++function trseStripHashCommentsIni($path)
+ {
+-    $path = str_replace('\\', '/', $path);
+-    if ($path === '' || $path[0] === '/') {
+-        return false;
++    $raw = file_get_contents($path);
++    if ($raw === false) {
++        return;
+     }
+-    if (preg_match('#(^|/)\.\.(/|$)#', $path)) {
+-        return false;
++    $lines = preg_split('/\r\n|\r|\n/', $raw);
++    $kept = [];
++    foreach ($lines as $line) {
++        $t = trim($line);
++        if ($t !== '' && isset($t[0]) && $t[0] === '#') {
++            continue;
++        }
++        $kept[] = $line;
+     }
+-    return true;
++    file_put_contents($path, implode("\n", $kept) . "\n");
+ }
+ 
+-/**
+- * If project.trse targets TRS80COCO or DRAGON, force `output_type = bin` so TRSE never invokes MAME imgtool.
+- */
+-function trseForceOutputTypeBinIf6809($sessionDir, $projectFile)
++function trseIniParseKeys($content)
+ {
+-    if (!trseIsSafeRelative($projectFile)) {
+-        return;
++    $keys = [];
++    foreach (preg_split('/\r\n|\r|\n/', $content) as $line) {
++        $line = trim($line);
++        if ($line === '' || (isset($line[0]) && ($line[0] === ';' || $line[0] === '#'))) {
++            continue;
++        }
++        if (strpos($line, '=') === false) {
++            continue;
++        }
++        $k = strtolower(trim(explode('=', $line, 2)[0]));
++        $keys[$k] = true;
+     }
+-    $path = $sessionDir . '/' . str_replace('\\', '/', $projectFile);
+-    if (!is_file($path) || !is_readable($path)) {
++    return $keys;
++}
++
++/** Append lines from defaults for keys not already in session trse.ini */
++function trseMergeIniDefaults($sessionIniPath, $defaultsPath)
++{
++    if (!is_readable($defaultsPath)) {
+         return;
+     }
+-    $text = file_get_contents($path);
+-    if ($text === false) {
++    $sess = file_get_contents($sessionIniPath);
++    if ($sess === false) {
+         return;
+     }
+-    if (!preg_match('/^\s*system\s*=\s*(TRS80COCO|DRAGON)\s*$/mi', $text)) {
++    $have = trseIniParseKeys($sess);
++    $def = file_get_contents($defaultsPath);
++    if ($def === false) {
+         return;
+     }
+-    $lines = preg_split("/\r\n|\n|\r/", $text);
+-    $out = [];
+-    $seen = false;
+-    foreach ($lines as $line) {
+-        if (preg_match('/^\s*output_type\s*=/i', $line)) {
+-            $out[] = 'output_type = bin';
+-            $seen = true;
+-        } else {
+-            $out[] = $line;
++    $append = '';
++    foreach (preg_split('/\r\n|\r|\n/', $def) as $line) {
++        $t = trim($line);
++        if ($t === '' || (isset($t[0]) && $t[0] === ';')) {
++            continue;
++        }
++        if (strpos($line, '=') === false) {
++            continue;
++        }
++        $k = strtolower(trim(explode('=', $line, 2)[0]));
++        if (!isset($have[$k])) {
++            $append .= trim($line) . "\n";
++            $have[$k] = true;
+         }
+     }
+-    if (!$seen) {
+-        $out[] = 'output_type = bin';
++    if ($append !== '') {
++        file_put_contents($sessionIniPath, rtrim($sess) . "\n" . $append);
++    }
++}
++
++/** API builds: flat .bin only (no MAME imgtool) for CoCo / Dragon. */
++function trseApiForceCoCoDragonBin($sessionDir, $projectFile)
++{
++    $full = $sessionDir . '/' . $projectFile;
++    $content = file_get_contents($full);
++    if ($content === false) {
++        return;
++    }
++    if (!preg_match('/^\s*system\s*=\s*(\S+)/mi', $content, $m)) {
++        return;
++    }
++    $sys = strtoupper(trim($m[1]));
++    if ($sys !== 'TRS80COCO' && $sys !== 'DRAGON') {
++        return;
++    }
++    if (preg_match('/^\s*output_type\s*=/mi', $content)) {
++        $content = preg_replace('/^\s*output_type\s*=\s*[^\r\n]*/mi', 'output_type = bin', $content);
++    } else {
++        $content = rtrim($content) . "\noutput_type = bin\n";
+     }
+-    file_put_contents($path, implode("\n", $out));
++    file_put_contents($full, $content);
+ }
+ 
+-/** @return true|string error message */
++function trseIsSafeRelative($path)
++{
++    $path = str_replace('\\', '/', $path);
++    if ($path === '' || $path[0] === '/') {
++        return false;
++    }
++    if (preg_match('#(^|/)\.\.(/|$)#', $path)) {
++        return false;
++    }
++    return true;
++}
++
++/** @return true|string */
+ function trseSafeWrite($baseDir, $relativePath, $contents)
+ {
+     if (!trseIsSafeRelative($relativePath)) {
+@@ -330,50 +342,28 @@ function trseBuildCommand($cfg, $sessionDir, $args)
+ function trseParseErrors($log)
+ {
+     $errors = [];
+-    $seen = [];
+-    $pushUnique = function($lineNo, $msg, $path = '') use (&$errors, &$seen) {
+-        $clean = trim((string)$msg);
+-        if ($clean === '') {
+-            return;
+-        }
+-        $key = strtolower($lineNo . '|' . $path . '|' . $clean);
+-        if (isset($seen[$key])) {
+-            return;
+-        }
+-        $seen[$key] = true;
+-        $errors[] = ['line' => (int)$lineNo, 'msg' => $clean, 'path' => $path];
+-    };
+     foreach (explode("\n", $log) as $line) {
+         $line = trim($line);
+         if ($line === '') {
+             continue;
+         }
+-        // file.ext:<line> or file.ext(<line>) patterns
+-        if (preg_match('/\.(ras|tru|trse)[:(]\s*(\d+)\s*[):]/i', $line, $m)) {
+-            $pushUnique((int)$m[2], $line, '');
+-        } elseif (preg_match('/\bline\s+(\d+)\b/i', $line, $m)) {
+-            $pushUnique((int)$m[1], $line, '');
+-        } elseif (preg_match('/error|fatal|exception|invalid|expected|not found/i', $line)) {
+-            $pushUnique(0, $line, '');
++        if (preg_match('/\.ras[:(]\s*(\d+)\s*[):]/i', $line, $m)) {
++            $errors[] = ['line' => (int)$m[1], 'msg' => $line, 'path' => ''];
++        } elseif (preg_match('/error|fatal|Error/i', $line)) {
++            $errors[] = ['line' => 0, 'msg' => $line, 'path' => ''];
+         }
+     }
+     if (empty($errors) && trim($log) !== '') {
+-        $pushUnique(0, trim($log), '');
++        $errors[] = ['line' => 0, 'msg' => trim($log), 'path' => ''];
+     }
+     return $errors;
+ }
+ 
+-/**
+- * Collect build products from session dir (flat list).
+- * Primary outputs depend on project .trse (output_type, system).
+- */
+ function trseCollectArtifacts($sessionDir, $mainFile, $projectFile)
+ {
+     $base = pathinfo($mainFile, PATHINFO_FILENAME);
+     $exts = [
+-        'prg', 'bin', 'xex', 'd64', 'd81', 'crt', 'tap', 't64', 'gb', 'gbc', 'nes', 'asm',
+-        'dsk', 'cdt',
+-        'vs', 'sym',
++        'prg', 'bin', 'd64', 'd81', 'crt', 'tap', 't64', 'gb', 'gbc', 'nes', 'asm', 'vs', 'sym',
+     ];
+     $out = [];
+     $seen = [];
+@@ -386,7 +376,7 @@ function trseCollectArtifacts($sessionDir, $mainFile, $projectFile)
+         }
+     }
+ 
+-    foreach (glob($sessionDir . '/*.{prg,bin,xex,d64,crt,tap,gb,nes,dsk,cdt}', GLOB_BRACE) ?: [] as $f) {
++    foreach (glob($sessionDir . '/*.{prg,bin,d64,crt,tap,gb,nes}', GLOB_BRACE) ?: [] as $f) {
+         if (empty($seen[$f])) {
+             $seen[$f] = true;
+             $out[] = trseArtifact($f);
+@@ -394,7 +384,7 @@ function trseCollectArtifacts($sessionDir, $mainFile, $projectFile)
+     }
+     $filesDir = $sessionDir . '/files';
+     if (is_dir($filesDir)) {
+-        foreach (glob($filesDir . '/*.{prg,bin,xex,d64,crt,dsk,cdt}', GLOB_BRACE) ?: [] as $f) {
++        foreach (glob($filesDir . '/*.{prg,bin,d64,crt}', GLOB_BRACE) ?: [] as $f) {
+             if (empty($seen[$f])) {
+                 $seen[$f] = true;
+                 $out[] = trseArtifact($f);
+@@ -402,23 +392,6 @@ function trseCollectArtifacts($sessionDir, $mainFile, $projectFile)
+         }
+     }
+ 
+-    // Fallback: scan recursively for known output extensions in case TRSE writes to subfolders.
+-    $extSet = array_fill_keys($exts, true);
+-    $it = new RecursiveIteratorIterator(
+-        new RecursiveDirectoryIterator($sessionDir, RecursiveDirectoryIterator::SKIP_DOTS),
+-        RecursiveIteratorIterator::LEAVES_ONLY
+-    );
+-    foreach ($it as $item) {
+-        if (!$item->isFile()) continue;
+-        $f = $item->getPathname();
+-        $ext = strtolower(pathinfo($f, PATHINFO_EXTENSION));
+-        if (!isset($extSet[$ext])) continue;
+-        if (empty($seen[$f])) {
+-            $seen[$f] = true;
+-            $out[] = trseArtifact($f);
+-        }
+-    }
+-
+     return $out;
+ }
+ 
+diff --git a/api/trse/trse.defaults.ini b/api/trse/trse.defaults.ini
+index 7771ebd..ca8586f 100644
+--- a/api/trse/trse.defaults.ini
++++ b/api/trse/trse.defaults.ini
+@@ -1,75 +1,5 @@
+-; Bundled fallback for api/trse/compile.php when TRSE_SETTINGS is unset or unreadable.
+-; (TRSE's ini parser does not accept # comment lines.)
+-windowpalette = 0
+-font_size = 12
+-font_size_symbols = 10
+-hide_exomizer_footprint = 1
+-tab_width = 4
+-editor_font = Courier
+-editor_font_symbols = Courier
+-auto_inject = 1
+-editor_cursor_width = 1
+-theme = dark_standard.ini
+-theme_fjong = dark_standard.ini
+-post_optimize = 1
+-display_addresses = 0
+-display_cycles = 1
+-display_warnings = 1
+-memory_analyzer_font_size = 17
+-memory_analyzer_window_width = 600
+-memory_analyzer_window_height = 600
+-image_painter = 0
+-ok64_emulator = bin/OK64
+-optimizer_remove_unused_symbols = 0
+-assembler = OrgAsm
+-assembler_z80 = OrgAsm
+-; 6809 (TRS-80 CoCo, Dragon, Thomson): OrgAsm = TRSE internal "Morgasm"; without this TRSE expects LWASM on disk.
++; Merged into each session trse.ini for keys not already present (after host copy).
++; TRSE CIniFile only accepts lines with key = value. Use ; for comments.
++; PHP strips # lines before TRSE reads the file.
++
+ assembler_6809 = OrgAsm
+-recent_projects = 0
+-default_project_dir = 0
+-vasmm_target_dir = 0
+-vasmm_target_dir_atarist = 0
+-vasmm = 0
+-nasm = 0
+-dosbox = 0
+-dasm = 0
+-exomizer = 0
+-tinycrunch = 0
+-emulator = /usr/bin/x64
+-vic20_emulator = /usr/bin/xvic
+-pet_emulator = /usr/bin/petcat
+-c128_emulator = /usr/bin/x128
+-atari2600_emulator = 0
+-plus4_emulator = /usr/bin/xplus4
+-x16_emulator = 0
+-amstradcpc_emulator = 0
+-coleco_emulator = 0
+-c1541 = 0
+-spectrum_emulator = 0
+-tiki100_emulator = 0
+-pasmo = 0
+-cpcdisk_location = 0
+-gameboy_rgbasm_dir = 0
+-nes_emulator = /usr/games/mednafen
+-gameboy_emulator = /usr/games/mednafen
+-user_defined_command = 0
+-disable_file_colors = 0
+-exomizer_version_3 = 0
+-custom_keyword_list = ,
+-custom_keyword_colour = ,
+-custom_keyword_bold = 0
+-custom_keyword_italic = 0
+-font_size_scale = 0.75
+-compile_thread = 1
+-splash_seconds = 1
+-backup_files_count = 10
+-bbc_emulator = 0
+-atari800_emulator = 0
+-sidplayer = 0
+-mega65_emulator = 0
+-auto_backup = 0
+-user_defined_command_parameters = 0
+-msx_emulator = 0
+-appleii_emulator = 0
+-lz4 = /usr/bin/lz4
+-editor_autocomplete = 1
+-- 
+2.43.0
+
