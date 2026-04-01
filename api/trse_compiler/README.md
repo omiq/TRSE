@@ -2,7 +2,9 @@
 
 PHP endpoint that accepts project files from a web IDE (same JSON shape as the KickAss API), runs **[TRSE](https://github.com/leuat/TRSE)** in **CLI mode** (`trse -cli`), and returns build artifacts as base64.
 
-**Script location:** `api/trse_compiler/compile.php`
+**Production deployment (8bitworkshop-rgc):** use **`api/trse/`** — same files as here, path `api/trse/compile.php`.
+
+**Script location (this repo):** `api/trse_compiler/compile.php` (duplicate of `api/trse/compile.php`)
 
 ---
 
