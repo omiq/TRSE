@@ -106,6 +106,43 @@ IMAGE_TYPE_NAMES: dict[int, str] = {
     47: "CGA_HIRES",
 }
 
+def _hint_wrong_file_for_flf2png(raw: bytes) -> str:
+    """Extra help when input is not FLUFF64 (usually wrong subcommand or file type)."""
+    if not raw:
+        return "The file is empty."
+    if raw.startswith(b"\x89PNG"):
+        return (
+            "The file looks like a PNG image, not a TRSE .flf.\n"
+            "  • PNG → .flf:  python3 flf_tool.py png2flf  <image.png>  <out.flf>\n"
+            "  • .flf → PNG:  python3 flf_tool.py flf2png  <in.flf>   <out.png>"
+        )
+    if raw.startswith((b"GIF87a", b"GIF89a")):
+        return (
+            "The file looks like a GIF. flf2png expects a .flf file. "
+            "Convert to PNG first, then use png2flf if you need a .flf."
+        )
+    if raw.startswith(b"\xff\xd8\xff"):
+        return (
+            "The file looks like a JPEG. flf2png expects a .flf file. "
+            "Use a PNG workflow (convert to PNG, then png2flf if needed)."
+        )
+    if raw.startswith(b"BM"):
+        return "The file looks like a BMP. flf2png expects a TRSE .flf (FLUFF64), not a bitmap image."
+    return (
+        f"TRSE .flf files must begin with the ASCII magic {MAGIC.decode('ascii')!r} (7 bytes)."
+    )
+
+
+def _hint_wrong_file_for_png2flf(raw: bytes) -> None:
+    """Raise ValueError if the user passed a .flf where png2flf expects PNG."""
+    if raw.startswith(MAGIC):
+        raise ValueError(
+            "This file looks like a TRSE .flf, not a PNG image.\n"
+            "  • .flf → PNG:  python3 flf_tool.py flf2png  <in.flf>   <out.png>\n"
+            "  • PNG → .flf:  python3 flf_tool.py png2flf  <image.png>  <out.flf>"
+        )
+
+
 PALETTE_TYPE_NAMES: dict[int, str] = {
     0: "C64",
     1: "C64_ORG",
@@ -135,11 +172,18 @@ PALETTE_TYPE_NAMES: dict[int, str] = {
 def describe_flf_header(raw: bytes) -> tuple[int, int, int, str]:
     """Return (version, image_type, palette_type, summary_line). Raises ValueError if too small or bad magic."""
     if len(raw) < HEADER_PREFIX:
+        extra = ""
+        if not raw or raw.startswith(b"\x89PNG") or raw.startswith(b"GIF"):
+            extra = "\n\n" + _hint_wrong_file_for_flf2png(raw)
         raise ValueError(
-            f"File too small ({len(raw)} bytes) to be FLUFF64 (need at least {HEADER_PREFIX} bytes for header)."
+            f"Not a TRSE .flf file: too small ({len(raw)} bytes); "
+            f"need at least {HEADER_PREFIX} bytes for the FLUFF64 header.{extra}"
         )
     if raw[: len(MAGIC)] != MAGIC:
-        raise ValueError(f"Not a TRSE FLF (bad magic): expected {MAGIC!r}, got {raw[: len(MAGIC)]!r}")
+        raise ValueError(
+            "Not a TRSE .flf file (missing FLUFF64 magic at the start of the file).\n\n"
+            + _hint_wrong_file_for_flf2png(raw)
+        )
     ver = struct.unpack_from("<i", raw, len(MAGIC))[0]
     off = len(MAGIC) + 4
     img_type = raw[off]
@@ -399,7 +443,15 @@ def flf_multicolor_to_png(raw: bytes, desc: str, png_path: Path) -> None:
 
 
 def png_to_flf(png_path: Path, flf_path: Path) -> None:
-    im = Image.open(png_path).convert("RGBA")
+    raw = png_path.read_bytes()
+    _hint_wrong_file_for_png2flf(raw)
+    try:
+        im = Image.open(png_path).convert("RGBA")
+    except Exception as e:
+        raise ValueError(
+            f"Could not read {png_path.name!r} as an image ({e}). "
+            "png2flf expects a bitmap file Pillow can open (e.g. PNG or JPEG)."
+        ) from e
     im = im.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
     data = bytearray(PAYLOAD)
     px = im.load()
@@ -517,12 +569,19 @@ def main() -> None:
     inf.add_argument("input", type=Path)
 
     args = p.parse_args()
-    if args.cmd == "png2flf":
-        png_to_flf(args.input, args.output)
-    elif args.cmd == "flf2png":
-        flf_to_png(args.input, args.output)
-    else:
-        cmd_info(args.input)
+    try:
+        if args.cmd == "png2flf":
+            png_to_flf(args.input, args.output)
+        elif args.cmd == "flf2png":
+            flf_to_png(args.input, args.output)
+        else:
+            cmd_info(args.input)
+    except ValueError as e:
+        print(f"Error:\n{e}", file=sys.stderr)
+        sys.exit(2)
+    except OSError as e:
+        print(f"Error: could not read or write a file: {e}", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

@@ -29,6 +29,8 @@ python3 flf_tool.py info image.flf
 - **flf2png:** **image_type=0** (QImageBitmap, **64269** bytes) or **image_type=1** (MultiColor C64, **12271** bytes), **palette_type=0**. Other types: use **`info`**, then TRSE or a future decoder.
 - **info:** Prints magic, version, image/palette type names, and file size.
 
+If you use the wrong subcommand (e.g. **`flf2png`** on a **PNG**), the tool prints a short explanation and the correct command lines instead of a raw traceback.
+
 ## Limits
 
 **png2flf** only emits QImageBitmap (type 0). **flf2png** supports types **0** and **1** (C64 multicolor screen). Sprites, charsets, other platforms, etc. need different parsers.
