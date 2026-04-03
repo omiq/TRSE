@@ -32,14 +32,14 @@ All integers **little-endian** unless stated. Offsets are from start of file.
 
 | Offset | Size | Field | Value / rule |
 |--------|------|--------|----------------|
-| 0 | 8 | Magic | ASCII **`FLUFF64`** (8 bytes, same as `LImageIO::m_ID`) |
-| 8 | 4 | Version | **`flfVersion`** from TRSE: integer **2** (`Data::data.flfVersion` in `source/LeLib/data.h`). **Read/write as 4 bytes** (same as `sizeof(int)` in `Load`). *Note:* `Save` in TRSE uses `memcpy` into 4 bytes but writes with `sizeof(float)` length — still 4 bytes on typical platforms. |
-| 12 | 1 | Image type | **`0`** = `QImageBitmap` |
-| 13 | 1 | Palette type | **`0`** = `LColorList::C64` |
-| 14 | *N* | Payload | Type-specific binary (`SaveBin`) — see §3 |
-| 14+N | 256 | Footer | `LImageFooter` block — see §4 |
+| 0 | 7 | Magic | ASCII **`FLUFF64`** (**7 bytes** — `QString("FLUFF64")` in TRSE, not 8) |
+| 7 | 4 | Version | **`flfVersion`** from TRSE: integer **2** (`Data::data.flfVersion` in `source/LeLib/data.h`). **Read/write as 4 bytes** (same as `sizeof(int)` in `Load`). *Note:* `Save` in TRSE uses `memcpy` into 4 bytes but writes with `sizeof(float)` length — still 4 bytes on typical platforms. |
+| 11 | 1 | Image type | **`0`** = `QImageBitmap` |
+| 12 | 1 | Palette type | **`0`** = `LColorList::C64` |
+| 13 | *N* | Payload | Type-specific binary (`SaveBin`) — see §3 |
+| 13+N | 256 | Footer | `LImageFooter` block — see §4 |
 
-**Total size (v1):** `8 + 4 + 1 + 1 + 320*200 + 256 = 64_256` bytes (no palette tail).
+**Total size (v1):** `7 + 4 + 1 + 1 + 320*200 + 256 = 64_269` bytes (no palette tail).
 
 ---
 
