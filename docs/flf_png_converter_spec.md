@@ -22,6 +22,8 @@ It is derived from TRSE source (`source/LeLib/limage/limageio.cpp`, `limage.cpp`
 
 **Rationale:** `QImageBitmap` + default size is the simplest path to round-trip PNG (resize/quantize input to 320×200 indexed).
 
+**Note (C64 MultiColorBitmap, image type 1):** The binary payload is identical for hires and multicolor; TRSE records the display mode in the **footer** at index **5** (`POS_DISPLAY_MULTICOLOR`). Tools must use that byte (or an explicit flag) to choose 320×200 vs 160×200 decoding.
+
 Future versions can add flags: `--type`, `--palette`, `--width/--height` once those `SaveBin`/`LoadBin` layouts are specified.
 
 ---

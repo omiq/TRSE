@@ -40,6 +40,8 @@ HEIGHT = 200
 FOOTER_SIZE = 256
 FOOTER_ID0 = 64
 FOOTER_ID1 = 69
+# limagefooter.h — saved with every .flf; TRSE uses this for MultiColorBitmap hires vs multicolor display
+FOOTER_POS_DISPLAY_MULTICOLOR = 5
 PAYLOAD = WIDTH * HEIGHT
 V1_TOTAL = HEADER_PREFIX + PAYLOAD + FOOTER_SIZE
 
@@ -172,6 +174,25 @@ PALETTE_TYPE_NAMES: dict[int, str] = {
     20: "THOMSON",
     21: "MONO",
 }
+
+
+def footer_bytes(raw: bytes) -> bytes:
+    """Last 256 bytes of a complete .flf (LImageFooter)."""
+    if len(raw) < FOOTER_SIZE:
+        return b""
+    return raw[-FOOTER_SIZE:]
+
+
+def multicolor_file_is_hires(raw: bytes) -> bool:
+    """
+    MultiColorBitmap (.flf image_type=1) stores the same SaveBin for hires and multicolor.
+    TRSE records the mode in the footer: POS_DISPLAY_MULTICOLOR==0 → hires (320×200), ==1 → multicolor.
+    See formimageeditor.cpp / limagefooter.h.
+    """
+    foot = footer_bytes(raw)
+    if len(foot) < FOOTER_POS_DISPLAY_MULTICOLOR + 1:
+        return True
+    return foot[FOOTER_POS_DISPLAY_MULTICOLOR] == 0
 
 
 def describe_flf_header(raw: bytes) -> tuple[int, int, int, str]:
@@ -511,7 +532,10 @@ def flf_to_png(flf_path: Path, png_path: Path) -> None:
         )
 
     if img_type == IMAGE_TYPE_MULTICOLOR_C64:
-        flf_multicolorimage_to_png(raw, desc, png_path, hires=False)
+        # Same TRSE type for C64 bitmap; footer byte 5 selects hires vs multicolor pixel layout.
+        flf_multicolorimage_to_png(
+            raw, desc, png_path, hires=multicolor_file_is_hires(raw)
+        )
         return
 
     if img_type == IMAGE_TYPE_HIRES_C64:
@@ -567,6 +591,13 @@ def cmd_info(path: Path) -> None:
         print(f"  flf2png (QImageBitmap): expects {V1_TOTAL} bytes, have {len(raw)}")
     elif img_type == IMAGE_TYPE_MULTICOLOR_C64:
         print(f"  flf2png (MultiColor C64): expects {MC_TOTAL} bytes, have {len(raw)}")
+        foot = footer_bytes(raw)
+        if len(foot) > FOOTER_POS_DISPLAY_MULTICOLOR:
+            mc = foot[FOOTER_POS_DISPLAY_MULTICOLOR]
+            mode = "hires (320×200)" if mc == 0 else "multicolor (160×200)"
+            print(
+                f"  footer[{FOOTER_POS_DISPLAY_MULTICOLOR}] (display multicolor)={mc} → decode as {mode}"
+            )
     elif img_type == IMAGE_TYPE_HIRES_C64:
         print(f"  flf2png (Hires C64): expects {MC_TOTAL} bytes, have {len(raw)}")
     elif img_type == IMAGE_TYPE_SPRITES2:
