@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 TRSE FLF (FLUFF64): C64 palette — flf2png decodes types 0 (QImageBitmap), 1 (MultiColor),
-and 10 (Sprites2). png2flf writes type 0 only.
+2 (Hires C64), and 10 (Sprites2). png2flf writes type 0 only.
 
 See docs/flf_png_converter_spec.md. Requires: pip install pillow
 """
@@ -26,6 +26,7 @@ HEADER_PREFIX = len(MAGIC) + 4 + 1 + 1  # 13
 VERSION = 2
 IMAGE_TYPE_QIMAGE = 0
 IMAGE_TYPE_MULTICOLOR_C64 = 1
+IMAGE_TYPE_HIRES_C64 = 2  # StandardColorImage — MultiColorImage with m_bitMask=1, m_scale=1 (320×200)
 IMAGE_TYPE_SPRITES2 = 10
 PALETTE_TYPE_C64 = 0
 
@@ -53,6 +54,10 @@ MC_WIDTH = 160
 MC_HEIGHT = 200
 MC_PAYLOAD = 2 + MC_CHAR_WIDTH * MC_CHAR_HEIGHT * MC_PIXELCHAR_BYTES  # 12002
 MC_TOTAL = HEADER_PREFIX + MC_PAYLOAD + FOOTER_SIZE
+
+# Hires C64 uses same SaveBin payload size as multicolor (1000 PixelChars); TRSE getPixel uses bitmask 1, scale 1.
+HIRES_BITMASK = 0b1
+HIRES_WIDTH = 320
 
 # LImage::TypeToString — source/LeLib/limage/limage.cpp (subset)
 IMAGE_TYPE_NAMES: dict[int, str] = {
@@ -407,12 +412,18 @@ def flf_sprites2_to_png(raw: bytes, desc: str, png_path: Path) -> None:
     out.save(png_path, "PNG")
 
 
-def flf_multicolor_to_png(raw: bytes, desc: str, png_path: Path) -> None:
-    """Decode FLF image_type=1 (MultiColorBitmap C64) — MultiColorImage::SaveBin layout."""
+def flf_multicolorimage_to_png(
+    raw: bytes, desc: str, png_path: Path, *, hires: bool
+) -> None:
+    """
+    Decode MultiColorImage::SaveBin — types 1 (multicolor) and 2 (hires C64).
+    Multicolor: m_bitMask=0b11, m_scale=2 → 160×200. Hires: m_bitMask=1, m_scale=1 → 320×200.
+    """
+    label = "HiresBitmap (C64)" if hires else "MultiColorBitmap (C64)"
     if len(raw) < MC_TOTAL:
         raise ValueError(
             f"{desc}\n\n"
-            f"Expected {MC_TOTAL} bytes for MultiColorBitmap C64 (160×200) + footer, got {len(raw)}."
+            f"Expected {MC_TOTAL} bytes for {label} + footer, got {len(raw)}."
         )
     p0 = HEADER_PREFIX
     blob = raw[p0 : p0 + MC_PAYLOAD]
@@ -424,7 +435,8 @@ def flf_multicolor_to_png(raw: bytes, desc: str, png_path: Path) -> None:
 
     # Skip 2-byte prefix (background / unused) — see MultiColorImage::LoadBin
     off = 2
-    im = Image.new("RGBA", (MC_WIDTH, MC_HEIGHT))
+    out_w = HIRES_WIDTH if hires else MC_WIDTH
+    im = Image.new("RGBA", (out_w, MC_HEIGHT))
     pix = im.load()
     for cy in range(MC_CHAR_HEIGHT):
         for cx in range(MC_CHAR_WIDTH):
@@ -433,12 +445,20 @@ def flf_multicolor_to_png(raw: bytes, desc: str, png_path: Path) -> None:
             p = pc[0:8]
             c = (pc[8], pc[9], pc[10], pc[11])
             for ly in range(8):
-                for lx in range(4):
-                    gx = cx * 4 + lx
-                    gy = cy * 8 + ly
-                    col_idx = pixelchar_get(MC_SCALE * lx, ly, MC_BITMASK, p, c)
-                    r, g, b = rgb_for_index(col_idx)
-                    pix[gx, gy] = (r, g, b, 255)
+                if hires:
+                    for lx in range(8):
+                        gx = cx * 8 + lx
+                        gy = cy * 8 + ly
+                        col_idx = pixelchar_get(lx, ly, HIRES_BITMASK, p, c)
+                        r, g, b = rgb_for_index(col_idx)
+                        pix[gx, gy] = (r, g, b, 255)
+                else:
+                    for lx in range(4):
+                        gx = cx * 4 + lx
+                        gy = cy * 8 + ly
+                        col_idx = pixelchar_get(MC_SCALE * lx, ly, MC_BITMASK, p, c)
+                        r, g, b = rgb_for_index(col_idx)
+                        pix[gx, gy] = (r, g, b, 255)
     im.save(png_path, "PNG")
 
 
@@ -491,7 +511,11 @@ def flf_to_png(flf_path: Path, png_path: Path) -> None:
         )
 
     if img_type == IMAGE_TYPE_MULTICOLOR_C64:
-        flf_multicolor_to_png(raw, desc, png_path)
+        flf_multicolorimage_to_png(raw, desc, png_path, hires=False)
+        return
+
+    if img_type == IMAGE_TYPE_HIRES_C64:
+        flf_multicolorimage_to_png(raw, desc, png_path, hires=True)
         return
 
     if img_type == IMAGE_TYPE_SPRITES2:
@@ -502,7 +526,8 @@ def flf_to_png(flf_path: Path, png_path: Path) -> None:
         raise ValueError(
             f"{desc}\n\n"
             f"flf2png supports image_type={IMAGE_TYPE_QIMAGE} (QImageBitmap), "
-            f"{IMAGE_TYPE_MULTICOLOR_C64} (MultiColor C64), or {IMAGE_TYPE_SPRITES2} (Sprites2). "
+            f"{IMAGE_TYPE_MULTICOLOR_C64} (MultiColor C64), {IMAGE_TYPE_HIRES_C64} (Hires C64), "
+            f"or {IMAGE_TYPE_SPRITES2} (Sprites2). "
             f"For image_type {img_type}, open in TRSE or extend flf_tool (SaveBin in TRSE source)."
         )
 
@@ -542,6 +567,8 @@ def cmd_info(path: Path) -> None:
         print(f"  flf2png (QImageBitmap): expects {V1_TOTAL} bytes, have {len(raw)}")
     elif img_type == IMAGE_TYPE_MULTICOLOR_C64:
         print(f"  flf2png (MultiColor C64): expects {MC_TOTAL} bytes, have {len(raw)}")
+    elif img_type == IMAGE_TYPE_HIRES_C64:
+        print(f"  flf2png (Hires C64): expects {MC_TOTAL} bytes, have {len(raw)}")
     elif img_type == IMAGE_TYPE_SPRITES2:
         print("  flf2png (Sprites2): variable size (pens + sprite list + 256-byte footer)")
     else:

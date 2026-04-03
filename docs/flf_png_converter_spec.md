@@ -47,12 +47,12 @@ All integers **little-endian** unless stated. Offsets are from start of file.
 
 When **image type = 0** and **`m_savePalette` is false** (default for generic bitmap):
 
-1. **`width × height` bytes** — raw indices in **column-major** order as stored by TRSE:
+1. **`width × height` bytes** — raw indices in **row-major** order as stored by TRSE (`LImageQImage::SaveBin`: `data[x + y*width]`):
 
    ```text
    index at file offset k (within payload) maps to:
      x = k % width
-     y = k / width
+     y = k // width
    ```
 
    with **`width = 320`**, **`height = 200`** for v1.
@@ -61,7 +61,7 @@ When **image type = 0** and **`m_savePalette` is false** (default for generic bi
 
 **Indexed colour → RGBA for PNG:** TRSE uses `LColorList` type **C64**. For export, use the same palette as TRSE’s C64 colour list (implementations should either embed TRSE’s RGB values from `lcolorlist` / theme data or ship a static 256×RGB table matching the IDE). **v1 shortcut:** treat indices as positions into the **16-colour C64 palette** for indices 0–15 and map 16–255 to black or a fixed extended table — *document whichever you choose* and prefer importing a **reference `.flf`** from TRSE to validate colours.
 
-**PNG → indices for `png2flf`:** Resize to **320×200**, quantize to **16 C64 colours** (or full 256-entry table if you embed TRSE’s palette), then write one byte per pixel in the same column-major order.
+**PNG → indices for `png2flf`:** Resize to **320×200**, quantize to **16 C64 colours** (or full 256-entry table if you embed TRSE’s palette), then write one byte per pixel in the same row-major order (`k = x + y*width`).
 
 ---
 

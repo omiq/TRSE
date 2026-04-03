@@ -4,7 +4,8 @@ Implements **`docs/flf_png_converter_spec.md`** for **QImageBitmap**: FLUFF64 (*
 
 **`flf2png`** also decodes:
 
-- **Image type 1** (MultiColorBitmap C64): **160×200** pixels, fixed layout (`MultiColorImage::SaveBin`).
+- **Image type 1** (MultiColorBitmap C64): **160×200** pixels, fixed layout (`MultiColorImage::SaveBin`, multicolor bitmask).
+- **Image type 2** (HiresBitmap C64): same **64000-byte** payload as type 1 but **320×200** — use hires `PixelChar` sampling (`m_bitMask=1`). Previously decoding hires as multicolor caused **horizontal striping / wrong colours**.
 - **Image type 10** (Sprites2): variable length (`LImageSprites2::SaveBin` — pens + sprite list). Output is a **horizontal strip** of each sprite block (24×21 hires or 12×21 multicolor per cell, TRSE header byte 0 toggles mode). Palette index **0** is exported as **transparent** in the PNG.
 
 **`png2flf`** still writes type **0** only.
