@@ -42,6 +42,7 @@ FOOTER_ID0 = 64
 FOOTER_ID1 = 69
 # limagefooter.h — saved with every .flf; TRSE uses this for MultiColorBitmap hires vs multicolor display
 FOOTER_POS_DISPLAY_MULTICOLOR = 5
+FOOTER_POS_PEN_START = 256 - 64  # LImageFooter::POS_PEN_START — pen colours in saved .flf
 PAYLOAD = WIDTH * HEIGHT
 V1_TOTAL = HEADER_PREFIX + PAYLOAD + FOOTER_SIZE
 
@@ -265,6 +266,279 @@ def build_footer() -> bytes:
 
 def rgb_for_index(idx: int) -> tuple[int, int, int]:
     return C64_PALETTE[idx & 15]
+
+
+def reverse_byte(b: int) -> int:
+    """PixelChar::reverse — TRSE flips bits in each nybble and swaps nybbles."""
+    b = b & 0xFF
+    b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4)
+    b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2)
+    b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1)
+    return b
+
+
+def flip_sprite_bit(cnt: int, p_byte: int, mask: int) -> int:
+    """PixelChar::flipSpriteBit — sprite export nibble swap for multicolor."""
+    k = p_byte & 0xFF
+    if mask == 0b1:
+        return k
+    for i in range(0, 8, 2):
+        msk = 0b11 << i
+        j = (k >> i) & 0b11
+        n = j
+        if j == 1:
+            n = 3
+        if j == 3:
+            n = 1
+        k = (k & ~msk) | (n << i)
+    return k & 0xFF
+
+
+def pixelchar_data_bytes(p: bytes) -> bytes:
+    """PixelChar::data() — 8 bytes, each row reversed."""
+    return bytes(reverse_byte(p[i]) for i in range(8))
+
+
+def color_map_to_number(c: tuple[int, int, int, int], i: int, j: int) -> int:
+    """PixelChar::colorMapToNumber — packed nybbles for multicolor screen RAM."""
+    ci = c[i] if c[i] != 255 else 0
+    cj = c[j] if c[j] != 255 else 0
+    return (ci | (cj << 4)) & 0xFF
+
+
+def parse_trse_export_ints(
+    one: Optional[int], two: Optional[int]
+) -> tuple[int, int]:
+    """
+    Match Parser::HandleExport integer handling:
+    one int N -> export1=N, param2=0; two ints A B -> export1=B, param2=A.
+    """
+    if two is not None:
+        return two, one if one is not None else 0
+    if one is not None:
+        return one, 0
+    return 0, 0
+
+
+def load_pens_from_flf_footer(raw: bytes) -> tuple[int, int, int, int]:
+    """Approximate FooterToPen for pen 0..3 (C64 export background)."""
+    foot = footer_bytes(raw)
+    if len(foot) < FOOTER_POS_PEN_START + 4:
+        return (0, 0, 0, 0)
+    pens = [0, 0, 0, 0]
+    for i in range(4):
+        val = foot[FOOTER_POS_PEN_START + i]
+        if val != 0:
+            pens[i] = val & 0xFF
+    return (pens[0], pens[1], pens[2], pens[3])
+
+
+def load_multicolor_pixelchars_from_flf(raw: bytes) -> tuple[list[tuple[bytes, tuple[int, int, int, int]]], bytes]:
+    """Parse MultiColorImage SaveBin payload from FLF (after 13-byte header)."""
+    if len(raw) < HEADER_PREFIX + MC_PAYLOAD:
+        raise ValueError("FLF too small for MultiColorImage payload")
+    blob = raw[HEADER_PREFIX : HEADER_PREFIX + MC_PAYLOAD]
+    off = 2
+    pcs: list[tuple[bytes, tuple[int, int, int, int]]] = []
+    for _ in range(MC_CHAR_WIDTH * MC_CHAR_HEIGHT):
+        base = off
+        off += MC_PIXELCHAR_BYTES
+        chunk = blob[base : base + MC_PIXELCHAR_BYTES]
+        p = chunk[0:8]
+        c = (chunk[8], chunk[9], chunk[10], chunk[11])
+        pcs.append((p, c))
+    return pcs, blob[0:2]
+
+
+def export_multicolor_bin_trse(
+    raw: bytes, out_base: Path, *, hires: bool
+) -> list[Path]:
+    """
+    MultiColorImage::ExportBin — neo_rider_data.bin + neo_rider_color.bin (multicolor)
+    or squiddy_hires_* (hires charC==1).
+    """
+    pcs, _pen2 = load_multicolor_pixelchars_from_flf(raw)
+    pens = load_pens_from_flf_footer(raw)
+    bg = pens[0]
+
+    sx, ex, sy, ey = 0, MC_CHAR_WIDTH, 0, MC_CHAR_HEIGHT
+    data = bytearray()
+    for j in range(sy, ey):
+        for i in range(sx, ex):
+            pc = pcs[i + j * MC_CHAR_WIDTH]
+            data.extend(pixelchar_data_bytes(pc[0]))
+
+    color_data = bytearray([bg & 0xFF, bg & 0xFF])
+    char_c = 1 if hires else 3
+    if char_c == 3:
+        for j in range(sy, ey):
+            for i in range(sx, ex):
+                c_tup = pcs[j * MC_CHAR_WIDTH + i][1]
+                color_data.append(color_map_to_number(c_tup, 1, 2))
+    screen_colors = bytearray()
+    for j in range(sy, ey):
+        for i in range(sx, ex):
+            c_tup = pcs[j * MC_CHAR_WIDTH + i][1]
+            c = 0
+            if char_c == 3:
+                c = c_tup[3] & 0xFF
+                if c == 255:
+                    c = 0
+            else:
+                c = color_map_to_number(c_tup, 0, 1)
+                if c == 255:
+                    c = 0
+            screen_colors.append(c)
+
+    base = str(out_base)
+    if base.lower().endswith(".bin"):
+        base = base[:-4]
+    f_data = Path(base + "_data.bin")
+    f_color = Path(base + "_color.bin")
+    f_data.write_bytes(data)
+    f_color.write_bytes(bytes(color_data) + bytes(screen_colors))
+    return [f_data, f_color]
+
+
+def export_qimage_blackwhite_type0(raw: bytes, out_path: Path) -> Path:
+    """LImageQImage::ExportBlackWhite type 0 — packed bitmap bits (non-zero pixel = 1)."""
+    if len(raw) < V1_TOTAL:
+        raise ValueError("FLF too small for QImageBitmap export")
+    payload = raw[HEADER_PREFIX : HEADER_PREFIX + PAYLOAD]
+    out = bytearray()
+    c = 0
+    cnt = 0
+    for y in range(HEIGHT):
+        for x in range(WIDTH):
+            k = x + y * WIDTH
+            p = payload[k]
+            if p != 0:
+                c |= 1 << cnt
+            cnt += 1
+            if cnt == 8:
+                out.append(c & 0xFF)
+                c = 0
+                cnt = 0
+    out_path.write_bytes(bytes(out))
+    return out_path
+
+
+def lsprite_to_qbytearray(
+    m_width: int,
+    m_height: int,
+    m_data: list[tuple[bytes, tuple[int, int, int, int]]],
+    mask: int,
+) -> bytes:
+    """
+    LSprite::ToQByteArray — limagesprites2.cpp (C64 64-byte blocks per cell).
+    m_data order matches QVector<PixelChar> in Init(w,h): size m_width*m_height*9.
+    """
+    m_pc_w = SPRITE_PC_WIDTH
+    m_pc_h = SPRITE_PC_HEIGHT
+    data = bytearray()
+    grid = [bytearray() for _ in range(m_width * (m_height + 1))]
+
+    for j in range(m_height):
+        for i in range(m_width):
+            a = bytearray()
+            idx = i * 3 + j * m_width * 3 * 3
+            a.extend(grid[i + j * m_width])
+            nx_grid = i + (j + 1) * m_width
+            yy = len(a) // 3
+            for y in range(m_pc_h):
+                for row in range(8):
+                    if yy < 21:
+                        for k in range(3):
+                            di = idx + m_width * m_pc_w * y + k
+                            p_byte = m_data[di][0][row]
+                            a.append(flip_sprite_bit(row, p_byte, mask))
+                    else:
+                        for k in range(3):
+                            di = idx + m_width * m_pc_w * y + k
+                            p_byte = m_data[di][0][row]
+                            grid[nx_grid].append(flip_sprite_bit(row, p_byte, mask))
+                    yy += 1
+            a.append(0)
+            data.extend(a)
+
+    need = m_height * m_width * 64
+    if len(data) < need:
+        data.extend(bytes(need - len(data)))
+    else:
+        data = data[:need]
+    return bytes(reverse_byte(c) for c in data)
+
+
+def export_sprites2_bin(raw: bytes, out_path: Path) -> Path:
+    """LImageSprites2::ExportBin — raw sprite binary (64 bytes per block per sprite)."""
+    if len(raw) < HEADER_PREFIX + PENS_BIN_SIZE + 1 + FOOTER_SIZE:
+        raise ValueError("FLF too small for Sprites2 export")
+    blob = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    sprites = parse_sprites2_body(blob)
+    out = bytearray()
+    for spr in sprites:
+        sx = int(spr["sx"])
+        sy = int(spr["sy"])
+        header = bytes(spr["header"])
+        mult = header[0] != 0 if len(header) > 0 else False
+        mask = 0b11 if mult else 0b1
+        pcs = spr["pcs"]
+        out.extend(lsprite_to_qbytearray(sx, sy, pcs, mask))
+    out_path.write_bytes(bytes(out))
+    return out_path
+
+
+def cmd_export_bin(
+    flf_path: Path,
+    out_path: Path,
+    param_a: Optional[int],
+    param_b: Optional[int],
+) -> None:
+    """
+    Mirror TRSE @export "in.flf" "out.bin" [int [int]] — see Parser::HandleExport.
+    """
+    raw = flf_path.read_bytes()
+    _ver, img_type, pal_type, desc = describe_flf_header(raw)
+    if pal_type != PALETTE_TYPE_C64:
+        raise ValueError(f"{desc}\nexport-bin currently supports C64 palette only.")
+
+    export1, param2 = parse_trse_export_ints(param_a, param_b)
+
+    if img_type in (IMAGE_TYPE_MULTICOLOR_C64, IMAGE_TYPE_HIRES_C64):
+        hires = img_type == IMAGE_TYPE_HIRES_C64 or (
+            img_type == IMAGE_TYPE_MULTICOLOR_C64 and multicolor_file_is_hires(raw)
+        )
+        written = export_multicolor_bin_trse(raw, out_path, hires=hires)
+        print(
+            "Wrote (MultiColorImage::ExportBin):",
+            ", ".join(str(p) for p in written),
+            file=sys.stderr,
+        )
+        return
+
+    if img_type == IMAGE_TYPE_QIMAGE:
+        # LImageQImage::ExportBin is empty in TRSE; packed 1-bpp uses ExportBlackWhite(..., type=0).
+        # Integer args are accepted for parity with @export but do not change this format.
+        if export1 != 0 or param2 != 0:
+            print(
+                f"Note: QImage export uses packed bitmap (ExportBlackWhite type 0); "
+                f"ignoring export params ({export1}, {param2}) for byte layout.",
+                file=sys.stderr,
+            )
+        written = export_qimage_blackwhite_type0(raw, out_path)
+        print(f"Wrote (QImage packed bitmap): {written}", file=sys.stderr)
+        return
+
+    if img_type == IMAGE_TYPE_SPRITES2:
+        p = export_sprites2_bin(raw, out_path)
+        print(f"Wrote (Sprites2::ExportBin): {p}", file=sys.stderr)
+        return
+
+    raise ValueError(
+        f"{desc}\nexport-bin supports image types "
+        f"{IMAGE_TYPE_QIMAGE} (QImage), {IMAGE_TYPE_MULTICOLOR_C64}/{IMAGE_TYPE_HIRES_C64} (C64 bitmap), "
+        f"or {IMAGE_TYPE_SPRITES2} (Sprites2)."
+    )
 
 
 def pixelchar_get(
@@ -608,7 +882,7 @@ def cmd_info(path: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="TRSE FLF → PNG: QImageBitmap, MultiColor C64, or Sprites2 (subset)"
+        description="TRSE FLF: PNG convert, @export-style .bin export, info (C64 subset)"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -626,12 +900,40 @@ def main() -> None:
     inf = sub.add_parser("info", help="Print FLF header (magic, types, size)")
     inf.add_argument("input", type=Path)
 
+    ex = sub.add_parser(
+        "export-bin",
+        help="Export .bin like TRSE @export (C64 bitmap → *_data.bin + *_color.bin, "
+        "QImage → packed bitmap, Sprites2 → raw sprite blocks)",
+    )
+    ex.add_argument("input", type=Path, help=".flf source file")
+    ex.add_argument(
+        "output",
+        type=Path,
+        help="Output base path (C64 bitmap: writes <base>_data.bin and <base>_color.bin)",
+    )
+    ex.add_argument(
+        "param1",
+        nargs="?",
+        type=int,
+        default=None,
+        help="First @export integer (default: 0). With two integers: first is param2 in TRSE.",
+    )
+    ex.add_argument(
+        "param2",
+        nargs="?",
+        type=int,
+        default=None,
+        help="Second @export integer (TRSE export1 when two args are given)",
+    )
+
     args = p.parse_args()
     try:
         if args.cmd == "png2flf":
             png_to_flf(args.input, args.output)
         elif args.cmd == "flf2png":
             flf_to_png(args.input, args.output)
+        elif args.cmd == "export-bin":
+            cmd_export_bin(args.input, args.output, args.param1, args.param2)
         else:
             cmd_info(args.input)
     except ValueError as e:
