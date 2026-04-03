@@ -1,15 +1,10 @@
-# flf_tool — PNG ↔ TRSE `.flf` (subset)
+# flf_tool — TRSE `.flf` helpers (PNG, `@export`-style bins, info)
 
-Implements **`docs/flf_png_converter_spec.md`** for **QImageBitmap**: FLUFF64 (**7-byte** magic), image type **0**, palette **0** (C64), **320×200** indexed pixels, 256-byte footer.
+Standalone Python 3 tool for **C64 palette** TRSE image files (FLUFF64). It does **not** require the TRSE IDE.
 
-**`flf2png`** decodes:
+**Spec:** [`docs/flf_png_converter_spec.md`](../../docs/flf_png_converter_spec.md) (QImage layout and container format).
 
-- **Type 0** (QImageBitmap): **64269** bytes.
-- **Type 1** (MultiColorBitmap C64): **12271** bytes; footer byte **5** selects hires **320×200** vs multicolor **160×200** (`POS_DISPLAY_MULTICOLOR`).
-- **Type 2** (HiresBitmap C64): same payload as type 1; **320×200** hires.
-- **Type 10** (Sprites2): variable length. Output is a **horizontal strip** of sprite blocks. Palette index **0** → transparent PNG.
-
-**`png2flf`** writes type **0** only (row-major indices, `x + y*320`).
+---
 
 ## Requirements
 
@@ -19,37 +14,82 @@ pip install pillow
 
 Python **3.8+** recommended.
 
-## Usage
+---
+
+## Subcommands
+
+| Command | Purpose |
+|--------|---------|
+| `png2flf` | PNG → `.flf` (QImageBitmap **type 0** only) |
+| `flf2png` | `.flf` → PNG (types **0**, **1**, **2**, **10** — see below) |
+| `info` | Print FLF header (version, image/palette types, size; footer hints for type 1) |
+| `export-bin` | Emit **`.bin`** files like TRSE **`@export`** for supported types |
 
 ```bash
-python3 flf_tool.py png2flf image.png out.flf
-python3 flf_tool.py flf2png image.flf out.png
-python3 flf_tool.py info image.flf
+python3 flf_tool.py png2flf   <image.png>  <out.flf>
+python3 flf_tool.py flf2png   <in.flf>      <out.png>
+python3 flf_tool.py info      <file.flf>
+python3 flf_tool.py export-bin <in.flf> <out[.bin]> [int [int]]
 ```
 
-### `export-bin` — same binaries as TRSE `@export`
+Wrong file type (e.g. **`flf2png`** on a PNG) prints a short hint instead of a raw traceback.
 
-Mirrors **`Parser::HandleExport`** → **`ExportBin`** for supported C64 types (see `source/Compiler/parser.cpp`, `multicolorimage.cpp`, `limageqimage.cpp`, `limagesprites2.cpp`):
+---
+
+## `flf2png` — supported FLF image types
+
+All expect **palette type 0** (C64).
+
+| `image_type` | Meaning | PNG output |
+|--------------|---------|------------|
+| **0** | QImageBitmap | **320×200** indexed RGB |
+| **1** | MultiColorBitmap (C64) | **160×200** (multicolor) or **320×200** (hires), from **footer byte 5** (`POS_DISPLAY_MULTICOLOR`: 0 = hires, non‑zero = multicolor) |
+| **2** | HiresBitmap | **320×200** |
+| **10** | Sprites2 | Horizontal strip of blocks; palette index **0** → transparent |
+
+---
+
+## `export-bin` — match TRSE `@export` binaries
+
+Same idea as **`Parser::HandleExport`** → **`LImage::ExportBin`** (see `source/Compiler/parser.cpp` and the image classes below).
+
+**Integer arguments** (optional): same parsing as TRSE — **one** number *N* means `export1=N`; **two** numbers *A B* mean `export1=B`, `param2=A`.
+
+### Examples (equivalent TRSE lines)
+
+```trse
+@export "neo_rider_by_the_diad.flf" "neo_rider.bin" 0
+@export "squiddy_hires.flf" "squiddy_hires.bin" 0
+@export "octo.flf" "octo.bin" 8
+```
 
 ```bash
-# C64 multicolor / hires bitmap → neo_rider_data.bin + neo_rider_color.bin
 python3 flf_tool.py export-bin neo_rider_by_the_diad.flf neo_rider.bin 0
-
-# QImage (type 0) → single packed 1-bpp file (ExportBlackWhite type 0; non-zero palette index → bit 1)
+python3 flf_tool.py export-bin squiddy_hires.flf squiddy_hires.bin 0
 python3 flf_tool.py export-bin octo.flf octo.bin 8
-
-# Sprites2 → sequential 64-byte C64 sprite blocks
-python3 flf_tool.py export-bin sprites.flf sprites.bin
 ```
 
-- **Types 1 / 2** (and type 1 with hires footer): writes **`<base>_data.bin`** and **`<base>_color.bin`** (strip `.bin` from the output path for the base name, same as TRSE).
-- **Type 0**: writes **one** file at the given path (packed bitmap, **8000** bytes for a full 320×200 screen). Integer arguments are accepted for parity with `@export` but do not change the layout (TRSE’s `LImageQImage::ExportBin` is empty; packing uses `ExportBlackWhite` type 0).
-- **Type 10**: writes **one** raw sprite binary.
+### What gets written
 
-**Note:** Pen colours for the two-byte background header in `*_color.bin` are taken from the FLF footer pen slots when present (`FooterToPen`).
+| FLF type | TRSE code path | Output files |
+|----------|----------------|--------------|
+| **1** / **2** (and type **1** with hires footer) | `MultiColorImage::ExportBin` | **`<base>_data.bin`** + **`<base>_color.bin`** — `<base>` is the output path **without** `.bin` (same as TRSE). |
+| **0** | `LImageQImage::ExportBlackWhite` **type 0** (packed 1 bpp; `ExportBin` is empty in TRSE) | **Single file** at the given path (e.g. `octo.bin`), **8000** bytes for a full 320×200 screen. Extra integer args are accepted for parity with `@export` but **do not** change the packed layout. |
+| **10** | `LImageSprites2::ExportBin` | **Single file** — sequential **64-byte** C64 sprite blocks per TRSE. |
 
-If you use the wrong subcommand (e.g. **`flf2png`** on a **PNG**), the tool prints a short hint instead of a raw traceback.
+**`*_color.bin`:** The two leading background bytes use **footer pen** values when present (`LImageFooter` / `FooterToPen`).
+
+---
+
+## `png2flf`
+
+- Resizes to **320×200**, maps pixels to the **16-colour C64** palette.
+- Writes **row-major** indices: offset `k` → `x = k % 320`, `y = k // 320` (matches `LImageQImage::SaveBin` / `LoadBin` in TRSE).
+
+---
 
 ## Limits
 
-Not every TRSE image type or export variant is implemented—only what the C++ paths above cover for C64 palette FLFs.
+- **C64 palette** FLFs only for these commands.
+- **`png2flf`** only writes **type 0** FLFs.
+- Other TRSE image types (charset-only, other platforms, etc.) are not covered unless listed above.
