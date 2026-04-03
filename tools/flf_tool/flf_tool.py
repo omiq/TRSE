@@ -30,6 +30,103 @@ FOOTER_SIZE = 256
 FOOTER_ID0 = 64
 FOOTER_ID1 = 69
 PAYLOAD = WIDTH * HEIGHT
+V1_TOTAL = HEADER_PREFIX + PAYLOAD + FOOTER_SIZE
+
+# LImage::TypeToString — source/LeLib/limage/limage.cpp (subset)
+IMAGE_TYPE_NAMES: dict[int, str] = {
+    0: "QImageBitmap",
+    1: "MultiColorBitmap (C64)",
+    2: "HiresBitmap",
+    3: "LevelEditor",
+    4: "CharMapMulticolor",
+    5: "Sprites",
+    6: "CharmapRegular",
+    7: "FullScreenChar",
+    8: "CharMapMultiColorFixed",
+    9: "VIC20_MultiColorbitmap",
+    10: "Sprites2",
+    11: "CGA",
+    12: "AMIGA320x200",
+    13: "AMIGA320x256",
+    14: "OK64_256x256",
+    15: "X16_640x480",
+    16: "NES",
+    17: "LMetaChunk",
+    18: "LevelEditorNES",
+    19: "SpritesNES",
+    20: "GAMEBOY",
+    21: "LevelEditorGameboy",
+    22: "ATARI320x200",
+    23: "HybridCharset",
+    24: "AmstradCPC",
+    25: "AmstradCPCGeneric",
+    26: "BBC",
+    27: "VGA",
+    28: "Spectrum",
+    29: "SNES",
+    30: "LevelEditorSNES",
+    31: "VZ200",
+    32: "CustomC64",
+    33: "JDH8",
+    34: "LImageGeneric",
+    35: "GenericSprites",
+    36: "CGA160x100",
+    37: "AmstradSprites",
+    38: "SNESGeneric",
+    39: "TIM",
+    40: "TVC",
+    41: "COCO3",
+    42: "THOMSON",
+    43: "TIMG",
+    44: "LevelEditorGeneric",
+    45: "AGON",
+    46: "PRIMO",
+    47: "CGA_HIRES",
+}
+
+PALETTE_TYPE_NAMES: dict[int, str] = {
+    0: "C64",
+    1: "C64_ORG",
+    2: "CGA1_LOW",
+    3: "CGA1_HIGH",
+    4: "CGA2_LOW",
+    5: "CGA2_HIGH",
+    6: "VIC20",
+    7: "PICO8",
+    8: "OK64",
+    9: "X16",
+    10: "NES",
+    11: "AMSTRADCPC",
+    12: "BBC",
+    13: "VGA",
+    14: "SPECTRUM",
+    15: "VZ200",
+    16: "DOS",
+    17: "TIM",
+    18: "TVC",
+    19: "COCO3",
+    20: "THOMSON",
+    21: "MONO",
+}
+
+
+def describe_flf_header(raw: bytes) -> tuple[int, int, int, str]:
+    """Return (version, image_type, palette_type, summary_line). Raises ValueError if too small or bad magic."""
+    if len(raw) < HEADER_PREFIX:
+        raise ValueError(
+            f"File too small ({len(raw)} bytes) to be FLUFF64 (need at least {HEADER_PREFIX} bytes for header)."
+        )
+    if raw[: len(MAGIC)] != MAGIC:
+        raise ValueError(f"Not a TRSE FLF (bad magic): expected {MAGIC!r}, got {raw[: len(MAGIC)]!r}")
+    ver = struct.unpack_from("<i", raw, len(MAGIC))[0]
+    off = len(MAGIC) + 4
+    img_type = raw[off]
+    pal_type = raw[off + 1]
+    iname = IMAGE_TYPE_NAMES.get(img_type, f"unknown({img_type})")
+    pname = PALETTE_TYPE_NAMES.get(pal_type, f"unknown({pal_type})")
+    line = f"FLUFF64 version={ver} image_type={img_type} ({iname}) palette_type={pal_type} ({pname}), file size={len(raw)} bytes"
+    return ver, img_type, pal_type, line
+
 
 # LColorList::InitC64() — source/LeLib/limage/lcolorlist.cpp (16 colours)
 C64_PALETTE: list[tuple[int, int, int]] = [
@@ -107,21 +204,24 @@ def png_to_flf(png_path: Path, flf_path: Path) -> None:
 
 def flf_to_png(flf_path: Path, png_path: Path) -> None:
     raw = flf_path.read_bytes()
-    need = HEADER_PREFIX + PAYLOAD + FOOTER_SIZE
-    if len(raw) < need:
-        raise ValueError(f"File too short ({len(raw)} bytes); expected at least {need}")
-    if raw[: len(MAGIC)] != MAGIC:
-        raise ValueError(f"Bad magic: expected {MAGIC!r}, got {raw[: len(MAGIC)]!r}")
-    ver = struct.unpack_from("<i", raw, len(MAGIC))[0]
+    ver, img_type, pal_type, desc = describe_flf_header(raw)
     if ver != VERSION:
         print(f"Warning: version is {ver}, expected {VERSION}", file=sys.stderr)
-    off = len(MAGIC) + 4
-    img_type = raw[off]
-    pal_type = raw[off + 1]
+
     if img_type != IMAGE_TYPE_QIMAGE or pal_type != PALETTE_TYPE_C64:
         raise ValueError(
-            f"Unsupported FLF for v1 tool: image_type={img_type}, palette_type={pal_type} "
-            f"(need {IMAGE_TYPE_QIMAGE}, {PALETTE_TYPE_C64}). Other TRSE image types differ."
+            f"{desc}\n\n"
+            f"This tool only decodes FLF v1: image_type={IMAGE_TYPE_QIMAGE} (QImageBitmap) and "
+            f"palette_type={PALETTE_TYPE_C64} (C64), fixed {WIDTH}x{HEIGHT} ({V1_TOTAL} bytes total).\n"
+            f"Open this file in the TRSE image editor and export, or implement SaveBin/LoadBin for "
+            f"image_type {img_type} in flf_tool (see TRSE source/LeLib/limage/)."
+        )
+
+    if len(raw) < V1_TOTAL:
+        raise ValueError(
+            f"{desc}\n\n"
+            f"Expected {V1_TOTAL} bytes for QImageBitmap 320x200 + footer, got {len(raw)}. "
+            f"File may be truncated or a different sub-format."
         )
     p0 = HEADER_PREFIX
     payload = raw[p0 : p0 + PAYLOAD]
@@ -142,6 +242,16 @@ def flf_to_png(flf_path: Path, png_path: Path) -> None:
     im.save(png_path, "PNG")
 
 
+def cmd_info(path: Path) -> None:
+    raw = path.read_bytes()
+    _ver, img_type, pal_type, line = describe_flf_header(raw)
+    print(line)
+    if img_type == IMAGE_TYPE_QIMAGE and pal_type == PALETTE_TYPE_C64:
+        print(f"  v1 tool: needs {V1_TOTAL} bytes, have {len(raw)}")
+    else:
+        print("  v1 png2flf/flf2png: not supported for this image/palette type.")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="TRSE FLF v1 (320x200 QImageBitmap, C64) ↔ PNG")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -150,15 +260,20 @@ def main() -> None:
     p2f.add_argument("input", type=Path)
     p2f.add_argument("output", type=Path)
 
-    f2p = sub.add_parser("flf2png", help="Extract PNG from .flf")
+    f2p = sub.add_parser("flf2png", help="Extract PNG from .flf (QImageBitmap 320x200 only)")
     f2p.add_argument("input", type=Path)
     f2p.add_argument("output", type=Path)
+
+    inf = sub.add_parser("info", help="Print FLF header (magic, types, size)")
+    inf.add_argument("input", type=Path)
 
     args = p.parse_args()
     if args.cmd == "png2flf":
         png_to_flf(args.input, args.output)
-    else:
+    elif args.cmd == "flf2png":
         flf_to_png(args.input, args.output)
+    else:
+        cmd_info(args.input)
 
 
 if __name__ == "__main__":
