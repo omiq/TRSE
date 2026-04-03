@@ -6,14 +6,21 @@
 #
 # Uses system liblua5.4 (bundled liblua.a is x86-64 only). Default trse.ini: /etc/trse/trse.ini
 # If offscreen fails: docker run -e QT_QPA_PLATFORM=minimal ...  or  xvfb-run docker run ...
+#
+# Parallel compile: default -j1 — qrc_resources.cpp is huge and OOMs easily.
+# Override: docker build --build-arg MAKE_JOBS=4 ...
+# resources_big: Qt RCC uses a lower-memory path for large .qrc (see QTBUG-50468).
 
 FROM debian:bookworm-slim AS builder
+
+ARG MAKE_JOBS=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     qtbase5-dev \
     qt5-qmake \
     qtdeclarative5-dev \
+    libqt5opengl5-dev \
     libgl1-mesa-dev \
     libgomp1 \
     ca-certificates \
@@ -25,13 +32,16 @@ COPY . .
 
 # Replace bundled x86 liblua link with system liblua5.4 (required on ARM).
 RUN sed -i 's|LIBS += -L$$PWD/libs/lua/ -llua -ldl|LIBS += -llua5.4 -ldl|' TRSE.pro \
+    && sed -i '/^CONFIG += c++17$/a CONFIG += resources_big' TRSE.pro \
     && qmake PREFIX=/usr TRSE.pro \
-    && make -j"$(nproc)"
+    && make -j"${MAKE_JOBS}"
 
-# Install binary + published resources (themes, ini template) like TRSE linux package.
+# Install binary + resources + built-in TRU units (@use "screen/screen", etc.).
+# Parser::HandleUseTPU looks under Util::GetSystemPrefix()+units/<System>/ (Linux: ../units from trse binary).
 RUN install -d /opt/trse/bin /opt/trse/Publish \
     && install -m755 trse /opt/trse/bin/ \
-    && cp -a Publish /opt/trse/
+    && cp -a Publish /opt/trse/ \
+    && cp -a units /opt/trse/
 
 FROM debian:bookworm-slim
 

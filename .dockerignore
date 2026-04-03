@@ -1,6 +1,10 @@
 .git
 .github
+# Exclude object files from context (smaller uploads) but keep tracked GB
+# prebuilts required by resources.qrc — qmake fails without them.
 **/*.o
+!resources/bin/gbt-player/gbt_player.o
+!resources/bin/gbt-player/gbt_player_bank1.o
 **/moc_*.cpp
 **/ui_*.h
 **/qrc_*.cpp

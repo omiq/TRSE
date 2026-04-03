@@ -31,6 +31,10 @@ void SystemTRS80CoCo::PostProcess(QString &text, QString file, QString currentDi
     if (!m_buildSuccess)
         return;
 
+    // Flat binary only: skip MAME imgtool/.dsk (not available on typical CI/API hosts).
+    if (m_projectIni->getString("output_type").toLower() == "bin")
+        return;
+
     QString tool = getEmulatorName();
     QString imgtool = QFileInfo(tool).absoluteDir().absolutePath()+"/imgtool";
 #ifdef _WIN32
