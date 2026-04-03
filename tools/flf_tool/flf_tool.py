@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-TRSE FLF (FLUFF64) v1 subset: QImageBitmap 320x200, C64 palette (type bytes 0,0).
+TRSE FLF (FLUFF64): C64 palette — QImageBitmap 320×200 (type 0,0) and
+MultiColorBitmap C64 160×200 (type 1,0) decode for flf2png; png2flf writes type 0 only.
 
 See docs/flf_png_converter_spec.md. Requires: pip install pillow
 """
@@ -23,6 +24,7 @@ MAGIC = b"FLUFF64"
 HEADER_PREFIX = len(MAGIC) + 4 + 1 + 1  # 13
 VERSION = 2
 IMAGE_TYPE_QIMAGE = 0
+IMAGE_TYPE_MULTICOLOR_C64 = 1
 PALETTE_TYPE_C64 = 0
 WIDTH = 320
 HEIGHT = 200
@@ -31,6 +33,18 @@ FOOTER_ID0 = 64
 FOOTER_ID1 = 69
 PAYLOAD = WIDTH * HEIGHT
 V1_TOTAL = HEADER_PREFIX + PAYLOAD + FOOTER_SIZE
+
+# MultiColorImage::SaveBin — source/LeLib/limage/multicolorimage.cpp
+# 2-byte header + 1000 * sizeof(PixelChar) where PixelChar is 8 + 4 = 12 bytes.
+MC_CHAR_WIDTH = 40
+MC_CHAR_HEIGHT = 25
+MC_PIXELCHAR_BYTES = 12
+MC_BITMASK = 0b11  # multicolor mode in TRSE
+MC_SCALE = 2
+MC_WIDTH = 160
+MC_HEIGHT = 200
+MC_PAYLOAD = 2 + MC_CHAR_WIDTH * MC_CHAR_HEIGHT * MC_PIXELCHAR_BYTES  # 12002
+MC_TOTAL = HEADER_PREFIX + MC_PAYLOAD + FOOTER_SIZE
 
 # LImage::TypeToString — source/LeLib/limage/limage.cpp (subset)
 IMAGE_TYPE_NAMES: dict[int, str] = {
@@ -175,6 +189,51 @@ def rgb_for_index(idx: int) -> tuple[int, int, int]:
     return C64_PALETTE[idx & 15]
 
 
+def pixelchar_get(
+    x: int, y: int, bit_mask: int, p: bytes, c: tuple[int, int, int, int]
+) -> int:
+    """Match PixelChar::get (pixelchar.cpp) — index into c[] from packed multicolor/hires bits."""
+    if x < 0 or x >= 8 or y < 0 or y >= 8:
+        return 0
+    pp = (p[y] >> x) & bit_mask
+    return c[pp]
+
+
+def flf_multicolor_to_png(raw: bytes, desc: str, png_path: Path) -> None:
+    """Decode FLF image_type=1 (MultiColorBitmap C64) — MultiColorImage::SaveBin layout."""
+    if len(raw) < MC_TOTAL:
+        raise ValueError(
+            f"{desc}\n\n"
+            f"Expected {MC_TOTAL} bytes for MultiColorBitmap C64 (160×200) + footer, got {len(raw)}."
+        )
+    p0 = HEADER_PREFIX
+    blob = raw[p0 : p0 + MC_PAYLOAD]
+    footer = raw[p0 + MC_PAYLOAD : p0 + MC_PAYLOAD + FOOTER_SIZE]
+    if len(footer) != FOOTER_SIZE:
+        raise ValueError("Footer missing or wrong size")
+    if footer[0] != FOOTER_ID0 or footer[1] != FOOTER_ID1:
+        print("Warning: footer ID bytes do not match TRSE default (64, 69)", file=sys.stderr)
+
+    # Skip 2-byte prefix (background / unused) — see MultiColorImage::LoadBin
+    off = 2
+    im = Image.new("RGBA", (MC_WIDTH, MC_HEIGHT))
+    pix = im.load()
+    for cy in range(MC_CHAR_HEIGHT):
+        for cx in range(MC_CHAR_WIDTH):
+            base = off + (cx + cy * MC_CHAR_WIDTH) * MC_PIXELCHAR_BYTES
+            pc = blob[base : base + MC_PIXELCHAR_BYTES]
+            p = pc[0:8]
+            c = (pc[8], pc[9], pc[10], pc[11])
+            for ly in range(8):
+                for lx in range(4):
+                    gx = cx * 4 + lx
+                    gy = cy * 8 + ly
+                    col_idx = pixelchar_get(MC_SCALE * lx, ly, MC_BITMASK, p, c)
+                    r, g, b = rgb_for_index(col_idx)
+                    pix[gx, gy] = (r, g, b, 255)
+    im.save(png_path, "PNG")
+
+
 def png_to_flf(png_path: Path, flf_path: Path) -> None:
     im = Image.open(png_path).convert("RGBA")
     im = im.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
@@ -208,13 +267,23 @@ def flf_to_png(flf_path: Path, png_path: Path) -> None:
     if ver != VERSION:
         print(f"Warning: version is {ver}, expected {VERSION}", file=sys.stderr)
 
-    if img_type != IMAGE_TYPE_QIMAGE or pal_type != PALETTE_TYPE_C64:
+    if pal_type != PALETTE_TYPE_C64:
         raise ValueError(
             f"{desc}\n\n"
-            f"This tool only decodes FLF v1: image_type={IMAGE_TYPE_QIMAGE} (QImageBitmap) and "
-            f"palette_type={PALETTE_TYPE_C64} (C64), fixed {WIDTH}x{HEIGHT} ({V1_TOTAL} bytes total).\n"
-            f"Open this file in the TRSE image editor and export, or implement SaveBin/LoadBin for "
-            f"image_type {img_type} in flf_tool (see TRSE source/LeLib/limage/)."
+            f"flf2png only supports palette_type={PALETTE_TYPE_C64} (C64). "
+            f"See TRSE source/LeLib/limage/ for other palette types."
+        )
+
+    if img_type == IMAGE_TYPE_MULTICOLOR_C64:
+        flf_multicolor_to_png(raw, desc, png_path)
+        return
+
+    if img_type != IMAGE_TYPE_QIMAGE:
+        raise ValueError(
+            f"{desc}\n\n"
+            f"flf2png supports image_type={IMAGE_TYPE_QIMAGE} (QImageBitmap, {V1_TOTAL} bytes) or "
+            f"{IMAGE_TYPE_MULTICOLOR_C64} (MultiColorBitmap C64, {MC_TOTAL} bytes). "
+            f"For image_type {img_type}, open in TRSE or extend flf_tool (SaveBin in TRSE source)."
         )
 
     if len(raw) < V1_TOTAL:
@@ -246,21 +315,31 @@ def cmd_info(path: Path) -> None:
     raw = path.read_bytes()
     _ver, img_type, pal_type, line = describe_flf_header(raw)
     print(line)
-    if img_type == IMAGE_TYPE_QIMAGE and pal_type == PALETTE_TYPE_C64:
-        print(f"  v1 tool: needs {V1_TOTAL} bytes, have {len(raw)}")
+    if pal_type != PALETTE_TYPE_C64:
+        print("  flf2png: palette type not supported (C64 only).")
+        return
+    if img_type == IMAGE_TYPE_QIMAGE:
+        print(f"  flf2png (QImageBitmap): expects {V1_TOTAL} bytes, have {len(raw)}")
+    elif img_type == IMAGE_TYPE_MULTICOLOR_C64:
+        print(f"  flf2png (MultiColor C64): expects {MC_TOTAL} bytes, have {len(raw)}")
     else:
-        print("  v1 png2flf/flf2png: not supported for this image/palette type.")
+        print("  flf2png: this image type is not implemented.")
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="TRSE FLF v1 (320x200 QImageBitmap, C64) ↔ PNG")
+    p = argparse.ArgumentParser(
+        description="TRSE FLF: QImageBitmap 320×200 or MultiColorBitmap C64 160×200 ↔ PNG (subset)"
+    )
     sub = p.add_subparsers(dest="cmd", required=True)
 
     p2f = sub.add_parser("png2flf", help="Convert PNG to .flf")
     p2f.add_argument("input", type=Path)
     p2f.add_argument("output", type=Path)
 
-    f2p = sub.add_parser("flf2png", help="Extract PNG from .flf (QImageBitmap 320x200 only)")
+    f2p = sub.add_parser(
+        "flf2png",
+        help="Extract PNG (.flf: QImageBitmap 320×200 or MultiColor C64 160×200)",
+    )
     f2p.add_argument("input", type=Path)
     f2p.add_argument("output", type=Path)
 

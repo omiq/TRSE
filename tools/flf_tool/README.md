@@ -1,6 +1,8 @@
-# flf_tool — PNG ↔ TRSE `.flf` (v1 subset)
+# flf_tool — PNG ↔ TRSE `.flf` (subset)
 
-Implements **`docs/flf_png_converter_spec.md`**: FLUFF64 container (**7-byte** magic), image type **0** (`QImageBitmap`), palette type **0** (C64), **320×200** indexed pixels, 256-byte footer.
+Implements **`docs/flf_png_converter_spec.md`** for **QImageBitmap**: FLUFF64 (**7-byte** magic), image type **0**, palette **0** (C64), **320×200** indexed pixels, 256-byte footer.
+
+**`flf2png`** also decodes **image type 1** (MultiColorBitmap C64): **160×200** pixels, **12271-byte** files (`MultiColorImage::SaveBin` in TRSE — 1000×12-byte `PixelChar` records + 2-byte prefix + footer). **`png2flf`** still writes type **0** only.
 
 ## Requirements
 
@@ -19,9 +21,9 @@ python3 flf_tool.py info image.flf
 ```
 
 - **png2flf:** Resizes to 320×200, maps each pixel to the nearest **C64 palette** colour (`LColorList::InitC64` in TRSE), writes column/row order matching `LImageQImage::SaveBin`.
-- **flf2png:** Only **image_type=0** (QImageBitmap), **palette_type=0** (C64), **64269-byte** files. If your `.flf` is a charset, sprite sheet, multicolor screen, etc., use **`info`** to see TRSE’s type bytes — those need a different decoder (or export from TRSE).
+- **flf2png:** **image_type=0** (QImageBitmap, **64269** bytes) or **image_type=1** (MultiColor C64, **12271** bytes), **palette_type=0**. Other types: use **`info`**, then TRSE or a future decoder.
 - **info:** Prints magic, version, image/palette type names, and file size.
 
 ## Limits
 
-Only this single FLF layout is supported. Other TRSE image types (sprites, multicolour, etc.) need different parsers.
+**png2flf** only emits QImageBitmap (type 0). **flf2png** supports types **0** and **1** (C64 multicolor screen). Sprites, charsets, other platforms, etc. need different parsers.
