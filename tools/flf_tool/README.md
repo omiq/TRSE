@@ -2,7 +2,12 @@
 
 Implements **`docs/flf_png_converter_spec.md`** for **QImageBitmap**: FLUFF64 (**7-byte** magic), image type **0**, palette **0** (C64), **320×200** indexed pixels, 256-byte footer.
 
-**`flf2png`** also decodes **image type 1** (MultiColorBitmap C64): **160×200** pixels, **12271-byte** files (`MultiColorImage::SaveBin` in TRSE — 1000×12-byte `PixelChar` records + 2-byte prefix + footer). **`png2flf`** still writes type **0** only.
+**`flf2png`** also decodes:
+
+- **Image type 1** (MultiColorBitmap C64): **160×200** pixels, fixed layout (`MultiColorImage::SaveBin`).
+- **Image type 10** (Sprites2): variable length (`LImageSprites2::SaveBin` — pens + sprite list). Output is a **horizontal strip** of each sprite block (24×21 hires or 12×21 multicolor per cell, TRSE header byte 0 toggles mode). Palette index **0** is exported as **transparent** in the PNG.
+
+**`png2flf`** still writes type **0** only.
 
 ## Requirements
 

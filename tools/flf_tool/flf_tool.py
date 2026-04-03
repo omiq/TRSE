@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-TRSE FLF (FLUFF64): C64 palette — QImageBitmap 320×200 (type 0,0) and
-MultiColorBitmap C64 160×200 (type 1,0) decode for flf2png; png2flf writes type 0 only.
+TRSE FLF (FLUFF64): C64 palette — flf2png decodes types 0 (QImageBitmap), 1 (MultiColor),
+and 10 (Sprites2). png2flf writes type 0 only.
 
 See docs/flf_png_converter_spec.md. Requires: pip install pillow
 """
@@ -12,6 +12,7 @@ import math
 import struct
 import sys
 from pathlib import Path
+from typing import Optional, Tuple
 
 try:
     from PIL import Image
@@ -25,7 +26,14 @@ HEADER_PREFIX = len(MAGIC) + 4 + 1 + 1  # 13
 VERSION = 2
 IMAGE_TYPE_QIMAGE = 0
 IMAGE_TYPE_MULTICOLOR_C64 = 1
+IMAGE_TYPE_SPRITES2 = 10
 PALETTE_TYPE_C64 = 0
+
+# LSprite — limagesprites2.h / limagesprites2.cpp
+SPRITE_HEADER_SIZE = 16
+SPRITE_PC_WIDTH = 3
+SPRITE_PC_HEIGHT = 3
+PENS_BIN_SIZE = 5  # CharsetImage::SavePensBin
 WIDTH = 320
 HEIGHT = 200
 FOOTER_SIZE = 256
@@ -199,6 +207,162 @@ def pixelchar_get(
     return c[pp]
 
 
+def lsprite_get_set_data(
+    x: float,
+    y: float,
+    bit_mask: int,
+    sx: int,
+    sy: int,
+    m_data: list[tuple[bytes, tuple[int, int, int, int]]],
+) -> Optional[Tuple[int, int, Tuple[bytes, Tuple[int, int, int, int]]]]:
+    """LSprite::GetSetData (limagesprites2.cpp) — x,y in [0,1). Returns (ix, iy_line, pc) or None."""
+    ix = x * float(sx * SPRITE_PC_WIDTH)
+    iy = y * float(sy * SPRITE_PC_HEIGHT) * 21.0 / 24.0
+    if iy < 0 or iy >= float(sy * SPRITE_PC_HEIGHT):
+        return None
+    if ix < 0 or ix >= float(sx * SPRITE_PC_WIDTH):
+        return None
+    scale = 2 if bit_mask == 0b11 else 1
+    v = int(ix) + int(iy) * SPRITE_PC_HEIGHT * sx
+    if v < 0 or v >= len(m_data):
+        return None
+    iy_line = int(iy * 8.0)
+    if iy_line > sy * 21:
+        return None
+    iy_line = iy_line & 7
+    if scale == 1:
+        ix_sub = int(ix * 8.0) & 7
+    else:
+        ix_sub = (int(ix * 8.0) // scale) & ((8 // scale) - 1)
+        ix_sub = ix_sub * scale
+    p, c = m_data[v]
+    return ix_sub, iy_line, (p, c)
+
+
+def lsprite_get_pixel(
+    x: float,
+    y: float,
+    bit_mask: int,
+    sx: int,
+    sy: int,
+    m_data: list[tuple[bytes, tuple[int, int, int, int]]],
+) -> int:
+    """LSprite::getPixel — palette index 0..15."""
+    r = lsprite_get_set_data(x, y, bit_mask, sx, sy, m_data)
+    if r is None:
+        return 0
+    ix_sub, iy_line, (p, c) = r
+    return pixelchar_get(ix_sub, iy_line, bit_mask, p, c)
+
+
+def parse_sprites2_body(blob: bytes) -> list[dict[str, object]]:
+    """
+    After FLF header: CharsetImage::SavePensBin (5) + LImageSprites2::SaveBin.
+    Each sprite: sx, sy, 16-byte header, sx*sy*9 PixelChars (12 bytes each).
+    """
+    off = PENS_BIN_SIZE
+    if len(blob) < off + 1:
+        raise ValueError("Sprites2 FLF: truncated after pens")
+    cnt = blob[off]
+    off += 1
+    sprites: list[dict[str, object]] = []
+    if cnt == 0:
+        if off != len(blob):
+            raise ValueError(
+                f"Sprites2 FLF: expected no sprite payload ({off} bytes), got {len(blob)}"
+            )
+        return sprites
+    for _ in range(cnt):
+        if off + 2 > len(blob):
+            raise ValueError("Sprites2 FLF: truncated (sprite size)")
+        sx = blob[off]
+        sy = blob[off + 1]
+        off += 2
+        if sx == 0 or sy == 0:
+            raise ValueError("Sprites2 FLF: invalid sprite size sx/sy")
+        if off + SPRITE_HEADER_SIZE > len(blob):
+            raise ValueError("Sprites2 FLF: truncated (header)")
+        header = blob[off : off + SPRITE_HEADER_SIZE]
+        off += SPRITE_HEADER_SIZE
+        n_pc = sx * sy * SPRITE_PC_WIDTH * SPRITE_PC_HEIGHT
+        need = n_pc * MC_PIXELCHAR_BYTES
+        if off + need > len(blob):
+            raise ValueError("Sprites2 FLF: truncated (pixel data)")
+        raw_pc = blob[off : off + need]
+        off += need
+        pcs: list[tuple[bytes, tuple[int, int, int, int]]] = []
+        for c in range(n_pc):
+            base = c * MC_PIXELCHAR_BYTES
+            chunk = raw_pc[base : base + MC_PIXELCHAR_BYTES]
+            p = chunk[0:8]
+            col = (chunk[8], chunk[9], chunk[10], chunk[11])
+            pcs.append((p, col))
+        sprites.append({"sx": sx, "sy": sy, "header": header, "pcs": pcs})
+    if off != len(blob):
+        raise ValueError(
+            f"Sprites2 FLF: extra bytes after sprites ({len(blob) - off} unparsed)"
+        )
+    return sprites
+
+
+def render_sprites2_sprite_rgba(
+    spr: dict[str, object],
+) -> Image.Image:
+    """Rasterize one C64 sprite block (LSprite) to RGBA — matches editor preview sampling."""
+    sx = int(spr["sx"])
+    sy = int(spr["sy"])
+    header = bytes(spr["header"])
+    pcs = spr["pcs"]
+    multicolor = header[0] != 0 if len(header) > 0 else False
+    bit_mask = 0b11 if multicolor else 0b1
+    w_px = (12 if multicolor else 24) * sx
+    h_px = 21 * sy
+    im = Image.new("RGBA", (w_px, h_px), (0, 0, 0, 0))
+    pix = im.load()
+    assert pix is not None
+    for j in range(h_px):
+        for i in range(w_px):
+            fx = (i + 0.5) / float(w_px)
+            fy = (j + 0.5) / float(h_px)
+            col_idx = lsprite_get_pixel(fx, fy, bit_mask, sx, sy, pcs)
+            r, g, b = rgb_for_index(col_idx)
+            # TRSE: index 0 is often transparent in sprite pixels
+            if col_idx == 0:
+                pix[i, j] = (0, 0, 0, 0)
+            else:
+                pix[i, j] = (r, g, b, 255)
+    return im
+
+
+def flf_sprites2_to_png(raw: bytes, desc: str, png_path: Path) -> None:
+    """Decode FLF image_type=10 (Sprites2) — LImageSprites2::SaveBin."""
+    if len(raw) < HEADER_PREFIX + PENS_BIN_SIZE + 1 + FOOTER_SIZE:
+        raise ValueError(f"{desc}\n\nSprites2 FLF: file too short.")
+    p0 = HEADER_PREFIX
+    footer = raw[-FOOTER_SIZE:]
+    blob = raw[p0:-FOOTER_SIZE]
+    if len(footer) != FOOTER_SIZE:
+        raise ValueError("Footer missing or wrong size")
+    if footer[0] != FOOTER_ID0 or footer[1] != FOOTER_ID1:
+        print("Warning: footer ID bytes do not match TRSE default (64, 69)", file=sys.stderr)
+
+    sprites = parse_sprites2_body(blob)
+    if not sprites:
+        Image.new("RGBA", (1, 1), (0, 0, 0, 0)).save(png_path, "PNG")
+        return
+
+    rendered = [render_sprites2_sprite_rgba(s) for s in sprites]
+    gap = 1
+    total_w = sum(im.width for im in rendered) + gap * (len(rendered) - 1)
+    max_h = max(im.height for im in rendered)
+    out = Image.new("RGBA", (total_w, max_h), (0, 0, 0, 0))
+    ox = 0
+    for im in rendered:
+        out.paste(im, (ox, 0), im)
+        ox += im.width + gap
+    out.save(png_path, "PNG")
+
+
 def flf_multicolor_to_png(raw: bytes, desc: str, png_path: Path) -> None:
     """Decode FLF image_type=1 (MultiColorBitmap C64) — MultiColorImage::SaveBin layout."""
     if len(raw) < MC_TOTAL:
@@ -278,11 +442,15 @@ def flf_to_png(flf_path: Path, png_path: Path) -> None:
         flf_multicolor_to_png(raw, desc, png_path)
         return
 
+    if img_type == IMAGE_TYPE_SPRITES2:
+        flf_sprites2_to_png(raw, desc, png_path)
+        return
+
     if img_type != IMAGE_TYPE_QIMAGE:
         raise ValueError(
             f"{desc}\n\n"
-            f"flf2png supports image_type={IMAGE_TYPE_QIMAGE} (QImageBitmap, {V1_TOTAL} bytes) or "
-            f"{IMAGE_TYPE_MULTICOLOR_C64} (MultiColorBitmap C64, {MC_TOTAL} bytes). "
+            f"flf2png supports image_type={IMAGE_TYPE_QIMAGE} (QImageBitmap), "
+            f"{IMAGE_TYPE_MULTICOLOR_C64} (MultiColor C64), or {IMAGE_TYPE_SPRITES2} (Sprites2). "
             f"For image_type {img_type}, open in TRSE or extend flf_tool (SaveBin in TRSE source)."
         )
 
@@ -322,13 +490,15 @@ def cmd_info(path: Path) -> None:
         print(f"  flf2png (QImageBitmap): expects {V1_TOTAL} bytes, have {len(raw)}")
     elif img_type == IMAGE_TYPE_MULTICOLOR_C64:
         print(f"  flf2png (MultiColor C64): expects {MC_TOTAL} bytes, have {len(raw)}")
+    elif img_type == IMAGE_TYPE_SPRITES2:
+        print("  flf2png (Sprites2): variable size (pens + sprite list + 256-byte footer)")
     else:
         print("  flf2png: this image type is not implemented.")
 
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="TRSE FLF: QImageBitmap 320×200 or MultiColorBitmap C64 160×200 ↔ PNG (subset)"
+        description="TRSE FLF → PNG: QImageBitmap, MultiColor C64, or Sprites2 (subset)"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -338,7 +508,7 @@ def main() -> None:
 
     f2p = sub.add_parser(
         "flf2png",
-        help="Extract PNG (.flf: QImageBitmap 320×200 or MultiColor C64 160×200)",
+        help="Extract PNG (QImageBitmap, MultiColor C64, or Sprites2 sheet)",
     )
     f2p.add_argument("input", type=Path)
     f2p.add_argument("output", type=Path)
