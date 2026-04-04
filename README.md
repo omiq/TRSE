@@ -12,6 +12,10 @@ Turbo Rascal Syntax Error full repo
 - C++
 - Qt
 
+### Educational documentation (MkDocs)
+
+The **`retrodocs/`** directory is a **[MkDocs Material](https://squidfunk.github.io/mkdocs-material/)** site for **ide.retrogamecoders.com**-style teaching material (TRSE notes, assembly, C, BASIC placeholders). See **`retrodocs/README.md`** and **`retrodocs/docs/MAINTAINING.md`** for setup, deploy (`deploy.sh`), and how to extend it.
+
 ## Prepare
 First, clone this repo to a TRSE directory.
 
