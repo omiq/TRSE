@@ -58,13 +58,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblua5.4-0 \
     xvfb \
     ca-certificates \
+    mame \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/trse /opt/trse
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
+# getEmulatorName() -> trse.ini pokemonmini_emulator). Debian installs mame + imgtool in /usr/games/.
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && install -d /etc/trse \
-    && cp /opt/trse/Publish/publish_linux/trse.ini /etc/trse/trse.ini
+    && cp /opt/trse/Publish/publish_linux/trse.ini /etc/trse/trse.ini \
+    && grep -q '^pokemonmini_emulator' /etc/trse/trse.ini \
+    || echo 'pokemonmini_emulator = /usr/games/mame' >> /etc/trse/trse.ini
 
 ENV PATH="/opt/trse/bin:${PATH}" \
     QT_QPA_PLATFORM=offscreen \
