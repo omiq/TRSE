@@ -59,10 +59,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     ca-certificates \
     mame \
+    nasm \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/trse /opt/trse
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+# NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
 # getEmulatorName() -> trse.ini pokemonmini_emulator). Debian installs mame + imgtool in /usr/games/.
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
