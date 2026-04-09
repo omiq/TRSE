@@ -76,6 +76,8 @@ python3 flf_tool.py export-bin octo.flf octo.bin 8
 | **1** / **2** (and type **1** with hires footer) | `MultiColorImage::ExportBin` | **`<base>_data.bin`** + **`<base>_color.bin`** — `<base>` is the output path **without** `.bin` (same as TRSE). |
 | **0** | `LImageQImage::ExportBlackWhite` **type 0** (packed 1 bpp; `ExportBin` is empty in TRSE) | **Single file** at the given path (e.g. `octo.bin`), **8000** bytes for a full 320×200 screen. Extra integer args are accepted for parity with `@export` but **do not** change the packed layout. |
 | **10** | `LImageSprites2::ExportBin` | **Single file** — sequential **64-byte** C64 sprite blocks per TRSE. |
+| **11** (CGA / IBM PC) | `LImageCGA::ExportBin` | **Single file** — default **192** zero bytes + **8000** even + **8000** odd CGA B800-style planes (`limagecga.cpp`). With **`export1=1`**: **16000** bytes interleaved (80 even + 80 odd per 100 row groups). Palette **CGA1_HIGH** etc. is fine — not limited to C64 palette. |
+| **44** (LevelEditorGeneric) | `LImageLevelGeneric::ExportBin` | **Single file** — **32-byte** `CharmapGlobalData` header + **char indices only** per level (skips 16-bit/color/extra regions present in `SaveBin`). Matches TRSE “Export bin” for VGA/X86 level maps. |
 
 **`*_color.bin`:** The two leading background bytes use **footer pen** values when present (`LImageFooter` / `FooterToPen`).
 

@@ -12,6 +12,7 @@ import math
 import struct
 import sys
 from pathlib import Path
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 try:
@@ -28,7 +29,10 @@ IMAGE_TYPE_QIMAGE = 0
 IMAGE_TYPE_MULTICOLOR_C64 = 1
 IMAGE_TYPE_HIRES_C64 = 2  # StandardColorImage — MultiColorImage with m_bitMask=1, m_scale=1 (320×200)
 IMAGE_TYPE_SPRITES2 = 10
+IMAGE_TYPE_CGA = 11
+IMAGE_TYPE_LEVEL_EDITOR_GENERIC = 44
 PALETTE_TYPE_C64 = 0
+LEVEL_HEADER_SIZE = 32
 
 # LSprite — limagesprites2.h / limagesprites2.cpp
 SPRITE_HEADER_SIZE = 16
@@ -469,6 +473,128 @@ def lsprite_to_qbytearray(
     return bytes(reverse_byte(c) for c in data)
 
 
+@dataclass
+class _CharmapHeader:
+    sizex: int
+    sizey: int
+    width: int
+    height: int
+    use_colors: bool
+    is16bit: bool
+    extra_data_size: int
+
+
+def _parse_charmap_header(h32: bytes) -> _CharmapHeader:
+    if len(h32) < 32:
+        raise ValueError("Level editor header must be 32 bytes")
+    return _CharmapHeader(
+        sizex=h32[0],
+        sizey=h32[1],
+        width=h32[2],
+        height=h32[3],
+        use_colors=h32[9] == 1,
+        is16bit=h32[13] == 1,
+        extra_data_size=h32[8],
+    )
+
+
+def _per_level_savebin_bytes(meta: _CharmapHeader) -> int:
+    """Bytes per level in ImageLevelEditor::SaveBin (after header)."""
+    ds = meta.width * meta.height
+    n = ds
+    if meta.is16bit:
+        n += ds
+    if meta.use_colors:
+        n += ds
+    if meta.extra_data_size:
+        n += meta.extra_data_size
+    return n
+
+
+def export_level_editor_generic_bin(raw: bytes, out_path: Path) -> Path:
+    """
+    LImageLevelGeneric::ExportBin — 32-byte CharmapGlobalData header + per-level
+    m_CharData only (no color / 16-bit / extra), matching TRSE IDE export button.
+    """
+    blob = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    if len(blob) < LEVEL_HEADER_SIZE:
+        raise ValueError("LevelEditorGeneric FLF: payload too small")
+    meta = _parse_charmap_header(blob[:LEVEL_HEADER_SIZE])
+    ds = meta.width * meta.height
+    nlev = meta.sizex * meta.sizey
+    if nlev <= 0 or ds <= 0:
+        raise ValueError("LevelEditorGeneric FLF: invalid header (levels or dimensions)")
+    need = LEVEL_HEADER_SIZE + nlev * _per_level_savebin_bytes(meta)
+    if len(blob) < need:
+        raise ValueError(
+            f"LevelEditorGeneric FLF: need at least {need} bytes SaveBin payload, have {len(blob)}"
+        )
+    out = bytearray(blob[:LEVEL_HEADER_SIZE])
+    off = LEVEL_HEADER_SIZE
+    for _ in range(nlev):
+        out.extend(blob[off : off + ds])
+        off += ds
+        if meta.is16bit:
+            off += ds
+        if meta.use_colors:
+            off += ds
+        if meta.extra_data_size:
+            off += meta.extra_data_size
+    # Skip optional charset filename trailer (AppendSaveBinCharsetFilename)
+    out_path.write_bytes(bytes(out))
+    return out_path
+
+
+def cga_payload_to_b800_planes(payload: bytes) -> tuple[bytes, bytes]:
+    """
+    LImageCGA::toCGA — pack 320×200 palette indices into even/odd CGA planes
+    (80 bytes × 100 rows each): even scanlines y%2==0, odd scanlines y%2==1.
+    """
+    if len(payload) < PAYLOAD:
+        raise ValueError(f"CGA FLF: need {PAYLOAD} index bytes, have {len(payload)}")
+    payload = payload[:PAYLOAD]
+    even = bytearray()
+    odd = bytearray()
+    for y in range(HEIGHT):
+        for x_block in range(80):
+            cur = 0
+            for cur_c in range(4):
+                x = x_block * 4 + cur_c
+                idx = payload[x + y * WIDTH] & 0xFF
+                cur |= (idx & 0xFF) << (6 - cur_c * 2)
+            b = cur & 0xFF
+            if (y & 1) == 0:
+                even.append(b)
+            else:
+                odd.append(b)
+    return bytes(even), bytes(odd)
+
+
+def export_cga_bin(raw: bytes, out_path: Path, *, chunky: bool) -> Path:
+    """
+    LImageCGA::ExportBin — default: 192 zero pad + 8000 even + 8000 odd B800-style planes.
+    If chunky (export1==1): 16000 bytes interleaved 80 even + 80 odd per row group.
+    """
+    payload = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    if len(payload) < PAYLOAD:
+        raise ValueError(f"CGA FLF: need {PAYLOAD} byte QImage SaveBin payload, have {len(payload)}")
+    even, odd = cga_payload_to_b800_planes(payload)
+    if len(even) != 8000 or len(odd) != 8000:
+        raise ValueError("CGA internal: unexpected plane size")
+    if chunky:
+        out = bytearray()
+        for i in range(100):
+            out.extend(even[i * 80 : (i + 1) * 80])
+            out.extend(odd[i * 80 : (i + 1) * 80])
+        out_path.write_bytes(bytes(out))
+        return out_path
+    out = bytearray(192)
+    out.extend(even)
+    out.extend(odd)
+    out_path.write_bytes(bytes(out))
+    return out_path
+
+
 def export_sprites2_bin(raw: bytes, out_path: Path) -> Path:
     """LImageSprites2::ExportBin — raw sprite binary (64 bytes per block per sprite)."""
     if len(raw) < HEADER_PREFIX + PENS_BIN_SIZE + 1 + FOOTER_SIZE:
@@ -499,10 +625,39 @@ def cmd_export_bin(
     """
     raw = flf_path.read_bytes()
     _ver, img_type, pal_type, desc = describe_flf_header(raw)
-    if pal_type != PALETTE_TYPE_C64:
-        raise ValueError(f"{desc}\nexport-bin currently supports C64 palette only.")
-
     export1, param2 = parse_trse_export_ints(param_a, param_b)
+
+    # IBM / PC — CGA (QImage) and Level editor generic: non-C64 palettes are valid in TRSE.
+    if img_type == IMAGE_TYPE_CGA:
+        p = export_cga_bin(raw, out_path, chunky=(export1 == 1))
+        mode = "chunky 16000-byte interleaved" if export1 == 1 else "B800 planes (192 pad + 8000 + 8000)"
+        print(
+            f"Wrote (LImageCGA::ExportBin, {mode}): {p}",
+            file=sys.stderr,
+        )
+        if export1 not in (0, 1) or param2 != 0:
+            print(
+                f"Note: CGA export uses export1 0=planar (default) or 1=chunky; "
+                f"got ({export1}, {param2}).",
+                file=sys.stderr,
+            )
+        return
+
+    if img_type == IMAGE_TYPE_LEVEL_EDITOR_GENERIC:
+        p = export_level_editor_generic_bin(raw, out_path)
+        print(f"Wrote (LImageLevelGeneric::ExportBin): {p}", file=sys.stderr)
+        if export1 != 0 or param2 != 0:
+            print(
+                "Note: LevelEditorGeneric ExportBin ignores @export integer params in TRSE.",
+                file=sys.stderr,
+            )
+        return
+
+    if pal_type != PALETTE_TYPE_C64:
+        raise ValueError(
+            f"{desc}\nexport-bin for this image type requires palette type 0 (C64). "
+            "Use CGA (type 11) or LevelEditorGeneric (type 44) export for IBM PC .flf files."
+        )
 
     if img_type in (IMAGE_TYPE_MULTICOLOR_C64, IMAGE_TYPE_HIRES_C64):
         hires = img_type == IMAGE_TYPE_HIRES_C64 or (
@@ -537,7 +692,8 @@ def cmd_export_bin(
     raise ValueError(
         f"{desc}\nexport-bin supports image types "
         f"{IMAGE_TYPE_QIMAGE} (QImage), {IMAGE_TYPE_MULTICOLOR_C64}/{IMAGE_TYPE_HIRES_C64} (C64 bitmap), "
-        f"or {IMAGE_TYPE_SPRITES2} (Sprites2)."
+        f"{IMAGE_TYPE_SPRITES2} (Sprites2), {IMAGE_TYPE_CGA} (CGA / IBM PC), "
+        f"or {IMAGE_TYPE_LEVEL_EDITOR_GENERIC} (level editor generic / IBM PC VGA tile maps)."
     )
 
 
@@ -882,7 +1038,7 @@ def cmd_info(path: Path) -> None:
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="TRSE FLF: PNG convert, @export-style .bin export, info (C64 subset)"
+        description="TRSE FLF: PNG convert, @export-style .bin export, info (C64 + IBM PC CGA/level editor)"
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -902,8 +1058,8 @@ def main() -> None:
 
     ex = sub.add_parser(
         "export-bin",
-        help="Export .bin like TRSE @export (C64 bitmap → *_data.bin + *_color.bin, "
-        "QImage → packed bitmap, Sprites2 → raw sprite blocks)",
+        help="Export .bin like TRSE @export (C64: multicolor/hires/sprites/QImage; "
+        "IBM PC: CGA planes or chunky; LevelEditorGeneric level bytes + header)",
     )
     ex.add_argument("input", type=Path, help=".flf source file")
     ex.add_argument(

@@ -24,7 +24,7 @@ It is derived from TRSE source (`source/LeLib/limage/limageio.cpp`, `limage.cpp`
 
 **Note (C64 MultiColorBitmap, image type 1):** The binary payload is identical for hires and multicolor; TRSE records the display mode in the **footer** at index **5** (`POS_DISPLAY_MULTICOLOR`). Tools must use that byte (or an explicit flag) to choose 320×200 vs 160×200 decoding.
 
-**Export to `*_data.bin` / `*_color.bin`:** TRSE’s `@export` directive calls `MultiColorImage::ExportBin` (see `source/LeLib/limage/multicolorimage.cpp`). The standalone **`tools/flf_tool/flf_tool.py export-bin`** subcommand replicates that layout for C64 `.flf` files.
+**Export to `*.bin`:** TRSE’s `@export` directive calls the image class’s `ExportBin` (see `multicolorimage.cpp`, `limagecga.cpp`, `limagelevelgeneric.cpp`, etc.). The standalone **`tools/flf_tool/flf_tool.py export-bin`** subcommand replicates C64 multicolor/hires, QImage packed bitmap, Sprites2, **CGA (type 11)**, and **LevelEditorGeneric (type 44)** export layouts — not only C64 palette `.flf` files.
 
 Future versions can add flags: `--type`, `--palette`, `--width/--height` once those `SaveBin`/`LoadBin` layouts are specified.
 
