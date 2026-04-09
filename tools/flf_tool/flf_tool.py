@@ -31,6 +31,8 @@ IMAGE_TYPE_HIRES_C64 = 2  # StandardColorImage — MultiColorImage with m_bitMas
 IMAGE_TYPE_SPRITES2 = 10
 IMAGE_TYPE_CGA = 11
 IMAGE_TYPE_LEVEL_EDITOR_GENERIC = 44
+IMAGE_TYPE_VGA = 27
+IMAGE_TYPE_CGA160X100 = 36
 PALETTE_TYPE_C64 = 0
 LEVEL_HEADER_SIZE = 32
 
@@ -511,6 +513,69 @@ def _per_level_savebin_bytes(meta: _CharmapHeader) -> int:
     return n
 
 
+def export_vga_bin(raw: bytes, out_path: Path) -> tuple[Path, Optional[Path]]:
+    """
+    LImageVGA::ExportBin — 320×200 raw indices, then optional .pal (toArray with first byte stripped).
+    SaveBin payload: 64000 + optional m_colorList.toArray() (1 + 3*count bytes).
+    """
+    blob = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    if len(blob) < PAYLOAD:
+        raise ValueError(f"VGA FLF: need at least {PAYLOAD} byte image payload, have {len(blob)}")
+    pixels = blob[:PAYLOAD]
+    pal_path: Optional[Path] = None
+    tail = blob[PAYLOAD:]
+    if len(tail) == 0:
+        out_path.write_bytes(pixels)
+        return out_path, None
+    n = tail[0]
+    need = 1 + n * 3
+    if len(tail) < need:
+        raise ValueError(
+            f"VGA FLF: palette tail needs {need} bytes (count={n}), have {len(tail)}"
+        )
+    pal_path = out_path.with_suffix(".pal")
+    pal_path.write_bytes(tail[1:need])
+    out_path.write_bytes(pixels)
+    return out_path, pal_path
+
+
+def export_cga160x100_bin(raw: bytes, out_path: Path, *, export1: int) -> Path:
+    """
+    LImageCGA160x100::ExportBin — export1 0: packed nybbles (d2|(d1<<4)) per pair;
+    export1 1: one byte per pixel.
+    SaveBin: 8-byte width/height (int32 LE) + w*h indices + optional palette.
+    """
+    blob = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    if len(blob) < 8:
+        raise ValueError("CGA160x100 FLF: payload too small")
+    w, h = struct.unpack_from("<ii", blob, 0)
+    if w <= 0 or h <= 0 or w > 4096 or h > 4096:
+        raise ValueError(f"CGA160x100 FLF: invalid dimensions {w}×{h}")
+    need_img = 8 + w * h
+    if len(blob) < need_img:
+        raise ValueError(
+            f"CGA160x100 FLF: need {need_img} bytes for header+image, have {len(blob)}"
+        )
+    pix = blob[8 : 8 + w * h]
+    out = bytearray()
+    if export1 == 0:
+        if w & 1:
+            raise ValueError("CGA160x100 packed export (export1=0) requires even width")
+        for y in range(h):
+            for x in range(0, w // 2):
+                d1 = pix[x * 2 + y * w]
+                d2 = pix[x * 2 + 1 + y * w]
+                out.append((d2 & 0xFF) | ((d1 & 0xFF) << 4))
+    elif export1 == 1:
+        out.extend(pix)
+    else:
+        raise ValueError(
+            "CGA160x100 ExportBin: export1 must be 0 (packed nybbles) or 1 (byte per pixel)"
+        )
+    out_path.write_bytes(bytes(out))
+    return out_path
+
+
 def export_level_editor_generic_bin(raw: bytes, out_path: Path) -> Path:
     """
     LImageLevelGeneric::ExportBin — 32-byte CharmapGlobalData header + per-level
@@ -653,10 +718,29 @@ def cmd_export_bin(
             )
         return
 
+    if img_type == IMAGE_TYPE_VGA:
+        p, pal = export_vga_bin(raw, out_path)
+        extra = f" + {pal}" if pal else ""
+        print(f"Wrote (LImageVGA::ExportBin): {p}{extra}", file=sys.stderr)
+        if export1 != 0 or param2 != 0:
+            print(
+                "Note: VGA ExportBin ignores @export integer params.",
+                file=sys.stderr,
+            )
+        return
+
+    if img_type == IMAGE_TYPE_CGA160X100:
+        p = export_cga160x100_bin(raw, out_path, export1=export1)
+        mode = "packed nybbles (export1=0)" if export1 == 0 else "byte per pixel (export1=1)"
+        print(f"Wrote (LImageCGA160x100::ExportBin, {mode}): {p}", file=sys.stderr)
+        if param2 != 0:
+            print(f"Note: ignoring param2={param2} for CGA160x100.", file=sys.stderr)
+        return
+
     if pal_type != PALETTE_TYPE_C64:
         raise ValueError(
-            f"{desc}\nexport-bin for this image type requires palette type 0 (C64). "
-            "Use CGA (type 11) or LevelEditorGeneric (type 44) export for IBM PC .flf files."
+            f"{desc}\nexport-bin for this image type requires palette type 0 (C64), "
+            "or use a supported IBM/PC type (CGA 11, VGA 27, CGA160x100 36, LevelEditorGeneric 44)."
         )
 
     if img_type in (IMAGE_TYPE_MULTICOLOR_C64, IMAGE_TYPE_HIRES_C64):
@@ -692,8 +776,9 @@ def cmd_export_bin(
     raise ValueError(
         f"{desc}\nexport-bin supports image types "
         f"{IMAGE_TYPE_QIMAGE} (QImage), {IMAGE_TYPE_MULTICOLOR_C64}/{IMAGE_TYPE_HIRES_C64} (C64 bitmap), "
-        f"{IMAGE_TYPE_SPRITES2} (Sprites2), {IMAGE_TYPE_CGA} (CGA / IBM PC), "
-        f"or {IMAGE_TYPE_LEVEL_EDITOR_GENERIC} (level editor generic / IBM PC VGA tile maps)."
+        f"{IMAGE_TYPE_SPRITES2} (Sprites2), {IMAGE_TYPE_CGA} (CGA), "
+        f"{IMAGE_TYPE_VGA} (VGA 320×200), {IMAGE_TYPE_CGA160X100} (CGA 160×100), "
+        f"or {IMAGE_TYPE_LEVEL_EDITOR_GENERIC} (level editor)."
     )
 
 

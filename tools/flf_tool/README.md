@@ -78,6 +78,8 @@ python3 flf_tool.py export-bin octo.flf octo.bin 8
 | **10** | `LImageSprites2::ExportBin` | **Single file** — sequential **64-byte** C64 sprite blocks per TRSE. |
 | **11** (CGA / IBM PC) | `LImageCGA::ExportBin` | **Single file** — default **192** zero bytes + **8000** even + **8000** odd CGA B800-style planes (`limagecga.cpp`). With **`export1=1`**: **16000** bytes interleaved (80 even + 80 odd per 100 row groups). Palette **CGA1_HIGH** etc. is fine — not limited to C64 palette. |
 | **44** (LevelEditorGeneric) | `LImageLevelGeneric::ExportBin` | **Single file** — **32-byte** `CharmapGlobalData` header + **char indices only** per level (skips 16-bit/color/extra regions present in `SaveBin`). Matches TRSE “Export bin” for VGA/X86 level maps. |
+| **27** (VGA) | `LImageVGA::ExportBin` | **`<base>.bin`** — **64000** raw indices (320×200). If the `.flf` saved a palette (`m_savePalette`), also **`<base>.pal`** — **48** bytes RGB×16 (TRSE strips the leading count byte from `toArray`). |
+| **36** (CGA160×100) | `LImageCGA160x100::ExportBin` | **Single file** — **`export1=0`** (default): packed nybbles per TRSE; **`export1=1`**: one byte per pixel. Dimensions come from the first 8 bytes of `SaveBin` (width/height int32 LE). Example: `export-bin mode.flf out.bin 0 0` (packed) or `export-bin mode.flf out.bin 0 1` (raw). |
 
 **`*_color.bin`:** The two leading background bytes use **footer pen** values when present (`LImageFooter` / `FooterToPen`).
 
