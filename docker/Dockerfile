@@ -43,6 +43,20 @@ RUN install -d /opt/trse/bin /opt/trse/Publish \
     && cp -a Publish /opt/trse/ \
     && cp -a units /opt/trse/
 
+# RGBDS (Game Boy assembler) — not in Debian bookworm main; build from
+# upstream release tarball. Produces rgbasm / rgblink / rgbfix / rgbgfx.
+# Pin version for reproducible builds.
+FROM debian:bookworm-slim AS rgbds-builder
+ARG RGBDS_VERSION=0.8.0
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential bison make gcc libpng-dev curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN set -eux \
+    && curl -fsSL "https://github.com/gbdev/rgbds/releases/download/v${RGBDS_VERSION}/rgbds-${RGBDS_VERSION}.tar.gz" -o /tmp/rgbds.tar.gz \
+    && mkdir -p /tmp/rgbds && tar -xzf /tmp/rgbds.tar.gz -C /tmp/rgbds --strip-components=1 \
+    && make -C /tmp/rgbds -j"$(nproc)" Q= \
+    && make -C /tmp/rgbds install PREFIX=/opt/rgbds
+
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -56,14 +70,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libgomp1 \
     liblua5.4-0 \
+    libpng16-16 \
     xvfb \
     ca-certificates \
     mame \
     nasm \
-    rgbds \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/trse /opt/trse
+COPY --from=rgbds-builder /opt/rgbds/bin/rgbasm /usr/local/bin/rgbasm
+COPY --from=rgbds-builder /opt/rgbds/bin/rgblink /usr/local/bin/rgblink
+COPY --from=rgbds-builder /opt/rgbds/bin/rgbfix /usr/local/bin/rgbfix
+COPY --from=rgbds-builder /opt/rgbds/bin/rgbgfx /usr/local/bin/rgbgfx
+COPY --from=rgbds-builder /opt/rgbds/share/man /usr/local/share/man
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
