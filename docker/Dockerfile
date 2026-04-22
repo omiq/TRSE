@@ -49,13 +49,16 @@ RUN install -d /opt/trse/bin /opt/trse/Publish \
 FROM debian:bookworm-slim AS rgbds-builder
 ARG RGBDS_VERSION=0.8.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential bison make gcc libpng-dev curl ca-certificates \
+    build-essential bison cmake pkg-config libpng-dev curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 RUN set -eux \
     && curl -fsSL "https://github.com/gbdev/rgbds/releases/download/v${RGBDS_VERSION}/rgbds-${RGBDS_VERSION}.tar.gz" -o /tmp/rgbds.tar.gz \
     && mkdir -p /tmp/rgbds && tar -xzf /tmp/rgbds.tar.gz -C /tmp/rgbds --strip-components=1 \
-    && make -C /tmp/rgbds -j"$(nproc)" Q= \
-    && make -C /tmp/rgbds install PREFIX=/opt/rgbds
+    && cmake -S /tmp/rgbds -B /tmp/rgbds/build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/rgbds \
+    && cmake --build /tmp/rgbds/build -j"$(nproc)" \
+    && cmake --install /tmp/rgbds/build
 
 FROM debian:bookworm-slim
 
