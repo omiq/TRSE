@@ -159,6 +159,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng16-16 \
     xvfb \
     ca-certificates \
+    curl \
     mame \
     nasm \
     && rm -rf /var/lib/apt/lists/*
@@ -174,6 +175,17 @@ COPY --from=vasm-builder  /opt/vasm/bin/vobjdump      /usr/local/bin/vobjdump
 COPY --from=cc65-builder  /opt/cc65 /opt/cc65
 COPY --from=vbcc-builder  /opt/vbcc /opt/vbcc
 ENV VBCC=/opt/vbcc
+
+# Disk-image packagers — wrap raw m68k executables into emulator-loadable
+# media so the IDE pipeline can produce .st (Atari ST floppy via
+# makeflop.py) and .adf (Amiga floppy via amitools.xdftool). Both
+# Python; pip-install into the runtime image.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip python3-setuptools \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir --break-system-packages amitools \
+    && curl -fsSL "https://raw.githubusercontent.com/bbbradsmith/makeflop.py/TwoSide/makeflop.py" -o /usr/local/bin/makeflop.py \
+    && chmod +x /usr/local/bin/makeflop.py
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
