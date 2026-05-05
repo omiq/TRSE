@@ -109,22 +109,30 @@ RUN set -eux \
     && cd /tmp/vlink \
     && make \
     && install -m755 vlink /opt/vbcc/bin/vlink
-# Unix `vc` driver config (per-target .vc files) — needed for vc m68k-* invocations
+# Unix `vc` driver config + per-target configs (aos68k, tos, …).
+# Archive layout: vbcc_unix_config/{config,...} → strip 1 to land at /opt/vbcc/config.
+# Amiga + Atari target archives have a wrapper dir + nested
+# `config/`, `targets/<arch>/{lib,include}` — flatten into /opt/vbcc
+# so paths line up with what `vc` expects ($VBCC/config/<name> +
+# $VBCC/targets/<arch>/{lib,include}).
 RUN set -eux \
+    && mkdir -p /opt/vbcc/config /opt/vbcc/targets \
     && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_unix_config.tar.gz" -o /tmp/vbcc_cfg.tar.gz \
-    && mkdir -p /opt/vbcc/config \
-    && tar -xzf /tmp/vbcc_cfg.tar.gz -C /opt/vbcc/config --strip-components=1
-# AmigaOS m68k target (LHA archive)
-RUN set -eux \
+    && tar -xzf /tmp/vbcc_cfg.tar.gz -C /opt/vbcc \
+    \
     && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_target_m68k-amigaos.lha" -o /tmp/vbcc_amigaos.lha \
-    && mkdir -p /opt/vbcc/targets/m68k-amigaos \
-    && cd /opt/vbcc/targets/m68k-amigaos \
-    && lhasa x /tmp/vbcc_amigaos.lha
-# Atari ST m68k target (tar.gz mirror)
-RUN set -eux \
+    && mkdir -p /tmp/extract_amigaos && cd /tmp/extract_amigaos \
+    && lhasa x /tmp/vbcc_amigaos.lha \
+    && cp -a /tmp/extract_amigaos/vbcc_target_m68k-amigaos/config/. /opt/vbcc/config/ 2>/dev/null || true \
+    && cp -a /tmp/extract_amigaos/vbcc_target_m68k-amigaos/targets/. /opt/vbcc/targets/ 2>/dev/null || true \
+    \
     && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_target_m68k-atari.tar.gz" -o /tmp/vbcc_atari.tar.gz \
-    && mkdir -p /opt/vbcc/targets/m68k-atari \
-    && tar -xzf /tmp/vbcc_atari.tar.gz -C /opt/vbcc/targets/m68k-atari
+    && mkdir -p /tmp/extract_atari && cd /tmp/extract_atari \
+    && tar -xzf /tmp/vbcc_atari.tar.gz \
+    && cp -a /tmp/extract_atari/vbcc_target_m68k-atari/config/. /opt/vbcc/config/ 2>/dev/null || true \
+    && cp -a /tmp/extract_atari/vbcc_target_m68k-atari/targets/. /opt/vbcc/targets/ 2>/dev/null || true \
+    \
+    && rm -rf /tmp/extract_amigaos /tmp/extract_atari /tmp/vbcc_*.lha /tmp/vbcc_*.tar.gz
 
 # RGBDS (Game Boy assembler) — not in Debian bookworm main; build from
 # upstream release tarball. Produces rgbasm / rgblink / rgbfix / rgbgfx.
@@ -210,7 +218,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && sed -i 's|^vasmm_target_dir_atarist *=.*|vasmm_target_dir_atarist = /tmp|' /etc/trse/trse.ini \
     && (grep -q '^cl65' /etc/trse/trse.ini && sed -i 's|^cl65 *=.*|cl65 = /opt/cc65/bin/cl65|' /etc/trse/trse.ini || echo 'cl65 = /opt/cc65/bin/cl65' >> /etc/trse/trse.ini)
 
-ENV PATH="/opt/trse/bin:${PATH}" \
+ENV PATH="/opt/trse/bin:/opt/vbcc/bin:${PATH}" \
     QT_QPA_PLATFORM=offscreen \
     XDG_RUNTIME_DIR=/tmp/trse-runtime
 
