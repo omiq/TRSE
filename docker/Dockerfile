@@ -43,6 +43,27 @@ RUN install -d /opt/trse/bin /opt/trse/Publish \
     && cp -a Publish /opt/trse/ \
     && cp -a units /opt/trse/
 
+# vasm — m68k cross assembler for ATARI520ST + AMIGA TRSE targets.
+# Not in Debian apt; build from upstream Volker Barthelmann sources.
+# Produces vasmm68k_mot (Motorola syntax) which TRSE invokes via the
+# `vasmm` ini key. ATARI520ST tutorials reference this binary directly.
+FROM debian:bookworm-slim AS vasm-builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+# Canonical "latest stable" tarball from Volker Barthelmann
+# (http://sun.hasenbraten.de/vasm/index.php?view=downloads). The tagged
+# server.owl.de mirror returns 404; this URL is the same source the
+# upstream docs point at and gives a current vasm.
+RUN set -eux \
+    && curl -fsSL "http://sun.hasenbraten.de/vasm/release/vasm.tar.gz" -o /tmp/vasm.tar.gz \
+    && mkdir -p /tmp/vasm && tar -xzf /tmp/vasm.tar.gz -C /tmp/vasm --strip-components=1 \
+    && cd /tmp/vasm \
+    && make CPU=m68k SYNTAX=mot \
+    && install -d /opt/vasm/bin \
+    && install -m755 vasmm68k_mot /opt/vasm/bin/vasmm68k_mot \
+    && install -m755 vobjdump      /opt/vasm/bin/vobjdump
+
 # RGBDS (Game Boy assembler) — not in Debian bookworm main; build from
 # upstream release tarball. Produces rgbasm / rgblink / rgbfix / rgbgfx.
 # Pin version for reproducible builds.
@@ -86,6 +107,8 @@ COPY --from=rgbds-builder /opt/rgbds/bin/rgblink /usr/local/bin/rgblink
 COPY --from=rgbds-builder /opt/rgbds/bin/rgbfix /usr/local/bin/rgbfix
 COPY --from=rgbds-builder /opt/rgbds/bin/rgbgfx /usr/local/bin/rgbgfx
 COPY --from=rgbds-builder /opt/rgbds/share/man /usr/local/share/man
+COPY --from=vasm-builder  /opt/vasm/bin/vasmm68k_mot /usr/local/bin/vasmm68k_mot
+COPY --from=vasm-builder  /opt/vasm/bin/vobjdump      /usr/local/bin/vobjdump
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
@@ -94,7 +117,10 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && install -d /etc/trse \
     && cp /opt/trse/Publish/publish_linux/trse.ini /etc/trse/trse.ini \
     && grep -q '^pokemonmini_emulator' /etc/trse/trse.ini \
-    || echo 'pokemonmini_emulator = /usr/games/mame' >> /etc/trse/trse.ini
+    || echo 'pokemonmini_emulator = /usr/games/mame' >> /etc/trse/trse.ini \
+    && sed -i 's|^vasmm *=.*|vasmm = /usr/local/bin/vasmm68k_mot|' /etc/trse/trse.ini \
+    && sed -i 's|^vasmm_target_dir *=.*|vasmm_target_dir = /tmp|' /etc/trse/trse.ini \
+    && sed -i 's|^vasmm_target_dir_atarist *=.*|vasmm_target_dir_atarist = /tmp|' /etc/trse/trse.ini
 
 ENV PATH="/opt/trse/bin:${PATH}" \
     QT_QPA_PLATFORM=offscreen \
