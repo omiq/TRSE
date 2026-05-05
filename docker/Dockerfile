@@ -81,6 +81,51 @@ RUN set -eux \
     && make -j"$(nproc)" PREFIX=/opt/cc65 \
     && make install PREFIX=/opt/cc65
 
+# vbcc + vlink — portable C cross compiler + linker (Volker Barthelmann).
+# Same upstream family as vasm. Produces working m68k executables for
+# AmigaOS (.exe hunk format) and Atari ST (.tos) — bypassing TRSE's
+# broken m68k Pascal codegen on EmuTOS/AROS. Compiler built from
+# source so it's native arm64; targets pulled as precompiled archives.
+# Sources: ibaug.de mirror for vbcc + phoenix.owl.de mirror for the
+# m68k targets (the canonical compilers.de paths 404 today).
+FROM debian:bookworm-slim AS vbcc-builder
+ARG VBCC_TARGET_DATE=2022-05-22
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential bison flex curl ca-certificates lhasa \
+    && rm -rf /var/lib/apt/lists/*
+# vbcc compiler (interactive Makefile prompts go to stdin via `yes ''`)
+RUN set -eux \
+    && curl -fsSL "http://www.ibaug.de/vbcc/vbcc.tar.gz" -o /tmp/vbcc.tar.gz \
+    && mkdir -p /tmp/vbcc && tar -xzf /tmp/vbcc.tar.gz -C /tmp/vbcc --strip-components=1 \
+    && cd /tmp/vbcc \
+    && mkdir -p bin \
+    && yes '' | make TARGET=m68k \
+    && install -d /opt/vbcc/bin \
+    && install -m755 bin/* /opt/vbcc/bin/
+# vlink linker (separate Volker tool, needed by vbcc m68k targets)
+RUN set -eux \
+    && curl -fsSL "http://sun.hasenbraten.de/vlink/release/vlink.tar.gz" -o /tmp/vlink.tar.gz \
+    && mkdir -p /tmp/vlink && tar -xzf /tmp/vlink.tar.gz -C /tmp/vlink --strip-components=1 \
+    && cd /tmp/vlink \
+    && make \
+    && install -m755 vlink /opt/vbcc/bin/vlink
+# Unix `vc` driver config (per-target .vc files) — needed for vc m68k-* invocations
+RUN set -eux \
+    && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_unix_config.tar.gz" -o /tmp/vbcc_cfg.tar.gz \
+    && mkdir -p /opt/vbcc/config \
+    && tar -xzf /tmp/vbcc_cfg.tar.gz -C /opt/vbcc/config --strip-components=1
+# AmigaOS m68k target (LHA archive)
+RUN set -eux \
+    && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_target_m68k-amigaos.lha" -o /tmp/vbcc_amigaos.lha \
+    && mkdir -p /opt/vbcc/targets/m68k-amigaos \
+    && cd /opt/vbcc/targets/m68k-amigaos \
+    && lhasa x /tmp/vbcc_amigaos.lha
+# Atari ST m68k target (tar.gz mirror)
+RUN set -eux \
+    && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_target_m68k-atari.tar.gz" -o /tmp/vbcc_atari.tar.gz \
+    && mkdir -p /opt/vbcc/targets/m68k-atari \
+    && tar -xzf /tmp/vbcc_atari.tar.gz -C /opt/vbcc/targets/m68k-atari
+
 # RGBDS (Game Boy assembler) — not in Debian bookworm main; build from
 # upstream release tarball. Produces rgbasm / rgblink / rgbfix / rgbgfx.
 # Pin version for reproducible builds.
@@ -127,6 +172,8 @@ COPY --from=rgbds-builder /opt/rgbds/share/man /usr/local/share/man
 COPY --from=vasm-builder  /opt/vasm/bin/vasmm68k_mot /usr/local/bin/vasmm68k_mot
 COPY --from=vasm-builder  /opt/vasm/bin/vobjdump      /usr/local/bin/vobjdump
 COPY --from=cc65-builder  /opt/cc65 /opt/cc65
+COPY --from=vbcc-builder  /opt/vbcc /opt/vbcc
+ENV VBCC=/opt/vbcc
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
