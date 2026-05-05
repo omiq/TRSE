@@ -10,3 +10,14 @@
 **/qrc_*.cpp
 **/Makefile
 **/.qmake.stash
+# Doc/markdown churn shouldn't bust the expensive Qt make layer
+# (the TRSE `builder` stage runs `COPY . .` over the full repo).
+# docker/ stays in context — final stage explicitly copies
+# stos2asc.class + entrypoint.sh from there.
+docs/
+retrodocs/
+README.md
+*.md
+LICENSE.txt
+*.icns
+*.ico
