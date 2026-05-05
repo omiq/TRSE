@@ -64,6 +64,23 @@ RUN set -eux \
     && install -m755 vasmm68k_mot /opt/vasm/bin/vasmm68k_mot \
     && install -m755 vobjdump      /opt/vasm/bin/vobjdump
 
+# cc65 — 65xx cross compiler/assembler suite (cl65, ca65, ld65, …).
+# TRSE invokes cl65 for SNES (65C816) builds. Not packaged in Debian
+# bookworm; build from upstream tag. Installs to /opt/cc65 so it
+# matches the path TRSE writes into session trse.ini (cl65 =
+# /opt/cc65/bin/cl65) without needing host bind-mounts.
+FROM debian:bookworm-slim AS cc65-builder
+ARG CC65_VERSION=V2.19
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+RUN set -eux \
+    && curl -fsSL "https://github.com/cc65/cc65/archive/refs/tags/${CC65_VERSION}.tar.gz" -o /tmp/cc65.tar.gz \
+    && mkdir -p /tmp/cc65 && tar -xzf /tmp/cc65.tar.gz -C /tmp/cc65 --strip-components=1 \
+    && cd /tmp/cc65 \
+    && make -j"$(nproc)" PREFIX=/opt/cc65 \
+    && make install PREFIX=/opt/cc65
+
 # RGBDS (Game Boy assembler) — not in Debian bookworm main; build from
 # upstream release tarball. Produces rgbasm / rgblink / rgbfix / rgbgfx.
 # Pin version for reproducible builds.
@@ -109,6 +126,7 @@ COPY --from=rgbds-builder /opt/rgbds/bin/rgbgfx /usr/local/bin/rgbgfx
 COPY --from=rgbds-builder /opt/rgbds/share/man /usr/local/share/man
 COPY --from=vasm-builder  /opt/vasm/bin/vasmm68k_mot /usr/local/bin/vasmm68k_mot
 COPY --from=vasm-builder  /opt/vasm/bin/vobjdump      /usr/local/bin/vobjdump
+COPY --from=cc65-builder  /opt/cc65 /opt/cc65
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
