@@ -138,7 +138,8 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     || echo 'pokemonmini_emulator = /usr/games/mame' >> /etc/trse/trse.ini \
     && sed -i 's|^vasmm *=.*|vasmm = /usr/local/bin/vasmm68k_mot|' /etc/trse/trse.ini \
     && sed -i 's|^vasmm_target_dir *=.*|vasmm_target_dir = /tmp|' /etc/trse/trse.ini \
-    && sed -i 's|^vasmm_target_dir_atarist *=.*|vasmm_target_dir_atarist = /tmp|' /etc/trse/trse.ini
+    && sed -i 's|^vasmm_target_dir_atarist *=.*|vasmm_target_dir_atarist = /tmp|' /etc/trse/trse.ini \
+    && (grep -q '^cl65' /etc/trse/trse.ini && sed -i 's|^cl65 *=.*|cl65 = /opt/cc65/bin/cl65|' /etc/trse/trse.ini || echo 'cl65 = /opt/cc65/bin/cl65' >> /etc/trse/trse.ini)
 
 ENV PATH="/opt/trse/bin:${PATH}" \
     QT_QPA_PLATFORM=offscreen \
