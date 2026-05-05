@@ -189,20 +189,28 @@ ENV VBCC=/opt/vbcc
 # makeflop.py) and .adf (Amiga floppy via amitools.xdftool). Both
 # Python; pip-install into the runtime image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip python3-setuptools git \
+    python3 python3-pip python3-setuptools \
+    default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir --break-system-packages amitools \
-    && pip3 install --no-cache-dir --break-system-packages git+https://github.com/fredrik-rambris/portamos.git \
     && curl -fsSL "https://raw.githubusercontent.com/bbbradsmith/makeflop.py/TwoSide/makeflop.py" -o /usr/local/bin/makeflop.py \
     && chmod +x /usr/local/bin/makeflop.py
 
-# OpenJDK headless — runs stos2asc.class for STOS BASIC binary↔ASCII
-# round-trip (the IDE writes user-friendly text + labels, then the
-# tokenizer compresses to STOS Compiler's on-disk format before
-# injecting onto the bootable disk image).
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    default-jre-headless \
-    && rm -rf /var/lib/apt/lists/*
+# AMOS tokenizer — Fredrik Rambris's portamos, distributed as a
+# runnable fat JAR (the repo is Kotlin/Gradle, not pip-installable).
+# Runs under OpenJDK headless above. Pin to a tagged release so
+# rebuilds are reproducible.
+ARG PORTAMOS_VERSION=v0.0.1-beta8
+ARG PORTAMOS_JAR=portamos-0.0.1-beta.8-all.jar
+RUN mkdir -p /opt/portamos \
+    && curl -fsSL "https://github.com/fredrik-rambris/portamos/releases/download/${PORTAMOS_VERSION}/${PORTAMOS_JAR}" \
+        -o /opt/portamos/portamos.jar \
+    && printf '#!/bin/sh\nexec java -jar /opt/portamos/portamos.jar "$@"\n' > /usr/local/bin/portamos \
+    && chmod +x /usr/local/bin/portamos
+
+# stos2asc — Java tool from STOSCoders VS Code extension. Pre-
+# processes friendly label-style text into numbered STOS .asc;
+# binary tokenize step still happens inside Hatari + STOS Compiler.
 COPY docker/stos2asc.class /opt/stos/stos2asc.class
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
