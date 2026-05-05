@@ -184,8 +184,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-setuptools \
     && rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir --break-system-packages amitools \
+    && pip3 install --no-cache-dir --break-system-packages git+https://github.com/fredrik-rambris/portamos.git \
     && curl -fsSL "https://raw.githubusercontent.com/bbbradsmith/makeflop.py/TwoSide/makeflop.py" -o /usr/local/bin/makeflop.py \
     && chmod +x /usr/local/bin/makeflop.py
+
+# OpenJDK headless — runs stos2asc.class for STOS BASIC binary↔ASCII
+# round-trip (the IDE writes user-friendly text + labels, then the
+# tokenizer compresses to STOS Compiler's on-disk format before
+# injecting onto the bootable disk image).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+COPY docker/stos2asc.class /opt/stos/stos2asc.class
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
