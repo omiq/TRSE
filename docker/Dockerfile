@@ -123,16 +123,18 @@ RUN set -eux \
     && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_target_m68k-amigaos.lha" -o /tmp/vbcc_amigaos.lha \
     && mkdir -p /tmp/extract_amigaos && cd /tmp/extract_amigaos \
     && lhasa x /tmp/vbcc_amigaos.lha \
-    && cp -a /tmp/extract_amigaos/vbcc_target_m68k-amigaos/config/. /opt/vbcc/config/ 2>/dev/null || true \
     && cp -a /tmp/extract_amigaos/vbcc_target_m68k-amigaos/targets/. /opt/vbcc/targets/ 2>/dev/null || true \
     \
     && curl -fsSL "http://phoenix.owl.de/vbcc/${VBCC_TARGET_DATE}/vbcc_target_m68k-atari.tar.gz" -o /tmp/vbcc_atari.tar.gz \
     && mkdir -p /tmp/extract_atari && cd /tmp/extract_atari \
     && tar -xzf /tmp/vbcc_atari.tar.gz \
-    && cp -a /tmp/extract_atari/vbcc_target_m68k-atari/config/. /opt/vbcc/config/ 2>/dev/null || true \
     && cp -a /tmp/extract_atari/vbcc_target_m68k-atari/targets/. /opt/vbcc/targets/ 2>/dev/null || true \
     \
     && rm -rf /tmp/extract_amigaos /tmp/extract_atari /tmp/vbcc_*.lha /tmp/vbcc_*.tar.gz
+# Note: target archives also ship Amiga-style assign-path configs
+# (`-Ivincludeos3:`) that would override vbcc_unix_config's
+# linux-friendly `$VBCC/targets/...` paths. We only copy targets/
+# from the archives (lib/+include/) — never config/.
 
 # RGBDS (Game Boy assembler) — not in Debian bookworm main; build from
 # upstream release tarball. Produces rgbasm / rgblink / rgbfix / rgbgfx.
