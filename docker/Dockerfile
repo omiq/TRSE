@@ -190,16 +190,35 @@ ENV VBCC=/opt/vbcc
 # Python; pip-install into the runtime image.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip python3-setuptools \
-    default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 RUN pip3 install --no-cache-dir --break-system-packages amitools \
     && curl -fsSL "https://raw.githubusercontent.com/bbbradsmith/makeflop.py/TwoSide/makeflop.py" -o /usr/local/bin/makeflop.py \
     && chmod +x /usr/local/bin/makeflop.py
 
+# OpenJDK 21 from Adoptium (Temurin). Debian bookworm main only ships
+# JDK 17; portamos-0.0.1-beta8.jar is compiled with class file
+# version 65 (Java 21), which 17 can't load. Tarball install keeps
+# the apt deps minimal.
+ARG TEMURIN_VERSION=21.0.5+11
+ARG TEMURIN_TAG=jdk-21.0.5%2B11
+RUN set -eux \
+    && arch="$(dpkg --print-architecture)" \
+    && case "$arch" in \
+         arm64) j_arch=aarch64 ;; \
+         amd64) j_arch=x64 ;; \
+         *) echo "unsupported arch $arch" >&2; exit 1 ;; \
+       esac \
+    && curl -fsSL "https://github.com/adoptium/temurin21-binaries/releases/download/${TEMURIN_TAG}/OpenJDK21U-jre_${j_arch}_linux_hotspot_21.0.5_11.tar.gz" \
+        -o /tmp/temurin.tar.gz \
+    && mkdir -p /opt/jvm \
+    && tar -xzf /tmp/temurin.tar.gz -C /opt/jvm --strip-components=1 \
+    && rm /tmp/temurin.tar.gz
+ENV JAVA_HOME=/opt/jvm
+ENV PATH="/opt/jvm/bin:${PATH}"
+
 # AMOS tokenizer — Fredrik Rambris's portamos, distributed as a
 # runnable fat JAR (the repo is Kotlin/Gradle, not pip-installable).
-# Runs under OpenJDK headless above. Pin to a tagged release so
-# rebuilds are reproducible.
+# Pin to a tagged release so rebuilds are reproducible.
 ARG PORTAMOS_VERSION=v0.0.1-beta8
 ARG PORTAMOS_JAR=portamos-0.0.1-beta.8-all.jar
 RUN mkdir -p /opt/portamos \
@@ -208,10 +227,13 @@ RUN mkdir -p /opt/portamos \
     && printf '#!/bin/sh\nexec java -jar /opt/portamos/portamos.jar "$@"\n' > /usr/local/bin/portamos \
     && chmod +x /usr/local/bin/portamos
 
-# stos2asc — Java tool from STOSCoders VS Code extension. Pre-
-# processes friendly label-style text into numbered STOS .asc;
-# binary tokenize step still happens inside Hatari + STOS Compiler.
-COPY docker/stos2asc.class /opt/stos/stos2asc.class
+# stos2asc — Java tool from STOSCoders VS Code extension. Class file
+# declares `package stos2asc;` so it must live at
+# /opt/stos/stos2asc/stos2asc.class for `java -cp /opt/stos stos2asc.stos2asc`
+# to load it. Wrap the invocation in a /usr/local/bin/stos2asc shim.
+COPY docker/stos2asc.class /opt/stos/stos2asc/stos2asc.class
+RUN printf '#!/bin/sh\nexec java -cp /opt/stos stos2asc.stos2asc "$@"\n' > /usr/local/bin/stos2asc \
+    && chmod +x /usr/local/bin/stos2asc
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 # NASM: x86/DOS TRSE targets invoke nasm (expected on PATH, typically /usr/bin/nasm).
 # CoCo/Dragon PostProcess looks for imgtool next to the "emulator" binary (see systemtrs80coco.cpp:
