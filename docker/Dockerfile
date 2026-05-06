@@ -160,11 +160,17 @@ RUN set -eux \
 # is dropped alongside the stock aos68k so api/vbcc/compile.php can
 # pick the KS 1.3 variant via 'vc +aos68k13' for the broadest compat
 # (AROS + KS 1.3 + KS 2.0+).
+# cp -af (force, archive) so amiga-dev's libs WIN on conflict.
+# Earlier build used cp -an which kept stock vbcc-archive vc.lib +
+# startup.o — that crashes on KS 1.3 because amiga-dev's startup13.o
+# expects amiga-dev's libnix ABI, not the stock one (Guru #81000005
+# AN_BadFreeAddr at exit). Letting amiga-dev replace the stock libs
+# also keeps startup.o / vc.lib / amiga.lib all from one matched set.
 RUN set -eux \
     && apt-get update && apt-get install -y --no-install-recommends git \
     && git clone --depth 1 https://github.com/kusma/amiga-dev /tmp/amiga-dev \
-    && cp -an /tmp/amiga-dev/targets/m68k-amigaos/include/. /opt/vbcc/targets/m68k-amigaos/include/ \
-    && cp -an /tmp/amiga-dev/targets/m68k-amigaos/lib/. /opt/vbcc/targets/m68k-amigaos/lib/ \
+    && cp -af /tmp/amiga-dev/targets/m68k-amigaos/include/. /opt/vbcc/targets/m68k-amigaos/include/ \
+    && cp -af /tmp/amiga-dev/targets/m68k-amigaos/lib/. /opt/vbcc/targets/m68k-amigaos/lib/ \
     && rm -rf /tmp/amiga-dev /var/lib/apt/lists/*
 # vbcc config for KS 1.3 builds — same toolchain as +aos68k but link
 # with startup13.o + m13.lib so libnix init stays inside the
