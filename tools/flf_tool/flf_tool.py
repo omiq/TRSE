@@ -36,6 +36,12 @@ IMAGE_TYPE_ATARI320X200 = 22
 IMAGE_TYPE_LEVEL_EDITOR_GENERIC = 44
 IMAGE_TYPE_VGA = 27
 IMAGE_TYPE_CGA160X100 = 36
+IMAGE_TYPE_SNES = 29
+SNES_DEFAULT_BANKS = 8       # LImageSNES::Initialize allocates 8 banks
+SNES_DEFAULT_W = 128         # LImageSNES constructor default
+SNES_DEFAULT_H = 128
+SNES_NESPPU_BYTES = 256      # m_nesPPU table written after bpp byte
+SNES_PAL_OUT_BYTES = 512     # ExportSNESPalette emits 256 entries × 2 bytes
 PALETTE_TYPE_C64 = 0
 LEVEL_HEADER_SIZE = 32
 
@@ -849,6 +855,131 @@ def export_atari520st_bin(
     return out_path, pal_path
 
 
+def _snes_decode_flf(raw: bytes) -> tuple[int, int, list[bytes], int, bytes]:
+    """
+    Parse SNES (image_type 29) .flf into bank pixel buffers + metadata.
+
+    Source: TRSE LImageSNES::SaveBin / LImageQImage::SaveBin / LColorList::toArray.
+    Layout after the 13-byte FLUFF64 header, before the 256-byte footer:
+        8 banks × W × H bytes (palette index per pixel)
+        toArray palette  : 1 byte count (0 → 256) + 3 × count RGB bytes
+        bpp              : 1 byte
+        m_nesPPU         : 256 bytes (palette-index table)
+
+    Width and height are not stored in the file; LImageSNES constructs at
+    128×128. Falls back to that and verifies the byte count adds up; raises
+    if not. Returns (width, height, [bank_bytes ×8], bpp, nesPPU bytes).
+    """
+    if len(raw) < HEADER_PREFIX + FOOTER_SIZE + 1 + SNES_NESPPU_BYTES + 1:
+        raise ValueError("SNES FLF: file too small")
+    body = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    nes_ppu = body[-SNES_NESPPU_BYTES:]
+    bpp = body[-(SNES_NESPPU_BYTES + 1)]
+    pal_and_banks = body[: -(SNES_NESPPU_BYTES + 1)]
+    # Walk back from the end to locate the toArray palette: count byte at
+    # banks_end → 0 means 256 colours. SNES tutorials always carry the
+    # full 256-entry InitSNESPens table (1 + 3·256 = 769 bytes).
+    pal_size_full = 1 + 3 * 256
+    if len(pal_and_banks) < pal_size_full:
+        raise ValueError("SNES FLF: palette payload too small")
+    banks_blob = pal_and_banks[:-pal_size_full]
+    expected = SNES_DEFAULT_BANKS * SNES_DEFAULT_W * SNES_DEFAULT_H
+    if len(banks_blob) != expected:
+        raise ValueError(
+            f"SNES FLF: bank section is {len(banks_blob)} bytes, "
+            f"expected {expected} (= 8 banks × {SNES_DEFAULT_W}×{SNES_DEFAULT_H}). "
+            "Non-default canvas sizes are not yet supported by flf_tool."
+        )
+    w, h = SNES_DEFAULT_W, SNES_DEFAULT_H
+    bank_size = w * h
+    banks = [banks_blob[i * bank_size : (i + 1) * bank_size] for i in range(SNES_DEFAULT_BANKS)]
+    return w, h, banks, bpp, bytes(nes_ppu)
+
+
+def _snes_pal_bytes(nes_ppu: bytes, cols: list[tuple[int, int, int]]) -> bytes:
+    """
+    LColorList::ExportSNESPalette — 256 entries × 2 bytes (15-bit RGB,
+    little-endian). For each i the palette source index is reordered with
+    skew={0,2,1,3} within its 4-entry group, then m_list[c].get15BitValue()
+    converts to SNES BGR15 (red>>3, green>>3<<5, blue>>3<<10).
+    """
+    skew = (0, 2, 1, 3)
+    out = bytearray()
+    n = len(cols)
+    for i in range(256):
+        c = nes_ppu[i - (i & 3) + skew[i & 3]]
+        if n == 0:
+            d = 0
+        else:
+            r, g, b = cols[c % n]
+            d = (r >> 3) | ((g >> 3) << 5) | ((b >> 3) << 10)
+        out.append(d & 0xFF)
+        out.append((d >> 8) & 0xFF)
+    return bytes(out)
+
+
+def _snes_bank_bitplanes(pixels: bytes, w: int, h: int, nobp: int, planes: tuple[int, int, int, int]) -> bytes:
+    """
+    LImageSNES::getBinaryExportData — 8×8 tile-major, plane-pair split,
+    matching the C++ loops exactly. Output size = w·h·nobp/8 bytes.
+    """
+    out = bytearray((w * h * nobp) // 8)
+    idx = 0
+    splits = nobp // 2
+    for y in range(0, h, 8):
+        for x in range(0, w, 8):
+            for split in range(splits):
+                for dy in range(8):
+                    for i in range(2):
+                        for dx in range(8):
+                            val = pixels[(x + dx) + (y + dy) * w]
+                            tst = i + (split * 2)
+                            bit = (val >> planes[tst]) & 1
+                            if val != 0:
+                                out[idx] |= bit << (7 - dx)
+                        idx += 1
+    return bytes(out)
+
+
+def export_snes_bin(
+    raw: bytes,
+    out_path: Path,
+    *,
+    start: int,
+    end: int,
+) -> tuple[Path, Optional[Path]]:
+    """
+    LImageSNES::ExportBin — emit `min(end, 8)` banks of bitplane-packed
+    tile data, then write the SNES palette to <out>.pal (no .bin suffix
+    in the .pal name to mirror TRSE).
+
+    `start` is m_exportParams["Start"] (1 → sprite plane order [0,1,3,2]),
+    `end` is m_exportParams["End"] (bank count). Both come from the
+    @export integer pair via Parser::HandleExport.
+    """
+    width, height, banks, bpp, nes_ppu = _snes_decode_flf(raw)
+    nobp = bpp if bpp in (2, 3, 4) else 2
+    if start == 1:
+        planes = (0, 1, 3, 2)
+    else:
+        planes = (1, 0, 2, 3)
+    no_banks = min(max(end, 1), len(banks))
+
+    out = bytearray()
+    for b in range(no_banks):
+        out.extend(_snes_bank_bitplanes(banks[b], width, height, nobp, planes))
+    out_path.write_bytes(bytes(out))
+
+    # Recover toArray palette (1 + 3·N RGB) for the .pal write.
+    body = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    pal_and_banks = body[: -(SNES_NESPPU_BYTES + 1)]
+    pal_blob = pal_and_banks[-(1 + 3 * 256):]
+    cols = _decode_palette_array(pal_blob)
+    pal_path: Optional[Path] = out_path.with_suffix(".pal")
+    pal_path.write_bytes(_snes_pal_bytes(nes_ppu, cols))
+    return out_path, pal_path
+
+
 def cmd_export_bin(
     flf_path: Path,
     out_path: Path,
@@ -861,6 +992,25 @@ def cmd_export_bin(
     raw = flf_path.read_bytes()
     _ver, img_type, pal_type, desc = describe_flf_header(raw)
     export1, param2 = parse_trse_export_ints(param_a, param_b)
+
+    if img_type == IMAGE_TYPE_SNES:
+        # Match Parser::HandleExport for SNES (img->isSnes()):
+        #   single int N -> Start=0, End=N
+        #   two ints A B -> Start=A, End=B
+        if param_b is not None:
+            start, end = (param_a or 0), (param_b or 0)
+        elif param_a is not None:
+            start, end = 0, param_a
+        else:
+            start, end = 0, 1
+        p, pal = export_snes_bin(raw, out_path, start=start, end=end)
+        extra = f" + {pal}" if pal else ""
+        print(
+            f"Wrote (LImageSNES::ExportBin, banks={min(max(end,1),SNES_DEFAULT_BANKS)}, "
+            f"sprite-planes={'yes' if start == 1 else 'no'}): {p}{extra}",
+            file=sys.stderr,
+        )
+        return
 
     # IBM / PC — CGA (QImage) and Level editor generic: non-C64 palettes are valid in TRSE.
     if img_type == IMAGE_TYPE_CGA:
@@ -963,6 +1113,7 @@ def cmd_export_bin(
         f"{IMAGE_TYPE_QIMAGE} (QImage), {IMAGE_TYPE_MULTICOLOR_C64}/{IMAGE_TYPE_HIRES_C64} (C64 bitmap), "
         f"{IMAGE_TYPE_SPRITES2} (Sprites2), {IMAGE_TYPE_CGA} (CGA), "
         f"{IMAGE_TYPE_VGA} (VGA 320×200), {IMAGE_TYPE_CGA160X100} (CGA 160×100), "
+        f"{IMAGE_TYPE_SNES} (SNES tiles/sprites), "
         f"or {IMAGE_TYPE_LEVEL_EDITOR_GENERIC} (level editor)."
     )
 
