@@ -62,7 +62,10 @@ RUN set -eux \
     && make CPU=m68k SYNTAX=mot \
     && install -d /opt/vasm/bin \
     && install -m755 vasmm68k_mot /opt/vasm/bin/vasmm68k_mot \
-    && install -m755 vobjdump      /opt/vasm/bin/vobjdump
+    && install -m755 vobjdump      /opt/vasm/bin/vobjdump \
+    && make clean \
+    && make CPU=6502 SYNTAX=oldstyle \
+    && install -m755 vasm6502_oldstyle /opt/vasm/bin/vasm6502_oldstyle
 
 # cc65 — 65xx cross compiler/assembler suite (cl65, ca65, ld65, …).
 # TRSE invokes cl65 for SNES (65C816) builds. Not packaged in Debian
@@ -93,13 +96,19 @@ ARG VBCC_TARGET_DATE=2022-05-22
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential bison flex curl ca-certificates lhasa \
     && rm -rf /var/lib/apt/lists/*
-# vbcc compiler (interactive Makefile prompts go to stdin via `yes ''`)
+# vbcc compiler (interactive Makefile prompts go to stdin via `yes '').
+# Build BOTH the m68k backend (used by Atari ST + Amiga) and the 65816
+# backend (used by the SNES target — configs + libs come from the
+# vbcc65816 r2 distribution further down). Same source tree handles
+# both targets via TARGET=<arch>; binaries are named per-target
+# (vbccm68k, vbcc65816) so they coexist in /opt/vbcc/bin.
 RUN set -eux \
     && curl -fsSL "http://www.ibaug.de/vbcc/vbcc.tar.gz" -o /tmp/vbcc.tar.gz \
     && mkdir -p /tmp/vbcc && tar -xzf /tmp/vbcc.tar.gz -C /tmp/vbcc --strip-components=1 \
     && cd /tmp/vbcc \
     && mkdir -p bin \
     && yes '' | make TARGET=m68k \
+    && yes '' | make TARGET=65816 \
     && install -d /opt/vbcc/bin \
     && install -m755 bin/* /opt/vbcc/bin/
 # vlink linker (separate Volker tool, needed by vbcc m68k targets)
@@ -135,6 +144,27 @@ RUN set -eux \
 # (`-Ivincludeos3:`) that would override vbcc_unix_config's
 # linux-friendly `$VBCC/targets/...` paths. We only copy targets/
 # from the archives (lib/+include/) — never config/.
+
+# vbcc65816 r2 — pull the SNES target's configs + libs + headers from
+# the upstream zip (ibaug.de). The included Linux binaries are x86_64
+# only and would not run on the production arm64 host, so we ignore
+# them and rely on the vbcc 65816 backend we just source-built above
+# (vbcc65816), plus vasm6502_oldstyle from the vasm-builder stage and
+# the existing source-built vlink. The lib/*.a archives are vobj-
+# format — vlink reads them on any host architecture, so portable.
+# Layout under /opt/vbcc65816/vbcc:
+#   config/{snes-mini,snes-lo,snes-hi,snes-los,snes-his,iigs,iigss,...}
+#   targets/65816-snes/{lib,include}
+#   bin/  (symlinks to /opt/vbcc/bin tools so vc finds them via $PATH)
+RUN set -eux \
+    && apt-get update && apt-get install -y --no-install-recommends unzip \
+    && curl -fsSL "http://www.ibaug.de/vbcc/vbcc65816_r2.zip" -o /tmp/vbcc65816.zip \
+    && unzip -q /tmp/vbcc65816.zip -d /tmp \
+    && mkdir -p /opt/vbcc65816/vbcc/bin \
+    && cp -a /tmp/vbcc65816/vbcc65816_linux/vbcc/config  /opt/vbcc65816/vbcc/config \
+    && cp -a /tmp/vbcc65816/vbcc65816_linux/vbcc/targets /opt/vbcc65816/vbcc/targets \
+    && rm -rf /tmp/vbcc65816 /tmp/vbcc65816.zip \
+    && rm -rf /var/lib/apt/lists/*
 
 # RGBDS (Game Boy assembler) — not in Debian bookworm main; build from
 # upstream release tarball. Produces rgbasm / rgblink / rgbfix / rgbgfx.
@@ -180,10 +210,12 @@ COPY --from=rgbds-builder /opt/rgbds/bin/rgblink /usr/local/bin/rgblink
 COPY --from=rgbds-builder /opt/rgbds/bin/rgbfix /usr/local/bin/rgbfix
 COPY --from=rgbds-builder /opt/rgbds/bin/rgbgfx /usr/local/bin/rgbgfx
 COPY --from=rgbds-builder /opt/rgbds/share/man /usr/local/share/man
-COPY --from=vasm-builder  /opt/vasm/bin/vasmm68k_mot /usr/local/bin/vasmm68k_mot
-COPY --from=vasm-builder  /opt/vasm/bin/vobjdump      /usr/local/bin/vobjdump
+COPY --from=vasm-builder  /opt/vasm/bin/vasmm68k_mot       /usr/local/bin/vasmm68k_mot
+COPY --from=vasm-builder  /opt/vasm/bin/vasm6502_oldstyle  /usr/local/bin/vasm6502_oldstyle
+COPY --from=vasm-builder  /opt/vasm/bin/vobjdump           /usr/local/bin/vobjdump
 COPY --from=cc65-builder  /opt/cc65 /opt/cc65
 COPY --from=vbcc-builder  /opt/vbcc /opt/vbcc
+COPY --from=vbcc-builder  /opt/vbcc65816 /opt/vbcc65816
 ENV VBCC=/opt/vbcc
 
 # Disk-image packagers — wrap raw m68k executables into emulator-loadable
