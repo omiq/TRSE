@@ -145,6 +145,35 @@ RUN set -eux \
 # linux-friendly `$VBCC/targets/...` paths. We only copy targets/
 # from the archives (lib/+include/) — never config/.
 
+# Overlay the m68k-amigaos target with kusma/amiga-dev's NDK headers +
+# Kickstart 1.3 runtime. The stock vbcc target archive ships only
+# stdlib headers (no <exec/types.h>, no <proto/dos.h>) and a single
+# startup.o that calls dos.library v34+ functions during libnix init —
+# fine on AROS / KS 2.0+, hangs hard on KS 1.3.
+#
+# kusma/amiga-dev bundles a full NDK header tree under
+# targets/m68k-amigaos/include and ships startup13.o + m13.lib for
+# KS 1.3 specifically. Overlay (cp -a) so any file vbcc's archive
+# already provided wins on conflict — we only add what's missing.
+#
+# A new vbcc config 'aos68k13' linked against startup13.o + m13.lib
+# is dropped alongside the stock aos68k so api/vbcc/compile.php can
+# pick the KS 1.3 variant via 'vc +aos68k13' for the broadest compat
+# (AROS + KS 1.3 + KS 2.0+).
+RUN set -eux \
+    && apt-get update && apt-get install -y --no-install-recommends git \
+    && git clone --depth 1 https://github.com/kusma/amiga-dev /tmp/amiga-dev \
+    && cp -an /tmp/amiga-dev/targets/m68k-amigaos/include/. /opt/vbcc/targets/m68k-amigaos/include/ \
+    && cp -an /tmp/amiga-dev/targets/m68k-amigaos/lib/. /opt/vbcc/targets/m68k-amigaos/lib/ \
+    && rm -rf /tmp/amiga-dev /var/lib/apt/lists/*
+# vbcc config for KS 1.3 builds — same toolchain as +aos68k but link
+# with startup13.o + m13.lib so libnix init stays inside the
+# dos.library v33 ABI.
+RUN set -eux \
+    && cp /opt/vbcc/config/aos68k /opt/vbcc/config/aos68k13 \
+    && sed -i 's|startup\.o|startup13.o|g' /opt/vbcc/config/aos68k13 \
+    && sed -i 's|-lmieee|-lm13|g'           /opt/vbcc/config/aos68k13
+
 # vbcc65816 r2 — pull the SNES target's configs + libs + headers from
 # the upstream zip (ibaug.de). The included Linux binaries are x86_64
 # only and would not run on the production arm64 host, so we ignore
