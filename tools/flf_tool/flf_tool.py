@@ -30,6 +30,9 @@ IMAGE_TYPE_MULTICOLOR_C64 = 1
 IMAGE_TYPE_HIRES_C64 = 2  # StandardColorImage — MultiColorImage with m_bitMask=1, m_scale=1 (320×200)
 IMAGE_TYPE_SPRITES2 = 10
 IMAGE_TYPE_CGA = 11
+IMAGE_TYPE_AMIGA320X200 = 12
+IMAGE_TYPE_AMIGA320X256 = 13
+IMAGE_TYPE_ATARI320X200 = 22
 IMAGE_TYPE_LEVEL_EDITOR_GENERIC = 44
 IMAGE_TYPE_VGA = 27
 IMAGE_TYPE_CGA160X100 = 36
@@ -679,6 +682,173 @@ def export_sprites2_bin(raw: bytes, out_path: Path) -> Path:
     return out_path
 
 
+def _decode_palette_array(pal_bytes: bytes) -> list[tuple[int, int, int]]:
+    """LColorList::toArray inverse — first byte = colour count (0 → 256), then RGB triples."""
+    if not pal_bytes:
+        return []
+    n = pal_bytes[0]
+    if n == 0:
+        n = 256
+    cols: list[tuple[int, int, int]] = []
+    for i in range(n):
+        base = 1 + i * 3
+        if base + 2 >= len(pal_bytes):
+            break
+        cols.append((pal_bytes[base], pal_bytes[base + 1], pal_bytes[base + 2]))
+    return cols
+
+
+def _amiga_pal_bytes(cols: list[tuple[int, int, int]]) -> bytes:
+    """LColorList::ExportAmigaPalette — 12-bit BGR per colour, big-endian word."""
+    out = bytearray()
+    for r, g, b in cols:
+        d = (b // 16) | ((g // 16) << 4) | ((r // 16) << 8)
+        out.append((d >> 8) & 0xFF)
+        out.append(d & 0xFF)
+    return bytes(out)
+
+
+def _atarist_pal_bytes(cols: list[tuple[int, int, int]]) -> bytes:
+    """LColorList::ExportAtariSTPalette — 9-bit BGR per colour, big-endian word (low 3 bits per channel ignored)."""
+    out = bytearray()
+    for r, g, b in cols:
+        d = (b // 32) | ((g // 32) << 4) | ((r // 32) << 8)
+        out.append((d >> 8) & 0xFF)
+        out.append(d & 0xFF)
+    return bytes(out)
+
+
+def _bitplane_count_from_colors(ncols: int) -> int:
+    if ncols >= 256: return 8
+    if ncols >= 128: return 7
+    if ncols >= 64:  return 6
+    if ncols >= 32:  return 5
+    if ncols >= 16:  return 4
+    if ncols >= 8:   return 3
+    if ncols >= 4:   return 2
+    return 1
+
+
+def export_amiga_bin(
+    raw: bytes,
+    out_path: Path,
+    *,
+    export1: int,
+    height: int = 256,
+) -> tuple[Path, Optional[Path]]:
+    """
+    LImageAmiga::ExportBin — interleaved (default) or non-interleaved (export1==1)
+    Amiga bitplanes. Source: TRSE LeLib/limage/limageamiga4.cpp:ExportBin.
+    Each row contributes 320/8 = 40 bytes per bitplane. Interleaved layout:
+      for y: for plane i: 40 bytes of plane[i] for row y
+    Non-interleaved (export1=1):
+      for plane i: for y: 40 bytes of plane[i] for row y
+
+    Palette goes to <out>.pal as 12-bit BGR words, big-endian (ExportAmigaPalette).
+    """
+    width = 320
+    blob = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    payload = width * height
+    if len(blob) < payload:
+        raise ValueError(
+            f"Amiga FLF: need {payload}-byte image payload, have {len(blob)}"
+        )
+    pixels = blob[:payload]
+    pal_bytes = blob[payload:]
+    cols = _decode_palette_array(pal_bytes)
+    nobp = _bitplane_count_from_colors(len(cols)) if cols else 4
+
+    plane_row = 40
+    plane_size = height * plane_row
+    planes = [bytearray(plane_size) for _ in range(nobp)]
+    for y in range(height):
+        cur_bit = 0
+        idx = y * plane_row
+        for x in range(width):
+            val = pixels[x + y * width]
+            for i in range(nobp):
+                bit = (val >> i) & 1
+                if bit:
+                    planes[i][idx] |= bit << (7 - cur_bit)
+            cur_bit += 1
+            if cur_bit == 8:
+                cur_bit = 0
+                idx += 1
+
+    out = bytearray()
+    if export1 == 1:
+        for i in range(nobp):
+            out.extend(planes[i])
+    else:
+        for y in range(height):
+            for i in range(nobp):
+                out.extend(planes[i][y * plane_row:(y + 1) * plane_row])
+
+    out_path.write_bytes(bytes(out))
+
+    pal_path: Optional[Path] = None
+    if cols:
+        pal_path = out_path.with_suffix(".pal")
+        pal_path.write_bytes(_amiga_pal_bytes(cols))
+    return out_path, pal_path
+
+
+def export_atari520st_bin(
+    raw: bytes,
+    out_path: Path,
+    *,
+    export1: int,
+) -> tuple[Path, Optional[Path]]:
+    """
+    LImageAtari520ST::ExportBin — word-interleaved bitplanes for ST low-res
+    (320×200, default 4 planes / 16 colours). Source:
+    TRSE LeLib/limage/limageatari520st.cpp:ExportBin.
+    Per 16-pixel run emits 1 word (high, low) per bitplane (interleaved).
+
+    `export1` clamps to that many planes (TRSE: `if (type!=0) nobp = min(type, nobp)`).
+    Palette → <out>.pal as 9-bit BGR big-endian words (ExportAtariSTPalette).
+    """
+    width, height = 320, 200
+    blob = raw[HEADER_PREFIX:-FOOTER_SIZE]
+    payload = width * height
+    if len(blob) < payload:
+        raise ValueError(
+            f"AtariST FLF: need {payload}-byte image payload, have {len(blob)}"
+        )
+    pixels = blob[:payload]
+    pal_bytes = blob[payload:]
+    cols = _decode_palette_array(pal_bytes)
+    nobp = _bitplane_count_from_colors(len(cols)) if cols else 4
+    if export1 != 0:
+        nobp = min(export1, nobp)
+
+    out = bytearray()
+    for y in range(height):
+        cur_bit = 0
+        is_acc = [0] * nobp
+        for x in range(width):
+            val = pixels[x + y * width]
+            for i in range(nobp):
+                bit = (val >> i) & 1
+                if bit:
+                    is_acc[i] |= bit << (15 - cur_bit)
+            cur_bit += 1
+            if cur_bit == 16:
+                cur_bit = 0
+                for i in range(nobp):
+                    out.append((is_acc[i] >> 8) & 0xFF)
+                    out.append(is_acc[i] & 0xFF)
+                is_acc = [0] * nobp
+
+    out_path.write_bytes(bytes(out))
+
+    pal_path: Optional[Path] = None
+    if cols:
+        pal_path = out_path.with_suffix(".pal")
+        pal_path.write_bytes(_atarist_pal_bytes(cols))
+    return out_path, pal_path
+
+
 def cmd_export_bin(
     flf_path: Path,
     out_path: Path,
@@ -716,6 +886,21 @@ def cmd_export_bin(
                 "Note: LevelEditorGeneric ExportBin ignores @export integer params in TRSE.",
                 file=sys.stderr,
             )
+        return
+
+    if img_type == IMAGE_TYPE_AMIGA320X200 or img_type == IMAGE_TYPE_AMIGA320X256:
+        h = 256  # TRSE LImageAmiga::ExportBin always processes 256 lines
+        p, pal = export_amiga_bin(raw, out_path, export1=export1, height=h)
+        layout = "non-interleaved planes (export1=1)" if export1 == 1 else "interleaved planes (default)"
+        extra = f" + {pal}" if pal else ""
+        print(f"Wrote (LImageAmiga::ExportBin, {layout}): {p}{extra}", file=sys.stderr)
+        return
+
+    if img_type == IMAGE_TYPE_ATARI320X200:
+        p, pal = export_atari520st_bin(raw, out_path, export1=export1)
+        plane_note = f" (clamped to {export1} planes)" if export1 != 0 else ""
+        extra = f" + {pal}" if pal else ""
+        print(f"Wrote (LImageAtari520ST::ExportBin{plane_note}): {p}{extra}", file=sys.stderr)
         return
 
     if img_type == IMAGE_TYPE_VGA:
