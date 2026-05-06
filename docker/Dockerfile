@@ -170,6 +170,12 @@ RUN set -eux \
     && apt-get update && apt-get install -y --no-install-recommends git \
     && git clone --depth 1 https://github.com/kusma/amiga-dev /tmp/amiga-dev \
     && cp -af /tmp/amiga-dev/targets/m68k-amigaos/include/. /opt/vbcc/targets/m68k-amigaos/include/ \
+    # amiga-dev keeps the NDK headers (exec/, dos/, proto/, libraries/, ...)
+    # in a parallel ndk/include_h/ tree, NOT inside include/. Flatten them
+    # into include/ so vbcc's default -I$VBCC/targets/m68k-amigaos/include
+    # resolves <exec/types.h> / <proto/dos.h> / etc. without needing a
+    # second -I in every compile command.
+    && cp -af /tmp/amiga-dev/targets/m68k-amigaos/ndk/include_h/. /opt/vbcc/targets/m68k-amigaos/include/ \
     && cp -af /tmp/amiga-dev/targets/m68k-amigaos/lib/. /opt/vbcc/targets/m68k-amigaos/lib/ \
     && rm -rf /tmp/amiga-dev /var/lib/apt/lists/*
 # vbcc config for KS 1.3 builds — same toolchain as +aos68k but link
